@@ -1,4 +1,4 @@
-from rouskinhf import import_dataset
+from rouskinhf import import_dataset, seq2int, dot2int, int2dot, int2seq
 from torch.utils.data import Dataset as TorchDataset
 from torch import nn, tensor, float32, int64, stack
 from numpy import array, ndarray
@@ -230,6 +230,10 @@ class DMSDataset(TemplateDataset):
             (0, padding_length),
             value=UKN,
         )
+        
+        # DMS is UKN where sequence is G or U
+        dms[sequences == seq2int['G']] = UKN
+        dms[sequences == seq2int['U']] = UKN
 
         return sequences, dms
 

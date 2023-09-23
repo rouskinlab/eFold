@@ -4,7 +4,7 @@ import numpy as np
 from torch import Tensor, tensor
 import wandb
 from .metrics import compute_f1, r2_score
-from .visualisation import plot_structure, plot_dms
+from .visualisation import plot_structure, plot_dms, plot_dms_padding
 from pytorch_lightning.utilities import rank_zero_only
 import os
 import pandas as pd
@@ -96,6 +96,18 @@ class PredictionLogger(pl.Callback):
             wandb.log(
                 {
                     "valid/example": wandb.Image(fig),
+                }
+            )
+
+            # plot the embedding
+            wandb.log(
+                {
+                    "valid/padding": wandb.Image(
+                        plot_dms_padding(
+                            self.valid_examples["true"][idx],
+                            self.valid_examples["pred"][idx],
+                        )
+                    )
                 }
             )
 

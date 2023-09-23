@@ -44,7 +44,7 @@ if __name__ == "__main__":
     model = create_model(
         data="dms",
         model="mlp",
-        hidden_layers=[8192, 8192, 8192, 4096, 2048, 1024, 512],
+        hidden_layers=[2048, 1024, 512],
         lr=1e-4,
         input_dim=MAX_LEN,
         embedding_dim=128,

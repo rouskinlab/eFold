@@ -52,7 +52,7 @@ class MultiLayerPerceptron(DMSModel):
                     nn.Linear(
                         hidden_layers[i], hidden_layers[i + 1], dtype=DEFAULT_FORMAT
                     ),
-                    nn.ReLU(),
+                    nn.ReLU() if i < len(hidden_layers) - 2 else nn.Identity(),
                 )
                 for i in range(len(hidden_layers) - 1)
             ],
