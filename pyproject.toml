@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools", "setuptools-git-versioning"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ['dmsensei']
+
+[project]
+name =  "dmsensei"
+version = "0.0.0"
+authors = [
+    {name = "Yves Martin", email = "yves@martin.yt"},
+    {name = "Alberic de Lajarte", email = "albericlajarte@gmail.com"},
+]
+description = "A library to build our DMS signal and RNAstructure prediction models."
+readme = "README.md"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.10"
+]
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+# add docstrings
+addopts = "--doctest-modules --doctest-glob='*.py' -v --capture=no --envfile env"
+pythonpath = [
+  "dmsensei",
+]
+testpaths = ['tests', 'dmsensei']
+junit_family = "xunit2"
