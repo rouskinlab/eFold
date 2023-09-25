@@ -21,7 +21,11 @@ class Model(pl.LightningModule):
         self.save_hyperparameters()
 
     def configure_optimizers(self):
-        return self.optimizer_fn(self.parameters(), lr=self.lr)
+        return self.optimizer_fn(
+            self.parameters(),
+            lr=self.lr,
+            weight_decay=self.weight_decay if hasattr(self, "weight_decay") else 0,
+        )
 
 
 class StructureModel(Model):
@@ -79,7 +83,8 @@ class DMSModel(Model):
         outputs = self.forward(inputs)
 
         # Compute loss
-        loss = self.loss_fn(outputs[label == UKN], label[label == UKN])
+        loss = self.loss_fn(outputs[label != UKN], label[label != UKN])
+
         r2 = mean(
             tensor(
                 [
@@ -104,7 +109,7 @@ class DMSModel(Model):
         outputs = self.forward(inputs)
 
         # Compute and log loss
-        loss = self.loss_fn(outputs[label == UKN], label[label == UKN])
+        loss = self.loss_fn(outputs[label != UKN], label[label != UKN])
 
         # Logging to TensorBoard
         self.log("train/loss", loss)

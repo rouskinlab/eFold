@@ -14,6 +14,7 @@ import wandb
 from pytorch_lightning.loggers import WandbLogger
 from ..config import UKN
 
+
 class DataModule(LightningDataModule):
     def __init__(
         self,
@@ -225,15 +226,16 @@ class DMSDataset(TemplateDataset):
         sequences = F.pad(
             nn.utils.rnn.pad_sequence(sequences, batch_first=True), (0, padding_length)
         )
+
         dms = F.pad(
             nn.utils.rnn.pad_sequence(dms, batch_first=True, padding_value=UKN),
             (0, padding_length),
             value=UKN,
         )
-        
+
         # DMS is UKN where sequence is G or U
-        dms[sequences == seq2int['G']] = UKN
-        dms[sequences == seq2int['U']] = UKN
+        dms[sequences == seq2int["G"]] = UKN
+        dms[sequences == seq2int["U"]] = UKN
 
         return sequences, dms
 

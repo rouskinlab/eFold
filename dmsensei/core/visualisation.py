@@ -69,14 +69,12 @@ def plot_dms(true_dms, pred_dms, r2=None, layout="bar", interval=100):
     return img
 
 
-
 def plot_dms_padding(true_dms, pred_dms):
-    
     fig, ax = plt.subplots()
-    
+
     pred_dms = pred_dms[true_dms == UKN]
     true_dms = true_dms[true_dms == UKN]
-    
+
     ax.scatter(true_dms, pred_dms)
     ax.set_xlabel("True DMS")
     ax.set_ylabel("Predicted DMS")
@@ -85,7 +83,6 @@ def plot_dms_padding(true_dms, pred_dms):
     fig = plt.close(fig)
 
     return img
-
 
 
 def plot_structure(true_struct, pred_struct):
