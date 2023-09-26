@@ -204,23 +204,17 @@ class DMSDataset(TemplateDataset):
         """
 
         sequences, dms = zip(*batch)
-
-        if self.zero_padding_to is None:
-            # convert list of tuples to a 2D tensor.
-            return [tensor(sequence, dtype=int64) for sequence in sequences], [
-                tensor(dm, dtype=DEFAULT_FORMAT) for dm in dms
-            ]
-
-            # return tensor(sequences, dtype=DEFAULT_FORMAT), tensor(dms, dtype=DEFAULT_FORMAT)
-
+        
+        padding_length = 0
         # Find longest sequence in batch
-        max_all_sequences_length = max([len(sequence) for sequence in sequences])
-        padding_length = self.zero_padding_to - max_all_sequences_length
+        if self.zero_padding_to != None:
+            max_all_sequences_length = max([len(sequence) for sequence in sequences])
+            padding_length = self.zero_padding_to - max_all_sequences_length
 
-        if padding_length < 0:
-            raise ValueError(
-                "The maximum sequence length of the dataset is greater than the zero padding length. Please increase the zero padding length."
-            )
+            if padding_length < 0:
+                raise ValueError(
+                    "The maximum sequence length of the dataset is greater than the zero padding length. Please increase the zero padding length."
+                )
 
         # Merge sequences (from tuple of 1D tensor to 2D tensor).
         sequences = F.pad(

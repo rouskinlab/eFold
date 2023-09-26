@@ -111,16 +111,16 @@ class PredictionLogger(pl.Callback):
                 }
             )
 
-    def on_test_start(self, trainer, pl_module):
-        if not self.wandb_log or rank_zero_only.rank != 0:
-            return
+    # def on_test_start(self, trainer, pl_module):
+    #     if not self.wandb_log or rank_zero_only.rank != 0:
+    #         return
 
-        # Load best model
-        pl_module.load_state_dict(
-            torch.load(
-                os.path.join(self.model_path, trainer.logger.experiment.name + ".pt")
-            )
-        )
+    #     # Load best model
+    #     pl_module.load_state_dict(
+    #         torch.load(
+    #             os.path.join(self.model_path, trainer.logger.experiment.name + ".pt")
+    #         )
+    #     )
 
     def on_test_batch_end(
         self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0
@@ -231,21 +231,22 @@ class PredictionLogger(pl.Callback):
 
 
 class ModelChecker(pl.Callback):
-    def __init__(self, log_every_nstep=1000):
+    def __init__(self, model, log_every_nstep=1000):
         self.step_number = 0
+        self.model = model
 
         self.log_every_nstep = log_every_nstep
 
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
-        if self.step_number % self.log_every_nstep == 0:
-            # Get all parameters
-            params = []
-            for param in pl_module.parameters():
-                params.append(param.view(-1))
-            params = torch.cat(params).cpu().detach().numpy()
+    # def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+    #     if self.step_number % self.log_every_nstep == 0:
+    #         # Get all parameters
+    #         params = []
+    #         for param in pl_module.parameters():
+    #             params.append(param.view(-1))
+    #         params = torch.cat(params).cpu().detach().numpy()
 
-            # Compute histogram
-            if rank_zero_only.rank == 0:
-                wandb.log({"model_params": wandb.Histogram(params)})
+    #         # Compute histogram
+    #         if rank_zero_only.rank == 0 and self.model in ['mlp']:
+    #             wandb.log({"model_params": wandb.Histogram(params)})
 
-        self.step_number += 1
+    #     self.step_number += 1

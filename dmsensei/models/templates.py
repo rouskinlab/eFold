@@ -82,9 +82,9 @@ class DMSModel(Model):
         inputs, label = batch
         outputs = self.forward(inputs)
 
-        # Compute loss
-        loss = self.loss_fn(outputs[label != UKN], label[label != UKN])
-
+        # Compute and log loss
+        mask = label != UKN
+        loss = self.loss_fn(outputs[mask], label[mask])
         r2 = mean(
             tensor(
                 [
@@ -105,11 +105,11 @@ class DMSModel(Model):
         #   sch.step()
 
         inputs, label = batch
-
         outputs = self.forward(inputs)
 
         # Compute and log loss
-        loss = self.loss_fn(outputs[label != UKN], label[label != UKN])
+        mask = label != UKN
+        loss = self.loss_fn(outputs[mask], label[mask])
 
         # Logging to TensorBoard
         self.log("train/loss", loss)

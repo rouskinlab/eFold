@@ -27,21 +27,23 @@ if __name__ == "__main__":
     wandb_logger = WandbLogger(project="dms")
 
     MAX_LEN = 1024
+    model = 'transformer'
+    data = 'dms'
 
     # Create dataset
     dm = DataModule(
         name="utr",
-        data="dms",
+        data=data,
         force_download=False,
         batch_size=4,
-        num_workers=1,
+        num_workers=0,
         train_split=784,
         valid_split=80,
     )
 
     model = create_model(
-        data="dms",
-        model="transformer",
+        data=data,
+        model=model,
         ntoken=5,
         n_struct=2,
         d_model=512,
@@ -62,7 +64,7 @@ if __name__ == "__main__":
         accelerator=device,
         callbacks=[  # EarlyStopping(monitor="valid/loss", mode='min', patience=5),
             PredictionLogger(data="dms"),
-            ModelChecker(log_every_nstep=1000),
+            ModelChecker(log_every_nstep=1000, model=model),
         ],
         enable_checkpointing=False,
     )
