@@ -117,7 +117,9 @@ class Transformer(DMSModel):
             src = self.transformer_encoder[i](src, src_key_padding_mask=padding_mask)
 
         output = self.output_net(src)
-        return self.sigmoid(torch.flatten(output, start_dim=1))
+        output = self.sigmoid(torch.flatten(output, start_dim=1))
+                
+        return output
 
     def configure_optimizers(self):
         # optimizer = torch.optim.SGD(self.parameters(), lr=self.lr, momentum=0.9)

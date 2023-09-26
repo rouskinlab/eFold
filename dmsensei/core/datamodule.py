@@ -228,8 +228,8 @@ class DMSDataset(TemplateDataset):
         )
 
         # DMS is UKN where sequence is G or U
-        assert dms[sequences == seq2int["G"]] == UKN, "Data is not consistent: G bases are not UKN"
-        assert dms[sequences == seq2int["U"]] == UKN, "Data is not consistent: U bases are not UKN"
+        assert set(dms[sequences == seq2int["G"]].tolist()) == set([UKN]), "Data is not consistent: G bases are not UKN. Set(dms[dms==G]) = {}".format( set(dms[sequences == seq2int["G"]]))
+        assert set(dms[sequences == seq2int["U"]].tolist()) == set([UKN]), "Data is not consistent: U bases are not UKN. Set(dms[dms==U]) = {}".format( set(dms[sequences == seq2int["U"]]))
 
         return sequences, dms
 
