@@ -63,8 +63,9 @@ def r2_score(y_true, y_pred):
     :return: R2 score
     """
 
-    y_pred = y_pred[y_true != UKN]
-    y_true = y_true[y_true != UKN]
+    mask = y_true != UKN
+    y_pred = y_pred[mask]
+    y_true = y_true[mask]
 
     return (
         1

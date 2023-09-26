@@ -18,7 +18,7 @@ import os
 from pytorch_lightning.loggers import WandbLogger
 import wandb
 import numpy as np
-
+from dmsensei.models.old import transformer_colin
 sys.path.append(os.path.abspath("."))
 # os.system('source /Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/RNA_data/env') why do you need this?
 
@@ -31,19 +31,9 @@ if __name__ == "__main__":
     data = 'dms'
 
     # Create dataset
-    dm = DataModule(
-        name="utr",
-        data=data,
-        force_download=False,
-        batch_size=4,
-        num_workers=1,
-        train_split=784,
-        valid_split=80,
-    )
-
-    model = create_model(
-        data=data,
-        model=model,
+    dm = transformer_colin.dms_seq_dataset()
+    
+    model = transformer_colin.TransformerModel(      
         ntoken=5,
         n_struct=2,
         d_model=512,
@@ -52,7 +42,6 @@ if __name__ == "__main__":
         nlayers=8,
         dropout=0.3,
         lr=1e-6,
-        comment = 'debugging',
     )
 
     wandb_logger.watch(model, log="all")

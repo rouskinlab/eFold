@@ -48,15 +48,6 @@ class Transformer(DMSModel):
         self.encoder = nn.Embedding(ntoken, d_model)
         self.pos_encoder = PositionalEncoding(d_model, dropout)
 
-        encoder_layers = TransformerEncoderLayer(
-            d_model,
-            nhead,
-            d_hid,
-            dropout,
-            batch_first=True,
-            norm_first=True,
-            activation="gelu",
-        )
         self.transformer_encoder = nn.ModuleList(
             [
                 TransformerEncoderLayer(
@@ -110,6 +101,7 @@ class Transformer(DMSModel):
         Returns:
             output Tensor of shape [seq_len, batch_size, ntoken]
         """
+        
         padding_mask = src == 0
         src = self.encoder(src) * np.sqrt(self.d_model)
         src = self.pos_encoder(src)

@@ -3,8 +3,11 @@ from ..core import metrics
 from ..core.embeddings import NUM_BASES, sequence_to_one_hot, int_dot_bracket_to_one_hot
 import torch.nn as nn
 from torch import Tensor, tensor, zeros_like, mean
+import torch
 import numpy as np
 from ..config import TEST_SETS_NAMES, UKN
+from scipy.stats.stats import pearsonr
+from rouskinhf import seq2int
 
 
 class Model(pl.LightningModule):
@@ -79,7 +82,12 @@ class DMSModel(Model):
         self.data_type = "dms"
 
     def validation_step(self, batch, batch_idx):
+        
         inputs, label = batch
+
+        mask = (inputs == seq2int['G']) | (inputs == seq2int['U'])
+        assert (label[mask] == UKN).all(), "Data is not consistent: G and U bases are not UKN."
+
         outputs = self.forward(inputs)
 
         # Compute and log loss
@@ -100,11 +108,13 @@ class DMSModel(Model):
 
         return outputs, loss
 
-    def training_step(self, batch, batch_idx):
-        #   sch = self.lr_schedulers()
-        #   sch.step()
 
+    def training_step(self, batch, batch_idx):
         inputs, label = batch
+        
+        mask = (inputs == seq2int['G']) | (inputs == seq2int['U'])
+        assert (label[mask] == UKN).all(), "Data is not consistent: G and U bases are not UKN."
+        
         outputs = self.forward(inputs)
 
         # Compute and log loss
@@ -112,9 +122,10 @@ class DMSModel(Model):
         loss = self.loss_fn(outputs[mask], label[mask])
 
         # Logging to TensorBoard
-        self.log("train/loss", loss)
+        self.log("train/loss", loss.item())
 
         return loss
+
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         inputs, label = batch

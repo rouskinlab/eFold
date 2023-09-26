@@ -154,11 +154,6 @@ class TemplateDataset(TorchDataset):
     def __len__(self) -> int:
         return len(self.sequences)
 
-    def _zero_pad(self, arr: ndarray, dtype=DEFAULT_FORMAT):
-        return nn.functional.pad(
-            tensor(arr, dtype=dtype), (0, self.zero_padding_to - len(arr)), value=0
-        )
-
     def collate_fn(self, batch):
         raise NotImplementedError("This method must be implemented in the child class")
 
@@ -187,6 +182,7 @@ class DMSDataset(TemplateDataset):
 
         assert len(sequence) == len(dms), "Data is not consistent"
 
+        
         return sequence, dms
 
     def __repr__(self) -> str:
@@ -226,10 +222,6 @@ class DMSDataset(TemplateDataset):
             (0, padding_length),
             value=UKN,
         )
-
-        # DMS is UKN where sequence is G or U
-        assert set(dms[sequences == seq2int["G"]].tolist()) == set([UKN]), "Data is not consistent: G bases are not UKN. Set(dms[dms==G]) = {}".format( set(dms[sequences == seq2int["G"]]))
-        assert set(dms[sequences == seq2int["U"]].tolist()) == set([UKN]), "Data is not consistent: U bases are not UKN. Set(dms[dms==U]) = {}".format( set(dms[sequences == seq2int["U"]]))
 
         return sequences, dms
 
