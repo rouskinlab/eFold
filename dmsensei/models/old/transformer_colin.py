@@ -110,7 +110,6 @@ class TransformerModel(pl.LightningModule):
     def __init__(
         self,
         ntoken: int,
-        n_struct: int,
         d_model: int,
         nhead: int,
         d_hid: int,
@@ -122,7 +121,6 @@ class TransformerModel(pl.LightningModule):
 
         self.lr = lr
         self.d_model = d_model
-        self.n_struct = n_struct
         self.loss = nn.MSELoss()
         # self.loss = nn.PoissonNLLLoss()
         self.save_hyperparameters()

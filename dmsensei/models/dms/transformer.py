@@ -28,7 +28,6 @@ class Transformer(DMSModel):
     def __init__(
         self,
         ntoken: int,
-        n_struct: int,
         d_model: int,
         nhead: int,
         d_hid: int,
@@ -42,8 +41,8 @@ class Transformer(DMSModel):
         super().__init__(lr=lr, loss_fn=loss_fn, optimizer_fn=optimizer_fn, **kwargs)
 
         self.d_model = d_model
-        self.n_struct = n_struct
-
+        self.nhead = nhead
+        self.nlayers = nlayers
         self.model_type = "Transformer"
         self.encoder = nn.Embedding(ntoken, d_model)
         self.pos_encoder = PositionalEncoding(d_model, dropout)
