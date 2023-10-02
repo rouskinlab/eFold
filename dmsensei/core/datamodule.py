@@ -218,13 +218,6 @@ class DMSDataset(TemplateDataset):
             value=0,
         )
         
-        # dms = F.pad(
-        #     nn.utils.rnn.pad_sequence(dms, batch_first=True, padding_value=0),
-        #     (0, padding_length),
-        #     value=0,
-        # )
-
-        # TODO: uncomment this and remove the lines above
         dms = F.pad(
             nn.utils.rnn.pad_sequence(dms, batch_first=True, padding_value=UKN),
             (0, padding_length),
