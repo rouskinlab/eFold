@@ -5,17 +5,17 @@ sys.path.append(os.path.abspath("."))
 from dmsensei import DataModule, create_model, metrics
 from dmsensei.config import device
 from dmsensei.core.callbacks import PredictionLogger, ModelChecker
-from pytorch_lightning import Trainer
+from lightning.pytorch import Trainer
 import pandas as pd
 from dmsensei.core.callbacks import PredictionLogger
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from dmsensei.core.callbacks import PredictionLogger
 import pandas as pd
-from pytorch_lightning import Trainer
+from lightning.pytorch import Trainer
 from dmsensei.config import device
 import sys
 import os
-from pytorch_lightning.loggers import WandbLogger
+from lightning.pytorch.loggers import WandbLogger
 import wandb
 import numpy as np
 from dmsensei.models.old import transformer_colin

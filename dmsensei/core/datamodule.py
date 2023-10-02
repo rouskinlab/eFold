@@ -7,15 +7,15 @@ from .embeddings import base_pairs_to_int_dot_bracket, sequence_to_int
 import torch
 from torch.utils.data import DataLoader, random_split
 from typing import Tuple
-from pytorch_lightning import LightningDataModule
+import lightning.pytorch as pl
 import torch.nn.functional as F
 from functools import partial
 import wandb
-from pytorch_lightning.loggers import WandbLogger
+from lightning.pytorch.loggers import WandbLogger
 from ..config import UKN
 
 
-class DataModule(LightningDataModule):
+class DataModule(pl.LightningDataModule):
     def __init__(
         self,
         name: str,

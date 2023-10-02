@@ -1,4 +1,4 @@
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 from ..core import metrics
 from ..core.embeddings import NUM_BASES, sequence_to_one_hot, int_dot_bracket_to_one_hot
 import torch.nn as nn

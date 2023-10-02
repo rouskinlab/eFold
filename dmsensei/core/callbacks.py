@@ -1,11 +1,11 @@
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torch
 import numpy as np
 from torch import Tensor, tensor
 import wandb
 from .metrics import compute_f1, r2_score
 from .visualisation import plot_structure, plot_dms, plot_dms_padding
-from pytorch_lightning.utilities import rank_zero_only
+from lightning.pytorch.utilities import rank_zero_only
 import os
 import pandas as pd
 from rouskinhf import int2seq
@@ -86,11 +86,10 @@ class PredictionLogger(pl.Callback):
                 )
 
             # Log a random example from the validation set. X is the true data, Y is the prediction, r2 is the score
-            idx = np.random.randint(len(self.valid_examples["seq"]))
             fig = plot_dms(
-                self.valid_examples["true"][idx],
-                self.valid_examples["pred"][idx],
-                r2=self.valid_examples["score"][idx],
+                self.valid_examples["true"][-1],
+                self.valid_examples["pred"][-1],
+                r2=self.valid_examples["score"][-1],
                 layout="scatter",
             )
             wandb.log(

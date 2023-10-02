@@ -27,8 +27,9 @@ def plot_dms(true_dms, pred_dms, r2=None, layout="bar", interval=100):
     fig, ax = plt.subplots()
 
     # Base position with no coverage or G/U base are removed
-    true_dms[true_dms == UKN] = 0
-    pred_dms[true_dms == UKN] = 0
+    mask = true_dms != UKN
+    pred_dms = pred_dms[mask]
+    true_dms = true_dms[mask]
 
     if layout == "bar":
         # Create and convert plot

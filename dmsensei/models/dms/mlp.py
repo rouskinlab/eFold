@@ -3,7 +3,7 @@ import torch.nn as nn
 import numpy as np
 from ...config import DEFAULT_FORMAT, device
 from torch import optim, nn, utils, Tensor, tensor
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 from ...core import metrics
 from ..templates import DMSModel
 from ...core.embeddings import NUM_BASES

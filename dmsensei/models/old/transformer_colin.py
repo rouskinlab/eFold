@@ -9,9 +9,9 @@ import torch
 from torch import nn, Tensor
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
-import pytorch_lightning as pl
-from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+import lightning.pytorch as pl
+from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 import pandas as pd
 import wandb
 
