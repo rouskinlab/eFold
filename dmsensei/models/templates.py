@@ -122,8 +122,8 @@ class DMSModel(Model):
         loss = self.loss_fn(outputs[mask], label[mask])
 
         # Logging to TensorBoard
-        self.log("train/loss", loss.item())
-
+        self.log("train/loss", np.sqrt(loss.item()))
+        
         return loss
 
 

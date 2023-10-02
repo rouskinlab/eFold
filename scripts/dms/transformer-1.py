@@ -55,7 +55,6 @@ if __name__ == "__main__":
         nlayers=8,
         dropout=0.3,
         lr=1e-6,
-        comment = 'debugging',
         wandb=USE_WANDB,
     )
 
@@ -77,5 +76,6 @@ if __name__ == "__main__":
 
     trainer.fit(model, datamodule=dm)
     # trainer.test(model, datamodule=dm)
+    
     if USE_WANDB:
         wandb.finish()
