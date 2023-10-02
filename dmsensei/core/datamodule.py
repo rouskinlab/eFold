@@ -76,7 +76,7 @@ class DataModule(pl.LightningDataModule):
     def train_dataloader(self):
         return DataLoader(
             self.train_set,
-            shuffle=True,
+            shuffle=False,
             collate_fn=self.collate_fn,
             **self.dataloader_args,
         )
@@ -182,7 +182,6 @@ class DMSDataset(TemplateDataset):
 
         assert len(sequence) == len(dms), "Data is not consistent"
 
-        
         return sequence, dms
 
     def __repr__(self) -> str:
@@ -200,7 +199,7 @@ class DMSDataset(TemplateDataset):
         """
 
         sequences, dms = zip(*batch)
-        
+
         padding_length = 0
         # Find longest sequence in batch
         if self.zero_padding_to != None:
@@ -214,15 +213,17 @@ class DMSDataset(TemplateDataset):
 
         # Merge sequences (from tuple of 1D tensor to 2D tensor).
         sequences = F.pad(
-            nn.utils.rnn.pad_sequence(sequences, batch_first=True), (0, padding_length)
+            nn.utils.rnn.pad_sequence(sequences, batch_first=True),
+            (0, padding_length),
+            value=0,
         )
-
+        
         dms = F.pad(
             nn.utils.rnn.pad_sequence(dms, batch_first=True, padding_value=UKN),
             (0, padding_length),
             value=UKN,
         )
-
+        
         return sequences, dms
 
 

@@ -28,7 +28,6 @@ class Transformer(DMSModel):
     def __init__(
         self,
         ntoken: int,
-        n_struct: int,
         d_model: int,
         nhead: int,
         d_hid: int,
@@ -42,8 +41,8 @@ class Transformer(DMSModel):
         super().__init__(lr=lr, loss_fn=loss_fn, optimizer_fn=optimizer_fn, **kwargs)
 
         self.d_model = d_model
-        self.n_struct = n_struct
-
+        self.nhead = nhead
+        self.nlayers = nlayers
         self.model_type = "Transformer"
         self.encoder = nn.Embedding(ntoken, d_model)
         self.pos_encoder = PositionalEncoding(d_model, dropout)
@@ -65,7 +64,7 @@ class Transformer(DMSModel):
         # self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
 
         self.decoder = nn.Linear(d_model, 1)
-        self.output_train_end = None
+        # self.output_train_end = None
         initrange = 1
         self.encoder.weight.data.uniform_(0, initrange)
         self.decoder.bias.data.zero_()
@@ -87,10 +86,10 @@ class Transformer(DMSModel):
                 m.bias.data.fill_(0.01)
 
         self.output_net.apply(init_weights)
-        self.train_losses = []
-        self.val_losses = []
-        self.val_corr = []
-        self.epoch_count = 0
+        # self.train_losses = []
+        # self.val_losses = []
+        # self.val_corr = []
+        # self.epoch_count = 0
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, src: Tensor) -> Tensor:
@@ -108,15 +107,11 @@ class Transformer(DMSModel):
         for i, l in enumerate(self.transformer_encoder):
             src = self.transformer_encoder[i](src, src_key_padding_mask=padding_mask)
 
-        output = self.output_net(src)
-        output = self.sigmoid(torch.flatten(output, start_dim=1))
+        # output = self.output_net(src)
+        # output = self.sigmoid(torch.flatten(output, start_dim=1))
                 
-        return output
+        return torch.flatten(self.decoder(src), start_dim=1)
 
-    def configure_optimizers(self):
-        # optimizer = torch.optim.SGD(self.parameters(), lr=self.lr, momentum=0.9)
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=1e-4)
-        return optimizer
 
 
 class PositionalEncoding(nn.Module):

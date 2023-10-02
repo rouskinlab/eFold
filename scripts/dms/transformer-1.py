@@ -16,15 +16,18 @@ from dmsensei.config import device
 import sys
 import os
 from pytorch_lightning.loggers import WandbLogger
-import wandb
+import wandb 
 import numpy as np
 
 sys.path.append(os.path.abspath("."))
 # os.system('source /Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/RNA_data/env') why do you need this?
 
 if __name__ == "__main__":
+    
+    USE_WANDB = False
     print("Running on device: {}".format(device))
-    wandb_logger = WandbLogger(project="dms")
+    if USE_WANDB:
+        wandb_logger = WandbLogger(project="dms")
 
     MAX_LEN = 1024
     model = 'transformer'
@@ -52,24 +55,27 @@ if __name__ == "__main__":
         nlayers=8,
         dropout=0.3,
         lr=1e-6,
-        comment = 'debugging',
+        wandb=USE_WANDB,
     )
 
-    wandb_logger.watch(model, log="all")
+    if USE_WANDB:
+        wandb_logger.watch(model, log="all")
 
     # train with both splits
     trainer = Trainer(
         max_epochs=100,
         log_every_n_steps=5,
-        logger=wandb_logger,
+        logger=wandb_logger if USE_WANDB else None,
         accelerator=device,
         callbacks=[  # EarlyStopping(monitor="valid/loss", mode='min', patience=5),
-            PredictionLogger(data="dms"),
-            ModelChecker(log_every_nstep=1000, model=model),
-        ],
+           PredictionLogger(data="dms"),
+           ModelChecker(log_every_nstep=1000, model=model),
+        ] if USE_WANDB else [],
         enable_checkpointing=False,
     )
 
     trainer.fit(model, datamodule=dm)
     # trainer.test(model, datamodule=dm)
-    wandb.finish()
+    
+    if USE_WANDB:
+        wandb.finish()

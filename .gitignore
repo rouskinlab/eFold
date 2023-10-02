@@ -2,4 +2,4 @@ data
 **__pycache__**
 wandb
 dmsensei/models/trained_models
-
+lightning_logs

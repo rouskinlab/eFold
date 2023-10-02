@@ -1,6 +1,6 @@
 from .dms import MultiLayerPerceptron as dms_mlp
 from .dms import Transformer as dms_transformer
-import wandb
+import wandb as wandb_module
 
 
 class ModelFactory:
@@ -25,8 +25,11 @@ class ModelFactory:
         raise NotImplementedError(f"Model {model} for data {data} not implemented.")
 
 
-def create_model(data: str, model: str, **kwargs):
+def create_model(data: str, model: str, wandb:bool=True, **kwargs):
+    
     # log hyperparameters into wandb
-    wandb.log({"model": model})
+    if wandb:
+        wandb_module.init()
+        wandb_module.log({"model": model})
 
     return ModelFactory()(data, model, **kwargs)
