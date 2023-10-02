@@ -1,17 +1,11 @@
 import torch
 from torch import nn, Tensor
-from torch.nn import TransformerEncoder, TransformerEncoderLayer
+from torch.nn import TransformerEncoderLayer
 import numpy as np
 import os, sys, json
 from scipy.stats.stats import pearsonr
 
-import torch
-from torch import nn, Tensor
-from torch.nn import TransformerEncoder, TransformerEncoderLayer
-
-import pytorch_lightning as pl
-from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+import lightning.pytorch as pl
 
 from ..templates import DMSModel
 import wandb
