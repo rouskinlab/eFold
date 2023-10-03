@@ -24,7 +24,7 @@ sys.path.append(os.path.abspath("."))
 
 if __name__ == "__main__":
     print("Running on device: {}".format(device))
-    wandb_logger = WandbLogger(project="dms")
+    wandb_logger = WandbLogger(project="dms", name="mlp-1 - overfit - 3 layers - shuffle")
 
     MAX_LEN = 1024
 
@@ -39,6 +39,8 @@ if __name__ == "__main__":
         valid_split=0.2,
         zero_padding_to=MAX_LEN,
         overfit_mode=True,
+        shuffle_train=True,
+        shuffle_valid=False
     )
 
     model = create_model(
@@ -49,6 +51,7 @@ if __name__ == "__main__":
         input_dim=MAX_LEN,
         embedding_dim=128,
         model_dim=16,
+        weight_decay=1e-4,
         #        loss_fn=metrics.r2_score,
     )
 
@@ -62,7 +65,7 @@ if __name__ == "__main__":
         accelerator=device,
         callbacks=[  # EarlyStopping(monitor="valid/loss", mode='min', patience=5),
             PredictionLogger(data="dms"),
-            ModelChecker(log_every_nstep=1000),
+            ModelChecker(model=model, log_every_nstep=1000),
         ],
         enable_checkpointing=False,
     )

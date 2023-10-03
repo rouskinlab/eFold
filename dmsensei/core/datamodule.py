@@ -27,6 +27,9 @@ class DataModule(pl.LightningDataModule):
         valid_split: float = 4096,
         zero_padding_to=None,
         overfit_mode=False,
+        shuffle_train=True,
+        shuffle_valid=False,
+        shuffle_test=False,
         **kwargs,
     ):
         """DataModule for the Rouskin lab datasets.
@@ -49,6 +52,7 @@ class DataModule(pl.LightningDataModule):
         self.dataloader_args = {"batch_size": batch_size, "num_workers": num_workers}
         self.splits = (train_split, valid_split)
         self.zero_padding_to = zero_padding_to
+        self.shuffle = {"train": shuffle_train, "valid": shuffle_valid, "test": shuffle_test}
 
         # we need to know the max sequence length for padding
         self.setup()
@@ -76,7 +80,7 @@ class DataModule(pl.LightningDataModule):
     def train_dataloader(self):
         return DataLoader(
             self.train_set,
-            shuffle=False,
+            shuffle=self.shuffle["train"],
             collate_fn=self.collate_fn,
             **self.dataloader_args,
         )
@@ -84,7 +88,7 @@ class DataModule(pl.LightningDataModule):
     def val_dataloader(self):
         return DataLoader(
             self.val_set,
-            shuffle=False,
+            shuffle=self.shuffle["valid"],
             collate_fn=self.collate_fn,
             **self.dataloader_args,
         )
@@ -93,7 +97,7 @@ class DataModule(pl.LightningDataModule):
         return [
             DataLoader(
                 test_set,
-                shuffle=False,
+                shuffle=self.shuffle["test"],
                 collate_fn=self.collate_fn,
                 **self.dataloader_args,
             )
