@@ -13,6 +13,7 @@ from functools import partial
 import wandb
 from lightning.pytorch.loggers import WandbLogger
 from ..config import UKN
+import copy
 
 
 class DataModule(pl.LightningDataModule):
@@ -55,12 +56,11 @@ class DataModule(pl.LightningDataModule):
         self.shuffle = {"train": shuffle_train, "valid": shuffle_valid, "test": shuffle_test}
 
         # we need to know the max sequence length for padding
+        self.overfit_mode = overfit_mode
         self.setup()
 
         # Log hyperparameters
         train_split, valid_split, _ = self.size_sets
-        if overfit_mode:
-            self.val_set = self.train_set
         self.save_hyperparameters(ignore=["force_download"])
 
     def setup(self, stage: str = None):
@@ -87,7 +87,7 @@ class DataModule(pl.LightningDataModule):
 
     def val_dataloader(self):
         return DataLoader(
-            self.val_set,
+            self.val_set if not self.overfit_mode else self.train_set,
             shuffle=self.shuffle["valid"],
             collate_fn=self.collate_fn,
             **self.dataloader_args,
