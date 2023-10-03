@@ -1,0 +1,5 @@
+wandb
+lightning_logs
+**__pycache__**
+dmsensei/models/trained_models
+data
