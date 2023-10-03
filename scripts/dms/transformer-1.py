@@ -1,26 +1,24 @@
 import sys, os
 
 sys.path.append(os.path.abspath("."))
-# os.system('source /Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/RNA_data/env')
 from dmsensei import DataModule, create_model, metrics
 from dmsensei.config import device
 from dmsensei.core.callbacks import PredictionLogger, ModelChecker
-from pytorch_lightning import Trainer
+from lightning.pytorch import Trainer
 import pandas as pd
 from dmsensei.core.callbacks import PredictionLogger
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from dmsensei.core.callbacks import PredictionLogger
 import pandas as pd
-from pytorch_lightning import Trainer
+from lightning.pytorch import Trainer
 from dmsensei.config import device
 import sys
 import os
-from pytorch_lightning.loggers import WandbLogger
+from lightning.pytorch.loggers import WandbLogger
 import wandb 
 import numpy as np
 
 sys.path.append(os.path.abspath("."))
-# os.system('source /Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/RNA_data/env') why do you need this?
 
 if __name__ == "__main__":
     
