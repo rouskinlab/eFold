@@ -103,8 +103,8 @@ class PredictionLogger(pl.Callback):
                 {
                     "valid/padding": wandb.Image(
                         plot_dms_padding(
-                            self.valid_examples["true"][idx],
-                            self.valid_examples["pred"][idx],
+                            self.valid_examples["true"][-1],
+                            self.valid_examples["pred"][-1],
                         )
                     )
                 }

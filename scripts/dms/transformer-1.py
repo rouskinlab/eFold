@@ -5,7 +5,6 @@ from dmsensei import DataModule, create_model, metrics
 from dmsensei.config import device
 from dmsensei.core.callbacks import PredictionLogger, ModelChecker
 from lightning.pytorch import Trainer
-import pandas as pd
 from dmsensei.core.callbacks import PredictionLogger
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from dmsensei.core.callbacks import PredictionLogger
@@ -22,12 +21,11 @@ sys.path.append(os.path.abspath("."))
 
 if __name__ == "__main__":
     
-    USE_WANDB = False
+    USE_WANDB = True
     print("Running on device: {}".format(device))
     if USE_WANDB:
         wandb_logger = WandbLogger(project="dms")
 
-    MAX_LEN = 1024
     model = 'transformer'
     data = 'dms'
 
@@ -38,8 +36,8 @@ if __name__ == "__main__":
         force_download=False,
         batch_size=4,
         num_workers=1,
-        train_split=784,
-        valid_split=80,
+        train_split=0.9999,
+        valid_split=0,
     )
 
     model = create_model(
@@ -47,12 +45,13 @@ if __name__ == "__main__":
         model=model,
         ntoken=5,
         n_struct=2,
-        d_model=512,
-        nhead=8,
-        d_hid=512,
+        d_model=64,
+        nhead=4,
+        d_hid=128,
         nlayers=8,
         dropout=0.3,
         lr=1e-6,
+        weight_decay=1e-4,
         wandb=USE_WANDB,
     )
 
