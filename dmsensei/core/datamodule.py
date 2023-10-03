@@ -7,14 +7,15 @@ from .embeddings import base_pairs_to_int_dot_bracket, sequence_to_int
 import torch
 from torch.utils.data import DataLoader, random_split
 from typing import Tuple
-from pytorch_lightning import LightningDataModule
+import lightning.pytorch as pl
 import torch.nn.functional as F
 from functools import partial
 import wandb
-from pytorch_lightning.loggers import WandbLogger
+from lightning.pytorch.loggers import WandbLogger
 from ..config import UKN
 
-class DataModule(LightningDataModule):
+
+class DataModule(pl.LightningDataModule):
     def __init__(
         self,
         name: str,
@@ -75,7 +76,7 @@ class DataModule(LightningDataModule):
     def train_dataloader(self):
         return DataLoader(
             self.train_set,
-            shuffle=True,
+            shuffle=False,
             collate_fn=self.collate_fn,
             **self.dataloader_args,
         )
@@ -153,11 +154,6 @@ class TemplateDataset(TorchDataset):
     def __len__(self) -> int:
         return len(self.sequences)
 
-    def _zero_pad(self, arr: ndarray, dtype=DEFAULT_FORMAT):
-        return nn.functional.pad(
-            tensor(arr, dtype=dtype), (0, self.zero_padding_to - len(arr)), value=0
-        )
-
     def collate_fn(self, batch):
         raise NotImplementedError("This method must be implemented in the child class")
 
@@ -204,37 +200,30 @@ class DMSDataset(TemplateDataset):
 
         sequences, dms = zip(*batch)
 
-        if self.zero_padding_to is None:
-            # convert list of tuples to a 2D tensor.
-            return [tensor(sequence, dtype=int64) for sequence in sequences], [
-                tensor(dm, dtype=DEFAULT_FORMAT) for dm in dms
-            ]
-
-            # return tensor(sequences, dtype=DEFAULT_FORMAT), tensor(dms, dtype=DEFAULT_FORMAT)
-
+        padding_length = 0
         # Find longest sequence in batch
-        max_all_sequences_length = max([len(sequence) for sequence in sequences])
-        padding_length = self.zero_padding_to - max_all_sequences_length
+        if self.zero_padding_to != None:
+            max_all_sequences_length = max([len(sequence) for sequence in sequences])
+            padding_length = self.zero_padding_to - max_all_sequences_length
 
-        if padding_length < 0:
-            raise ValueError(
-                "The maximum sequence length of the dataset is greater than the zero padding length. Please increase the zero padding length."
-            )
+            if padding_length < 0:
+                raise ValueError(
+                    "The maximum sequence length of the dataset is greater than the zero padding length. Please increase the zero padding length."
+                )
 
         # Merge sequences (from tuple of 1D tensor to 2D tensor).
         sequences = F.pad(
-            nn.utils.rnn.pad_sequence(sequences, batch_first=True), (0, padding_length)
+            nn.utils.rnn.pad_sequence(sequences, batch_first=True),
+            (0, padding_length),
+            value=0,
         )
+        
         dms = F.pad(
             nn.utils.rnn.pad_sequence(dms, batch_first=True, padding_value=UKN),
             (0, padding_length),
             value=UKN,
         )
         
-        # DMS is UKN where sequence is G or U
-        dms[sequences == seq2int['G']] = UKN
-        dms[sequences == seq2int['U']] = UKN
-
         return sequences, dms
 
 

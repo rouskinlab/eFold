@@ -27,8 +27,9 @@ def plot_dms(true_dms, pred_dms, r2=None, layout="bar", interval=100):
     fig, ax = plt.subplots()
 
     # Base position with no coverage or G/U base are removed
-    true_dms[true_dms == UKN] = 0
-    pred_dms[true_dms == UKN] = 0
+    mask = true_dms != UKN
+    pred_dms = pred_dms[mask]
+    true_dms = true_dms[mask]
 
     if layout == "bar":
         # Create and convert plot
@@ -69,14 +70,12 @@ def plot_dms(true_dms, pred_dms, r2=None, layout="bar", interval=100):
     return img
 
 
-
 def plot_dms_padding(true_dms, pred_dms):
-    
     fig, ax = plt.subplots()
-    
+
     pred_dms = pred_dms[true_dms == UKN]
     true_dms = true_dms[true_dms == UKN]
-    
+
     ax.scatter(true_dms, pred_dms)
     ax.set_xlabel("True DMS")
     ax.set_ylabel("Predicted DMS")
@@ -85,7 +84,6 @@ def plot_dms_padding(true_dms, pred_dms):
     fig = plt.close(fig)
 
     return img
-
 
 
 def plot_structure(true_struct, pred_struct):

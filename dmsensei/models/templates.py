@@ -1,10 +1,13 @@
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 from ..core import metrics
 from ..core.embeddings import NUM_BASES, sequence_to_one_hot, int_dot_bracket_to_one_hot
 import torch.nn as nn
 from torch import Tensor, tensor, zeros_like, mean
+import torch
 import numpy as np
 from ..config import TEST_SETS_NAMES, UKN
+from scipy.stats.stats import pearsonr
+from rouskinhf import seq2int
 
 
 class Model(pl.LightningModule):
@@ -21,7 +24,11 @@ class Model(pl.LightningModule):
         self.save_hyperparameters()
 
     def configure_optimizers(self):
-        return self.optimizer_fn(self.parameters(), lr=self.lr)
+        return self.optimizer_fn(
+            self.parameters(),
+            lr=self.lr,
+            weight_decay=self.weight_decay if hasattr(self, "weight_decay") else 0,
+        )
 
 
 class StructureModel(Model):
@@ -75,11 +82,17 @@ class DMSModel(Model):
         self.data_type = "dms"
 
     def validation_step(self, batch, batch_idx):
+        
         inputs, label = batch
+
+        mask = (inputs == seq2int['G']) | (inputs == seq2int['U'])
+        assert (label[mask] == UKN).all(), "Data is not consistent: G and U bases are not UKN."
+
         outputs = self.forward(inputs)
 
-        # Compute loss
-        loss = self.loss_fn(outputs[label == UKN], label[label == UKN])
+        # Compute and log loss
+        mask = label != UKN
+        loss = self.loss_fn(outputs[mask], label[mask])
         r2 = mean(
             tensor(
                 [
@@ -95,21 +108,24 @@ class DMSModel(Model):
 
         return outputs, loss
 
+
     def training_step(self, batch, batch_idx):
-        #   sch = self.lr_schedulers()
-        #   sch.step()
-
         inputs, label = batch
-
+        
+        mask = (inputs == seq2int['G']) | (inputs == seq2int['U'])
+        assert (label[mask] == UKN).all(), "Data is not consistent: G and U bases are not UKN."
+        
         outputs = self.forward(inputs)
 
         # Compute and log loss
-        loss = self.loss_fn(outputs[label == UKN], label[label == UKN])
+        mask = label != UKN
+        loss = self.loss_fn(outputs[mask], label[mask])
 
         # Logging to TensorBoard
-        self.log("train/loss", loss)
-
+        self.log("train/loss", np.sqrt(loss.item()))
+        
         return loss
+
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         inputs, label = batch

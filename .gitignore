@@ -1,5 +1,5 @@
-wandb
-lightning_logs
-**__pycache__**
-dmsensei/models/trained_models
 data
+**__pycache__**
+wandb
+dmsensei/models/trained_models
+lightning_logs

@@ -1,11 +1,11 @@
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torch
 import numpy as np
 from torch import Tensor, tensor
 import wandb
 from .metrics import compute_f1, r2_score
 from .visualisation import plot_structure, plot_dms, plot_dms_padding
-from pytorch_lightning.utilities import rank_zero_only
+from lightning.pytorch.utilities import rank_zero_only
 import os
 import pandas as pd
 from rouskinhf import int2seq
@@ -86,11 +86,10 @@ class PredictionLogger(pl.Callback):
                 )
 
             # Log a random example from the validation set. X is the true data, Y is the prediction, r2 is the score
-            idx = np.random.randint(len(self.valid_examples["seq"]))
             fig = plot_dms(
-                self.valid_examples["true"][idx],
-                self.valid_examples["pred"][idx],
-                r2=self.valid_examples["score"][idx],
+                self.valid_examples["true"][-1],
+                self.valid_examples["pred"][-1],
+                r2=self.valid_examples["score"][-1],
                 layout="scatter",
             )
             wandb.log(
@@ -104,23 +103,23 @@ class PredictionLogger(pl.Callback):
                 {
                     "valid/padding": wandb.Image(
                         plot_dms_padding(
-                            self.valid_examples["true"][idx],
-                            self.valid_examples["pred"][idx],
+                            self.valid_examples["true"][-1],
+                            self.valid_examples["pred"][-1],
                         )
                     )
                 }
             )
 
-    def on_test_start(self, trainer, pl_module):
-        if not self.wandb_log or rank_zero_only.rank != 0:
-            return
+    # def on_test_start(self, trainer, pl_module):
+    #     if not self.wandb_log or rank_zero_only.rank != 0:
+    #         return
 
-        # Load best model
-        pl_module.load_state_dict(
-            torch.load(
-                os.path.join(self.model_path, trainer.logger.experiment.name + ".pt")
-            )
-        )
+    #     # Load best model
+    #     pl_module.load_state_dict(
+    #         torch.load(
+    #             os.path.join(self.model_path, trainer.logger.experiment.name + ".pt")
+    #         )
+    #     )
 
     def on_test_batch_end(
         self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0
@@ -231,21 +230,22 @@ class PredictionLogger(pl.Callback):
 
 
 class ModelChecker(pl.Callback):
-    def __init__(self, log_every_nstep=1000):
+    def __init__(self, model, log_every_nstep=1000):
         self.step_number = 0
+        self.model = model
 
         self.log_every_nstep = log_every_nstep
 
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
-        if self.step_number % self.log_every_nstep == 0:
-            # Get all parameters
-            params = []
-            for param in pl_module.parameters():
-                params.append(param.view(-1))
-            params = torch.cat(params).cpu().detach().numpy()
+    # def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+    #     if self.step_number % self.log_every_nstep == 0:
+    #         # Get all parameters
+    #         params = []
+    #         for param in pl_module.parameters():
+    #             params.append(param.view(-1))
+    #         params = torch.cat(params).cpu().detach().numpy()
 
-            # Compute histogram
-            if rank_zero_only.rank == 0:
-                wandb.log({"model_params": wandb.Histogram(params)})
+    #         # Compute histogram
+    #         if rank_zero_only.rank == 0 and self.model in ['mlp']:
+    #             wandb.log({"model_params": wandb.Histogram(params)})
 
-        self.step_number += 1
+    #     self.step_number += 1

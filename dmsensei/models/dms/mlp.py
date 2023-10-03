@@ -3,7 +3,7 @@ import torch.nn as nn
 import numpy as np
 from ...config import DEFAULT_FORMAT, device
 from torch import optim, nn, utils, Tensor, tensor
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 from ...core import metrics
 from ..templates import DMSModel
 from ...core.embeddings import NUM_BASES
@@ -12,6 +12,7 @@ from torcheval.metrics import R2Score
 
 torch.seed()
 np.random.seed(0)
+
 
 class MultiLayerPerceptron(DMSModel):
     def __init__(
@@ -23,17 +24,22 @@ class MultiLayerPerceptron(DMSModel):
         optimizer_fn=torch.optim.Adam,
         embedding_dim=640,
         model_dim=128,
+        weight_decay=0,
         **kwargs,
     ):
-        super().__init__(lr=lr, loss_fn=loss_fn, optimizer_fn=optimizer_fn, **kwargs)
+        super().__init__(
+            lr=lr,
+            loss_fn=loss_fn,
+            optimizer_fn=optimizer_fn,
+            weight_decay=weight_decay,
+            **kwargs,
+        )
 
         hidden_layers = hidden_layers + [input_dim]
         self.embedding = nn.Embedding(NUM_BASES, embedding_dim)
 
         self.block1 = nn.Sequential(
-            nn.Linear(
-                embedding_dim, model_dim, dtype=DEFAULT_FORMAT
-            ),
+            nn.Linear(embedding_dim, model_dim, dtype=DEFAULT_FORMAT),
             nn.ReLU(),
         )
 

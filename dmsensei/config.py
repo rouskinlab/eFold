@@ -2,7 +2,7 @@ from torch import nn, tensor, float32, cuda, backends
 import torch
 
 DEFAULT_FORMAT = float32
-UKN = -1000
+UKN = -1000.0
 
 device = (
     "cuda"
