@@ -1,0 +1,63 @@
+method: bayes
+metric:
+  goal: minimize
+  name: valid/r2
+parameters:
+  batch_size:
+    distribution: int_uniform
+    max: 128
+    min: 2
+  embedding_dim:
+    distribution: int_uniform
+    max: 256
+    min: 64
+  input_dim:
+    distribution: int_uniform
+    max: 2048
+    min: 512
+  loss_fn:
+    distribution: categorical
+    values:
+      - mse_loss
+      - l1_loss
+  lr:
+    distribution: log_uniform
+    max: 0.0005
+    min: 0.000001
+  model_dim:
+    distribution: int_uniform
+    max: 32
+    min: 8
+  optimizer_fn:
+    distribution: categorical
+    values:
+      - Adam
+  shuffle_train:
+    distribution: categorical
+    values:
+      - True
+  shuffle_valid:
+    distribution: categorical
+    values:
+      - False
+  weight_decay:
+    distribution: uniform
+    max: 0.0002
+    min: 0
+  dropout:
+    distribution: uniform
+    max: 0.5
+    min: 0
+  hidden_layers:
+    distribution: categorical
+    values:
+      - [4096, 4096, 2048, 1024, 512]
+      - [8096, 4096, 4096, 2048, 1024, 512]
+      - [8096, 4096, 2048, 1024, 512]
+      - [8096, 4096, 2048, 1024]
+  max_epochs: 
+    distribution: categorical
+    values:
+      - 500
+
+program: scripts/dms/mlp-sweep.py

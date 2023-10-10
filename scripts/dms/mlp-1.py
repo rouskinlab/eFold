@@ -24,16 +24,24 @@ sys.path.append(os.path.abspath("."))
 
 if __name__ == "__main__":
     print("Running on device: {}".format(device))
-    wandb_logger = WandbLogger(project="dms mlp", name="mlp - 4L - lr 1e-4 - batch 64 - wd 0 - embed 128 - model 16")
+    
+    BATCH_SIZE = 4
+    LR = 5e-5
+    WD = 1e-4
+    EMBED = 128
+    MODEL = 16
+    DROPOUT = [0.5, 0.5, 0.3, 0.3, 0.2]
+    
+    wandb_logger = WandbLogger(project="dms mlp", name="mlp - 5L - lr {} - batch {} - wd {} - embed {} - model {} - dropout".format(LR, BATCH_SIZE, WD, EMBED, MODEL))
 
     MAX_LEN = 1024
 
     # Create dataset
     dm = DataModule(
-        name="utr",
+        name=['utr','utr'],
         data="dms",
         force_download=False,
-        batch_size=64,
+        batch_size=BATCH_SIZE,
         num_workers=1,
         train_split=0.8,
         valid_split=0.2,
@@ -46,12 +54,13 @@ if __name__ == "__main__":
     model = create_model(
         data="dms",
         model="mlp",
-        hidden_layers=[4096, 2048, 1024, 512],
-        lr=1e-4,
+        hidden_layers=[4096, 4096, 2048, 1024, 512],
+        lr=LR,
         input_dim=MAX_LEN,
-        embedding_dim=128,
-        model_dim=16,
-       # weight_decay=1e-4,
+        embedding_dim=EMBED,
+        model_dim=MODEL,
+        weight_decay=WD,
+        dropout=DROPOUT,
         #        loss_fn=metrics.r2_score,
     )
 
@@ -59,7 +68,7 @@ if __name__ == "__main__":
 
     # train with both splits
     trainer = Trainer(
-        max_epochs=500,
+        max_epochs=1,
         log_every_n_steps=1,
         logger=wandb_logger,
         accelerator=device,
