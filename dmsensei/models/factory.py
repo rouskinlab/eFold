@@ -6,7 +6,7 @@ import wandb as wandb_module
 class ModelFactory:
     def __init__(self):
         self.data = ["dms", "structure"]
-        self.models = {"dms": ["mlp", 'transformer'], "structure": []}
+        self.models = {"dms": ["mlp", "transformer"], "structure": []}
 
     def __call__(self, data: str, model: str, **kwargs):
         data = data.lower()
@@ -25,8 +25,7 @@ class ModelFactory:
         raise NotImplementedError(f"Model {model} for data {data} not implemented.")
 
 
-def create_model(data: str, model: str, wandb:bool=True, **kwargs):
-    
+def create_model(data: str, model: str, wandb: bool = True, **kwargs):
     # log hyperparameters into wandb
     if wandb:
         wandb_module.init()

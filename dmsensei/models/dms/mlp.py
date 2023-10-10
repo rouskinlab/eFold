@@ -25,7 +25,7 @@ class MultiLayerPerceptron(DMSModel):
         embedding_dim=640,
         model_dim=128,
         weight_decay=0,
-        dropout = 0,
+        dropout=0,
         **kwargs,
     ):
         super().__init__(
@@ -60,7 +60,9 @@ class MultiLayerPerceptron(DMSModel):
                         hidden_layers[i], hidden_layers[i + 1], dtype=DEFAULT_FORMAT
                     ),
                     # dropout
-                    nn.Dropout(dropout if not hasattr(dropout, "__len__") else dropout[i]),
+                    nn.Dropout(
+                        dropout if not hasattr(dropout, "__len__") else dropout[i]
+                    ),
                     nn.ReLU() if i < len(hidden_layers) - 2 else nn.Identity(),
                 )
                 for i in range(len(hidden_layers) - 1)
@@ -74,5 +76,5 @@ class MultiLayerPerceptron(DMSModel):
         x = self.block1(x)
         x = self.flatten(x)
         x = self.block2(x)
-        logits = self.sigmoid(x)
+        # logits = self.sigmoid(x)
         return x  # logits

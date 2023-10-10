@@ -104,7 +104,9 @@ class DataModule(pl.LightningDataModule):
             self.train_set, self.val_set, _ = random_split(dataFull, self.size_sets)
 
         if stage == "test" or stage is None:
-            self.test_sets = self._select_test_dataset(data=self.data, force_download=self.force_download)
+            self.test_sets = self._select_test_dataset(
+                data=self.data, force_download=self.force_download
+            )
 
         if stage is None:
             self.collate_fn = dataFull.collate_fn
@@ -153,7 +155,7 @@ class DataModule(pl.LightningDataModule):
             )
             for name in TEST_SETS_NAMES[data]
         ]
-        
+
 
 class Dataset:
     def __new__(cls, name: str, data: str, force_download, zero_padding_to):

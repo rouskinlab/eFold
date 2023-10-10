@@ -94,7 +94,7 @@ class Transformer(DMSModel):
         Returns:
             output Tensor of shape [seq_len, batch_size, ntoken]
         """
-        
+
         padding_mask = src == 0
         src = self.encoder(src) * np.sqrt(self.d_model)
         src = self.pos_encoder(src)
@@ -103,9 +103,8 @@ class Transformer(DMSModel):
 
         # output = self.output_net(src)
         # output = self.sigmoid(torch.flatten(output, start_dim=1))
-                
-        return torch.flatten(self.decoder(src), start_dim=1)
 
+        return torch.flatten(self.decoder(src), start_dim=1)
 
 
 class PositionalEncoding(nn.Module):
@@ -128,4 +127,3 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[: x.shape[1]]
         # x = torch.concatenate((x, torch.tile(self.pe[:x.shape[1]], (x.shape[0], 1, 1))), 2)
         return self.dropout(x)
-

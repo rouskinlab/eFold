@@ -82,11 +82,12 @@ class DMSModel(Model):
         self.data_type = "dms"
 
     def validation_step(self, batch, batch_idx):
-        
         inputs, label = batch
 
-        mask = (inputs == seq2int['G']) | (inputs == seq2int['U'])
-        assert (label[mask] == UKN).all(), "Data is not consistent: G and U bases are not UKN."
+        mask = (inputs == seq2int["G"]) | (inputs == seq2int["U"])
+        assert (
+            label[mask] == UKN
+        ).all(), "Data is not consistent: G and U bases are not UKN."
 
         outputs = self.forward(inputs)
 
@@ -108,13 +109,14 @@ class DMSModel(Model):
 
         return outputs, loss
 
-
     def training_step(self, batch, batch_idx):
         inputs, label = batch
-        
-        mask = (inputs == seq2int['G']) | (inputs == seq2int['U'])
-        assert (label[mask] == UKN).all(), "Data is not consistent: G and U bases are not UKN."
-        
+
+        mask = (inputs == seq2int["G"]) | (inputs == seq2int["U"])
+        assert (
+            label[mask] == UKN
+        ).all(), "Data is not consistent: G and U bases are not UKN."
+
         outputs = self.forward(inputs)
 
         # Compute and log loss
@@ -123,9 +125,8 @@ class DMSModel(Model):
 
         # Logging to TensorBoard
         self.log("train/loss", np.sqrt(loss.item()))
-        
-        return loss
 
+        return loss
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         inputs, label = batch
