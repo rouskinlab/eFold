@@ -36,7 +36,7 @@ class DataModule(pl.LightningDataModule):
         """DataModule for the Rouskin lab datasets.
 
         Args:
-            name: name of the dataset on the Rouskin lab HuggingFace repository
+            name: name of the dataset on the Rouskin lab HuggingFace repository. Can be a list of names.
             data: type of the data (e.g. 'dms', 'structure')
             force_download: re-download the dataset from the Rouskin lab HuggingFace repository
             batch_size: batch size for the dataloaders
@@ -49,11 +49,17 @@ class DataModule(pl.LightningDataModule):
         # Save arguments
         super().__init__(**kwargs)
 
-        self.rouskinhf_args = (name, data, force_download)
+        self.name = name
+        self.data = data
+        self.force_download = force_download
         self.dataloader_args = {"batch_size": batch_size, "num_workers": num_workers}
         self.splits = (train_split, valid_split)
         self.zero_padding_to = zero_padding_to
-        self.shuffle = {"train": shuffle_train, "valid": shuffle_valid, "test": shuffle_test}
+        self.shuffle = {
+            "train": shuffle_train,
+            "valid": shuffle_valid,
+            "test": shuffle_test,
+        }
 
         # we need to know the max sequence length for padding
         self.overfit_mode = overfit_mode
@@ -63,16 +69,42 @@ class DataModule(pl.LightningDataModule):
         train_split, valid_split, _ = self.size_sets
         self.save_hyperparameters(ignore=["force_download"])
 
+    def _use_multiple_datasets(self, name):
+        if type(name) == str:
+            return False
+        elif type(name) == list or type(name) == tuple:
+            return True
+        raise ValueError("name must be a string or a list of strings")
+
+    def _dataset_merge(self, datasets):
+        merge = datasets[0]
+        collate_fn = merge.collate_fn
+        for dataset in datasets[1:]:
+            merge = merge + dataset
+        merge.collate_fn = collate_fn
+        return merge
+
     def setup(self, stage: str = None):
         if stage == "fit" or stage is None:
-            dataFull = Dataset(
-                *self.rouskinhf_args, zero_padding_to=self.zero_padding_to
+            if not self._use_multiple_datasets(self.name):
+                self.name = [self.name]
+            dataFull = self._dataset_merge(
+                [
+                    Dataset(
+                        name=name,
+                        data=self.data,
+                        force_download=self.force_download,
+                        zero_padding_to=self.zero_padding_to,
+                    )
+                    for name in self.name
+                ]
             )
+
             self.size_sets = _compute_size_sets(len(dataFull), *self.splits)
             self.train_set, self.val_set, _ = random_split(dataFull, self.size_sets)
 
         if stage == "test" or stage is None:
-            self.test_sets = self._select_test_dataset(*self.rouskinhf_args[1:])
+            self.test_sets = self._select_test_dataset(data=self.data, force_download=self.force_download)
 
         if stage is None:
             self.collate_fn = dataFull.collate_fn
@@ -121,11 +153,10 @@ class DataModule(pl.LightningDataModule):
             )
             for name in TEST_SETS_NAMES[data]
         ]
-
+        
 
 class Dataset:
     def __new__(cls, name: str, data: str, force_download, zero_padding_to):
-        # Create dataset
         data = data.lower()
         if data == "dms":
             return DMSDataset(
@@ -221,13 +252,13 @@ class DMSDataset(TemplateDataset):
             (0, padding_length),
             value=0,
         )
-        
+
         dms = F.pad(
             nn.utils.rnn.pad_sequence(dms, batch_first=True, padding_value=UKN),
             (0, padding_length),
             value=UKN,
         )
-        
+
         return sequences, dms
 
 
