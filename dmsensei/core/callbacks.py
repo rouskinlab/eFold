@@ -17,6 +17,7 @@ class PredictionLogger(pl.Callback):
     def __init__(self, data, n_best=5, wandb_log=True):
         self.wandb_log = wandb_log
         self.data = data
+        self.best_r2 = -np.inf
 
         self.n_best = n_best
 
@@ -84,6 +85,8 @@ class PredictionLogger(pl.Callback):
                         self.model_path, trainer.logger.experiment.name + ".pt"
                     ),
                 )
+                if self.data.lower() == "dms":
+                    wandb.log({"final/best_r2": score})
 
             # Log a random example from the validation set. X is the true data, Y is the prediction, r2 is the score
             fig = plot_dms(
