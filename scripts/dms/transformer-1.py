@@ -36,8 +36,9 @@ if __name__ == "__main__":
         force_download=False,
         batch_size=4,
         num_workers=1,
-        train_split=0.9999,
+        train_split=0.05,
         valid_split=0,
+        overfit_mode=True
     )
 
     model = create_model(
@@ -45,13 +46,13 @@ if __name__ == "__main__":
         model=model,
         ntoken=5,
         n_struct=2,
-        d_model=64,
-        nhead=4,
-        d_hid=128,
-        nlayers=8,
-        dropout=0.3,
-        lr=1e-6,
-        weight_decay=1e-4,
+        d_model= 128,
+        nhead=16,
+        d_hid=1024,
+        nlayers=48,
+        dropout=0.0,
+        lr=1e-5,
+        weight_decay=0,
         wandb=USE_WANDB,
     )
 
@@ -60,11 +61,11 @@ if __name__ == "__main__":
 
     # train with both splits
     trainer = Trainer(
-        max_epochs=100,
+        max_epochs=1000,
         log_every_n_steps=5,
         logger=wandb_logger if USE_WANDB else None,
         accelerator=device,
-        callbacks=[  # EarlyStopping(monitor="valid/loss", mode='min', patience=5),
+        callbacks=[  EarlyStopping(monitor="valid/loss", mode='min', patience=5),
            PredictionLogger(data="dms"),
            ModelChecker(log_every_nstep=1000, model=model),
         ] if USE_WANDB else [],

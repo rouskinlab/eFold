@@ -93,7 +93,8 @@ class DMSModel(Model):
 
         # Compute and log loss
         mask = label != UKN
-        loss = self.loss_fn(outputs[mask], label[mask])
+        label[label == UKN] = -1.0
+        loss = self.loss_fn(outputs, label)
         r2 = mean(
             tensor(
                 [
@@ -121,7 +122,8 @@ class DMSModel(Model):
 
         # Compute and log loss
         mask = label != UKN
-        loss = self.loss_fn(outputs[mask], label[mask])
+        label[label == UKN] = -1.0
+        loss = self.loss_fn(outputs, label)
 
         # Logging to TensorBoard
         self.log("train/loss", np.sqrt(loss.item()))

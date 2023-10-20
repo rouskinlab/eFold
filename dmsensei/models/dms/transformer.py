@@ -40,7 +40,7 @@ class Transformer(DMSModel):
         self.model_type = "Transformer"
         self.encoder = nn.Embedding(ntoken, d_model)
         self.pos_encoder = PositionalEncoding(d_model, dropout)
-
+        '''
         self.transformer_encoder = nn.ModuleList(
             [
                 TransformerEncoderLayer(
@@ -55,6 +55,8 @@ class Transformer(DMSModel):
                 for i in range(nlayers)
             ]
         )
+        '''
+        self.transformer_encoder = nn.Sequential(*[TransformerEncoderLayer(d_model,nhead,d_hid,dropout,batch_first=True,norm_first=True,activation="gelu",)for i in range(nlayers)])
         # self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
 
         self.decoder = nn.Linear(d_model, 1)
@@ -67,16 +69,19 @@ class Transformer(DMSModel):
         self.sigmoid = nn.Sigmoid()
         # self.init_weights()
         self.output_net = nn.Sequential(
-            nn.Linear(d_model, d_model),
-            nn.LayerNorm(d_model),
+            nn.Linear(d_model, d_model*2),
+            nn.LayerNorm(d_model*2),
             nn.ReLU(inplace=True),
-            nn.Dropout(dropout),
-            nn.Linear(d_model, 1),
+            #nn.Flatten(start_dim=1, end_dim=-1),  
+            nn.Linear(d_model*2, d_model),
+            nn.LayerNorm(d_model),
+            nn.ReLU(inplace=True),  
+            nn.Linear(d_model, 1)
         )
 
         def init_weights(m):
             if isinstance(m, nn.Linear):
-                torch.nn.init.xavier_uniform(m.weight)
+                torch.nn.init.xavier_uniform(m.weight*0.001)
                 m.bias.data.fill_(0.01)
 
         self.output_net.apply(init_weights)
@@ -103,8 +108,8 @@ class Transformer(DMSModel):
 
         # output = self.output_net(src)
         # output = self.sigmoid(torch.flatten(output, start_dim=1))
-
-        return torch.flatten(self.decoder(src), start_dim=1)
+        #print(src.flatten(start_dim=1, end_dim=-1).size())
+        return self.output_net(src).flatten(start_dim=1, end_dim=-1)
 
 
 class PositionalEncoding(nn.Module):
