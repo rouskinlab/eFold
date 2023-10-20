@@ -72,3 +72,19 @@ def r2_score(y_true, y_pred):
         - torch.sum((y_true - y_pred) ** 2)
         / torch.sum((y_true - torch.mean(y_true)) ** 2).item()
     )
+
+
+def mae_score(y_true, y_pred):
+    """
+    Compute the Mean Average Error of the predictions.
+
+    :param y_true: True values
+    :param y_pred: Predicted values
+    :return: MAE score
+    """
+
+    mask = y_true != UKN
+    y_pred = y_pred[mask]
+    y_true = y_true[mask]
+
+    return torch.mean(torch.abs(y_true - y_pred))
