@@ -102,11 +102,20 @@ class DMSModel(Model):
                 ]
             )
         )
+        mae = mean(
+            tensor(
+                [
+                    metrics.mae_score(y_true, y_pred)
+                    for y_true, y_pred in zip(label, outputs)
+                ]
+            )
+        )
 
         # Logging to Wandb
         self.log("valid/loss", loss)
         self.log("valid/r2", r2)
-
+        self.log("valid/mae", mae)
+        
         return outputs, loss
 
     def training_step(self, batch, batch_idx):
@@ -140,8 +149,18 @@ class DMSModel(Model):
                 ]
             )
         )
+        
+        mae = mean(
+            tensor(
+                [
+                    metrics.mae_score(y_true, y_pred)
+                    for y_true, y_pred in zip(label, outputs)
+                ]
+            )
+        )
 
         test_set_name = TEST_SETS_NAMES[self.data_type][dataloader_idx]
         self.log(f"test/{test_set_name}/r2", r2, add_dataloader_idx=False)
-
+        self.log(f"test/{test_set_name}/mae", mae, add_dataloader_idx=False)
+        
         return outputs
