@@ -2,7 +2,6 @@ import torch
 from rouskinhf import seq2int
 from ..config import UKN
 
-
 def compute_f1(pred_matrix, target_matrix, threshold=0.5):
     """
     Compute the F1 score of the predictions.
@@ -88,3 +87,32 @@ def mae_score(y_true, y_pred):
     y_true = y_true[mask]
 
     return torch.mean(torch.abs(y_true - y_pred))
+
+
+# def mae_score_ACGU(sequence, y_true, y_pred):
+#     """
+#     Compute the Mean Average Error of the predictions. Weighted by the number of A, C, G and U bases.
+
+#     :param sequence: RNA sequence
+#     :param y_true: True values
+#     :param y_pred: Predicted values
+#     :return: MAE score
+#     """
+
+#     MEAN_GU = 0.1
+#     nGU = torch.sum(sequence == seq2int["G"]) + torch.sum(sequence == seq2int["U"])
+#     nAC = torch.sum(sequence == seq2int["A"]) + torch.sum(sequence == seq2int["C"])
+#     mae = mae_score(y_true, y_pred)
+    
+#     return (nGU * MEAN_GU + nAC * mae) / (nGU + nAC)
+
+
+def mean_std_dms(y_pred):
+    """
+    Compute the mean and standard deviation of the predictions.
+
+    :param y_pred: Predicted values
+    :return: Mean and standard deviation
+    """
+
+    return torch.mean(y_pred), torch.std(y_pred)

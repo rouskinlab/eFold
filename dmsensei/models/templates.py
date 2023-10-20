@@ -24,11 +24,19 @@ class Model(pl.LightningModule):
         self.save_hyperparameters()
 
     def configure_optimizers(self):
-        return self.optimizer_fn(
+        
+        optimizer = self.optimizer_fn(
             self.parameters(),
             lr=self.lr,
             weight_decay=self.weight_decay if hasattr(self, "weight_decay") else 0,
         )
+        if not hasattr(self, "scheduler") or self.scheduler is None:
+            return optimizer
+
+        scheduler = {"scheduler": self.scheduler(optimizer, patience=5, factor=0.5, verbose=True), "interval": "epoch", "monitor": "valid/loss"}
+        return [optimizer], [scheduler]
+        
+
 
 
 class StructureModel(Model):
@@ -110,11 +118,24 @@ class DMSModel(Model):
                 ]
             )
         )
+        # mae_ACGU = mean(
+        #     tensor(
+        #         [
+        #             metrics.mae_score_ACGU(seq, y_true, y_pred)
+        #             for seq, y_true, y_pred in zip(inputs, label, outputs)
+        #         ]
+        #     )
+        # )
+        
+        this_mean, this_std = metrics.mean_std_dms(outputs)
 
         # Logging to Wandb
         self.log("valid/loss", loss)
         self.log("valid/r2", r2)
         self.log("valid/mae", mae)
+        self.log("valid/mean", this_mean)
+        self.log("valid/std", this_std)
+        # self.log("valid/mae_ACGU", mae_ACGU)
         
         return outputs, loss
 
