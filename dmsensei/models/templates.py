@@ -24,11 +24,19 @@ class Model(pl.LightningModule):
         self.save_hyperparameters()
 
     def configure_optimizers(self):
-        return self.optimizer_fn(
+        
+        optimizer = self.optimizer_fn(
             self.parameters(),
             lr=self.lr,
             weight_decay=self.weight_decay if hasattr(self, "weight_decay") else 0,
         )
+        if not hasattr(self, "scheduler") or self.scheduler is None:
+            return optimizer
+
+        scheduler = {"scheduler": self.scheduler(optimizer, patience=5, factor=0.5, verbose=True), "interval": "epoch", "monitor": "valid/loss"}
+        return [optimizer], [scheduler]
+        
+
 
 
 class StructureModel(Model):
@@ -103,11 +111,33 @@ class DMSModel(Model):
                 ]
             )
         )
+        mae = mean(
+            tensor(
+                [
+                    metrics.mae_score(y_true, y_pred)
+                    for y_true, y_pred in zip(label, outputs)
+                ]
+            )
+        )
+        # mae_ACGU = mean(
+        #     tensor(
+        #         [
+        #             metrics.mae_score_ACGU(seq, y_true, y_pred)
+        #             for seq, y_true, y_pred in zip(inputs, label, outputs)
+        #         ]
+        #     )
+        # )
+        
+        this_mean, this_std = metrics.mean_std_dms(outputs)
 
         # Logging to Wandb
         self.log("valid/loss", loss)
         self.log("valid/r2", r2)
-
+        self.log("valid/mae", mae)
+        self.log("valid/mean", this_mean)
+        self.log("valid/std", this_std)
+        # self.log("valid/mae_ACGU", mae_ACGU)
+        
         return outputs, loss
 
     def training_step(self, batch, batch_idx):
@@ -142,8 +172,18 @@ class DMSModel(Model):
                 ]
             )
         )
+        
+        mae = mean(
+            tensor(
+                [
+                    metrics.mae_score(y_true, y_pred)
+                    for y_true, y_pred in zip(label, outputs)
+                ]
+            )
+        )
 
         test_set_name = TEST_SETS_NAMES[self.data_type][dataloader_idx]
         self.log(f"test/{test_set_name}/r2", r2, add_dataloader_idx=False)
-
+        self.log(f"test/{test_set_name}/mae", mae, add_dataloader_idx=False)
+        
         return outputs

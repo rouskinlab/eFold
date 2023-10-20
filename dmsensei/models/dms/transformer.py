@@ -27,7 +27,7 @@ class Transformer(DMSModel):
         d_hid: int,
         nlayers: int,
         dropout: float = 0.1,
-        lr: float = 1e-2,
+        lr: float = 1e-5,
         loss_fn=nn.MSELoss(),
         optimizer_fn=torch.optim.Adam,
         **kwargs,
@@ -82,7 +82,7 @@ class Transformer(DMSModel):
         def init_weights(m):
             if isinstance(m, nn.Linear):
                 torch.nn.init.xavier_uniform(m.weight*0.001)
-                m.bias.data.fill_(0.01)
+                m.bias.data.fill_(0.)
 
         self.output_net.apply(init_weights)
         # self.train_losses = []
@@ -132,3 +132,4 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[: x.shape[1]]
         # x = torch.concatenate((x, torch.tile(self.pe[:x.shape[1]], (x.shape[0], 1, 1))), 2)
         return self.dropout(x)
+
