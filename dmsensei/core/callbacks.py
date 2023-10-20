@@ -79,11 +79,10 @@ class PredictionLogger(pl.Callback):
             if score > self.best_score:
                 self.best_score = score
                 os.makedirs(self.model_path, exist_ok=True)
+                self.best_model_path = os.path.join(self.model_path, trainer.logger.experiment.name + ".pt")
                 torch.save(
                     pl_module.state_dict(),
-                    os.path.join(
-                        self.model_path, trainer.logger.experiment.name + ".pt"
-                    ),
+                    self.best_model_path,
                 )
                 if self.data.lower() == "dms":
                     wandb.log({"final/best_r2": score})

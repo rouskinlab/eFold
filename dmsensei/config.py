@@ -14,7 +14,7 @@ device = (
 
 TEST_SETS_NAMES = {
     "structure": ["CT_files_pdbee"],
-    "dms": ["sarah_supermodel", "sequences_mid"],
+    "dms": ["sarah_supermodel", "utr"],
 }
 
 
