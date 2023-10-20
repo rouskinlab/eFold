@@ -239,16 +239,16 @@ class ModelChecker(pl.Callback):
 
         self.log_every_nstep = log_every_nstep
 
-    # def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
-    #     if self.step_number % self.log_every_nstep == 0:
-    #         # Get all parameters
-    #         params = []
-    #         for param in pl_module.parameters():
-    #             params.append(param.view(-1))
-    #         params = torch.cat(params).cpu().detach().numpy()
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+        if self.step_number % self.log_every_nstep == 0:
+            # Get all parameters
+            params = []
+            for param in pl_module.parameters():
+                params.append(param.view(-1))
+            params = torch.cat(params).cpu().detach().numpy()
 
-    #         # Compute histogram
-    #         if rank_zero_only.rank == 0 and self.model in ['mlp']:
-    #             wandb.log({"model_params": wandb.Histogram(params)})
+            # Compute histogram
+            if rank_zero_only.rank == 0 and self.model in ['mlp']:
+                wandb.log({"model_params": wandb.Histogram(params)})
 
-    #     self.step_number += 1
+        self.step_number += 1
