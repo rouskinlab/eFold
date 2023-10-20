@@ -40,7 +40,7 @@ sweep_configuration = {
         "optimizer_fn": {"distribution": "categorical", "values": ["Adam"]},
         "shuffle_train": {"distribution": "categorical", "values": [True]},
         "shuffle_valid": {"distribution": "categorical", "values": [False]},
-        "weight_decay": {"distribution": "log_uniform", "max": 1e-5, "min": 0},
+      #  "weight_decay": {"distribution": "uniform", "max": 1e-5, "min": 0},
      #   "dropout": {"distribution": "uniform", "max": 0.5, "min": 0},
      #   "max_epochs": {"distribution": "categorical", "values": [100]},
     #    "early_terminate": {"type": "hyperband", "min_iter": 3},
@@ -76,7 +76,7 @@ def train(config=None):
         nlayers=config["nlayers"],
         dropout=0,#config["dropout"],
         lr=config["lr"],
-        weight_decay=config["weight_decay"],
+        weight_decay=0#config["weight_decay"],
         ).to(device)
             
 
