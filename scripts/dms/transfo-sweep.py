@@ -31,15 +31,15 @@ sweep_configuration = {
     "metric": {"goal": "maximize", "name": "final/best_r2"},
     "parameters": {
         "batch_size": {"distribution": "categorical", "values": [4, 8, 16]},
-        "loss_fn": {"distribution": "categorical", "values": [ "l1_loss"]}, #"mse_loss",
+        "loss_fn": {"distribution": "categorical", "values": [ "l1_loss", "mse_loss"]},
         "lr": {"distribution": "log_uniform", "max": -7, "min": -11},
         "d_model": {"distribution":  "categorical", "values": [64, 128]},
         "nhead": {"distribution": "categorical", "values": [8, 16]},
         "d_hid": {"distribution":  "categorical", "values": [128, 256]},
         "nlayers": {"distribution":  "categorical", "values": [2, 4, 8, 16]},
-        "optimizer_fn": {"distribution": "categorical", "values": ["Adam"]},
-        "shuffle_train": {"distribution": "categorical", "values": [True]},
-        "shuffle_valid": {"distribution": "categorical", "values": [False]},
+        # "optimizer_fn": {"distribution": "categorical", "values": ["Adam"]},
+        # "shuffle_train": {"distribution": "categorical", "values": [True]},
+        # "shuffle_valid": {"distribution": "categorical", "values": [False]},
       #  "weight_decay": {"distribution": "uniform", "max": 1e-5, "min": 0},
      #   "dropout": {"distribution": "uniform", "max": 0.5, "min": 0},
      #   "max_epochs": {"distribution": "categorical", "values": [100]},
@@ -76,6 +76,8 @@ def train(config=None):
         nlayers=config["nlayers"],
         dropout=0,#config["dropout"],
         lr=config["lr"],
+        loss_fn=str2fun[config["loss_fn"]],
+        optimizer_fn=torch.optim.Adam,
         weight_decay=0#config["weight_decay"],
         ).to(device)
             
@@ -103,6 +105,6 @@ def train(config=None):
 
 if __name__ == "__main__":
 
-    sweep_id = wandb.sweep(sweep=sweep_configuration, project="transfo_ribonanza_sweep_2")
+    sweep_id = wandb.sweep(sweep=sweep_configuration, project="transfo2_ribonanza_sweep")
     wandb.agent(sweep_id=sweep_id, function=train, count=100)
     
