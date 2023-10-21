@@ -22,6 +22,18 @@ matplotlib_colors = [
     "navy",
 ]
 
+def plot_r2_distribution(r2_scores):
+    
+    fig, ax = plt.subplots()
+    ax.hist(r2_scores, bins=20)
+    ax.set_xlabel("R2 score")
+    ax.set_ylabel("Count")
+    ax.set_title("R2 score distribution")
+    img = wandb.Image(fig)
+    fig = plt.close(fig)
+
+    return img
+
 
 def plot_dms(true_dms, pred_dms, r2=None, layout="bar", interval=100):
     fig, ax = plt.subplots()

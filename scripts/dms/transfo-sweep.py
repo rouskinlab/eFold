@@ -81,7 +81,7 @@ def train(config=None):
         weight_decay=0#config["weight_decay"],
         ).to(device)
             
-
+        wandb.watch(model, log="all")
         trainer = Trainer(
             logger= WandbLogger(),
             max_epochs=200,#config['max_epochs'],

@@ -129,90 +129,101 @@ class PredictionLogger(pl.Callback):
         features, labels = batch
         predictions = outputs
 
-        for i in range(predictions.shape[0]):
-            len_seq = torch.count_nonzero(features[i]).item()
+        # for i in range(predictions.shape[0]):
+        #     len_seq = torch.count_nonzero(features[i]).item()
 
-            self.test_examples["seq"].append(features[i].cpu()[:len_seq].numpy())
+        #     self.test_examples["seq"].append(features[i].cpu()[:len_seq].numpy())
 
-            if self.data == "dms":
-                self.test_examples["pred"].append(predictions[i].cpu()[:len_seq])
-                self.test_examples["true"].append(labels[i].cpu()[:len_seq])
-                self.test_examples["score"].append(
-                    r2_score(predictions[i], labels[i], features[i])
-                )
+        #     if self.data == "dms":
+        #         self.test_examples["pred"].append(predictions[i].cpu()[:len_seq])
+        #         self.test_examples["true"].append(labels[i].cpu()[:len_seq])
+        #         self.test_examples["score"].append(
+        #             r2_score(predictions[i], labels[i])
+        #         )
 
-            else:
-                self.test_examples["pred"].append(
-                    predictions[i].cpu()[:len_seq, :len_seq].numpy()
-                )
-                self.test_examples["true"].append(
-                    labels[i].cpu()[:len_seq, :len_seq].bool().numpy()
-                )
-                self.test_examples["score"].append(
-                    compute_f1(predictions[i], labels[i])
-                )
+        #     else:
+        #         self.test_examples["pred"].append(
+        #             predictions[i].cpu()[:len_seq, :len_seq].numpy()
+        #         )
+        #         self.test_examples["true"].append(
+        #             labels[i].cpu()[:len_seq, :len_seq].bool().numpy()
+        #         )
+        #         self.test_examples["score"].append(
+        #             compute_f1(predictions[i], labels[i])
+        #         )
 
     def on_test_end(self, trainer, pl_module):
         if not self.wandb_log or rank_zero_only.rank != 0:
             return
 
-        self.log_valid_example()
+        # self.log_valid_example()
 
-        ## Log best and worst predictions of test dataset ##
+        # ## Log best and worst predictions of test dataset ##
 
-        for key in self.test_examples.keys():
-            self.test_examples[key] = np.array(self.test_examples[key], dtype=object)
+        # for key in self.test_examples.keys():
+        #     self.test_examples[key] = np.array(self.test_examples[key], dtype=object)
 
-        # Select best and worst predictions
-        idx_sorted = np.argsort(self.test_examples["score"])[::-1]
-        best_worst_idx = np.concatenate(
-            (idx_sorted[-self.n_best :], idx_sorted[: self.n_best])
-        )
+        # # Select best and worst predictions
+        # idx_sorted = np.argsort(self.test_examples["score"])[::-1]
+        # best_worst_idx = np.concatenate(
+        #     (idx_sorted[-self.n_best :], idx_sorted[: self.n_best])
+        # )
 
-        sequences = self.test_examples["seq"][best_worst_idx]
-        true_outputs = self.test_examples["true"][best_worst_idx]
-        pred_outputs = self.test_examples["pred"][best_worst_idx]
-        scores = self.test_examples["score"][best_worst_idx]
+        # sequences = self.test_examples["seq"][best_worst_idx]
+        # true_outputs = self.test_examples["true"][best_worst_idx]
+        # pred_outputs = self.test_examples["pred"][best_worst_idx]
+        # scores = self.test_examples["score"][best_worst_idx]
 
-        # Plot best and worst predictions
-        fig_list = []
-        for true_output, pred_output in zip(true_outputs, pred_outputs):
-            if self.data == "dms":
-                fig_list.append(plot_dms(true_output, pred_output))
-            else:
-                fig_list.append(plot_structure(true_output, pred_output))
+        # # Plot best and worst predictions
+        # fig_list = []
+        # for true_output, pred_output in zip(true_outputs, pred_outputs):
+        #     if self.data == "dms":
+        #         fig_list.append(plot_dms(true_output, pred_output))
+        #     else:
+        #         fig_list.append(plot_structure(true_output, pred_output))
 
-        # Make list of figures into a wandb table
-        df = pd.DataFrame(
-            {
-                "seq": [
-                    "".join([int2seq[char] for char in seq[seq != 0]])
-                    for seq in sequences
-                ],
-                "structures": fig_list,
-                "score": scores,
-            }
-        )
+        # # Make list of figures into a wandb table
+        # df = pd.DataFrame(
+        #     {
+        #         "seq": [
+        #             "".join([int2seq[char] for char in seq[seq != 0]])
+        #             for seq in sequences
+        #         ],
+        #         "structures": fig_list,
+        #         "score": scores,
+        #     }
+        # )
 
-        wandb.log({"final/best_worst": wandb.Table(dataframe=df)})
+        # wandb.log({"final/best_worst": wandb.Table(dataframe=df)})
 
-        ## Log correlation of F1 score and sequence lengths ##
+        # ## Log correlation of F1 score and sequence lengths ##
 
-        fig = go.Figure(
-            data=go.Scatter(
-                x=[len(seq[seq != 0]) for seq in self.test_examples["seq"]],
-                y=self.test_examples["score"],
-                mode="markers",
-            )
-        )
-        score_type = "R2 score" if self.data == "dms" else "F1 score"
-        fig.update_layout(
-            title=f'Sequence lenght vs {score_type}. Mean score: {self.test_examples["score"].mean():.2f}',
-            xaxis_title="Sequence length",
-            yaxis_title=score_type,
-        )
+        # fig = go.Figure(
+        #     data=go.Scatter(
+        #         x=[len(seq[seq != 0]) for seq in self.test_examples["seq"]],
+        #         y=self.test_examples["score"],
+        #         mode="markers",
+        #     )
+        # )
+        # score_type = "R2 score" if self.data == "dms" else "F1 score"
+        # fig.update_layout(
+        #     title=f'Sequence lenght vs {score_type}. Mean score: {self.test_examples["score"].mean():.2f}',
+        #     xaxis_title="Sequence length",
+        #     yaxis_title=score_type,
+        # )
 
-        wandb.log({"final/score_vs_lenght": fig})
+        # wandb.log({"final/score_vs_lenght": fig})
+        
+        
+        # # plot the whole validation set
+        # figs = []
+        # for true_output, pred_output in zip(self.valid_examples["true"], self.valid_examples["pred"]):
+        #     if self.data == "dms":
+        #         figs.append(plot_dms(true_output, pred_output))
+        #     else:
+        #         figs.append(plot_structure(true_output, pred_output))
+        # wandb.log({"valid/whole_set": wandb.Image(figs)})
+        
 
     def log_valid_example(self):
         fig_list = []

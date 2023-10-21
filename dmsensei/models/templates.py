@@ -8,7 +8,7 @@ import numpy as np
 from ..config import TEST_SETS_NAMES, UKN
 from scipy.stats.stats import pearsonr
 from rouskinhf import seq2int
-
+import wandb
 
 class Model(pl.LightningModule):
     def __init__(self, lr: float, loss_fn, optimizer_fn, **kwargs):
@@ -102,14 +102,14 @@ class DMSModel(Model):
         # Compute and log loss
         mask = label != UKN
         loss = self.loss_fn(outputs[mask], label[mask])
-        r2 = mean(
-            tensor(
+        r2_scores =  tensor(
                 [
                     metrics.r2_score(y_true, y_pred)
                     for y_true, y_pred in zip(label, outputs)
                 ]
             )
-        )
+        r2 = r2_scores.mean()
+        r2_std = r2_scores.std()
         mae = mean(
             tensor(
                 [
@@ -132,9 +132,11 @@ class DMSModel(Model):
         # Logging to Wandb
         self.log("valid/loss", loss)
         self.log("valid/r2", r2)
+        self.log("valid/r2_std", r2_std)
         self.log("valid/mae", mae)
         self.log("valid/mean", this_mean)
         self.log("valid/std", this_std)
+        wandb.log({"valid/r2_hist": wandb.Histogram(r2_scores)})
         # self.log("valid/mae_ACGU", mae_ACGU)
         
         return outputs, loss
