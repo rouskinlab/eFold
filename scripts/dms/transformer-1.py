@@ -36,8 +36,8 @@ if __name__ == "__main__":
         force_download=False,
         batch_size=4,
         num_workers=1,
-        train_split=0.05,
-        valid_split=0,
+        train_split=6,
+        valid_split=4,
         overfit_mode=True
     )
 
@@ -61,7 +61,7 @@ if __name__ == "__main__":
 
     # train with both splits
     trainer = Trainer(
-        max_epochs=1000,
+        max_epochs=1,
         log_every_n_steps=5,
         logger=wandb_logger if USE_WANDB else None,
         accelerator=device,
@@ -73,7 +73,7 @@ if __name__ == "__main__":
     )
 
     trainer.fit(model, datamodule=dm)
-    # trainer.test(model, datamodule=dm)
+    trainer.test(model, datamodule=dm)
     
     if USE_WANDB:
         wandb.finish()

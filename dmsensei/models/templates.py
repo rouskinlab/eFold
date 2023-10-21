@@ -108,8 +108,6 @@ class DMSModel(Model):
                     for y_true, y_pred in zip(label, outputs)
                 ]
             )
-        r2 = r2_scores.mean()
-        r2_std = r2_scores.std()
         mae = mean(
             tensor(
                 [
@@ -131,8 +129,7 @@ class DMSModel(Model):
 
         # Logging to Wandb
         self.log("valid/loss", loss)
-        self.log("valid/r2", r2)
-        self.log("valid/r2_std", r2_std)
+        self.log("valid/r2",  mean(r2_scores))
         self.log("valid/mae", mae)
         self.log("valid/mean", this_mean)
         self.log("valid/std", this_std)
