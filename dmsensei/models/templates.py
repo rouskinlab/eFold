@@ -133,7 +133,7 @@ class DMSModel(Model):
         self.log("valid/mae", mae)
         self.log("valid/mean", this_mean)
         self.log("valid/std", this_std)
-        wandb.log({"valid/r2_hist": wandb.Histogram(r2_scores)})
+        # wandb.log({"valid/r2_hist": wandb.Histogram(r2_scores)})
         # self.log("valid/mae_ACGU", mae_ACGU)
         
         return outputs, loss

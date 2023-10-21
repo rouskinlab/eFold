@@ -105,6 +105,6 @@ def train(config=None):
 
 if __name__ == "__main__":
 
-    sweep_id = wandb.sweep(sweep=sweep_configuration, project="transfo2_ribonanza_sweep")
+    sweep_id = wandb.sweep(sweep=sweep_configuration, project="transfo4_ribonanza_sweep")
     wandb.agent(sweep_id=sweep_id, function=train, count=100)
     
