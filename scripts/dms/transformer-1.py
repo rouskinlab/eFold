@@ -24,21 +24,21 @@ if __name__ == "__main__":
     USE_WANDB = True
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        wandb_logger = WandbLogger(project="dms")
+        wandb_logger = WandbLogger(project="dms-alby_test")
 
     model = 'transformer'
     data = 'dms'
 
     # Create dataset
     dm = DataModule(
-        name="utr",
+        name="ribonanza",
         data=data,
         force_download=False,
-        batch_size=4,
+        batch_size=128,
         num_workers=1,
-        train_split=6,
-        valid_split=4,
-        overfit_mode=True
+        train_split=25000,
+        valid_split=2857,
+        overfit_mode=False
     )
 
     model = create_model(
@@ -46,12 +46,12 @@ if __name__ == "__main__":
         model=model,
         ntoken=5,
         n_struct=2,
-        d_model= 128,
+        d_model= 32,
         nhead=16,
-        d_hid=1024,
-        nlayers=48,
+        d_hid=32,
+        nlayers=8,
         dropout=0.0,
-        lr=1e-5,
+        lr=1e-3,
         weight_decay=0,
         wandb=USE_WANDB,
     )
@@ -61,11 +61,11 @@ if __name__ == "__main__":
 
     # train with both splits
     trainer = Trainer(
-        max_epochs=1,
-        log_every_n_steps=5,
+        accelerator=device, devices=2, strategy="ddp",
+        max_epochs=1500,
+        log_every_n_steps=100,
         logger=wandb_logger if USE_WANDB else None,
-        accelerator=device,
-        callbacks=[  EarlyStopping(monitor="valid/loss", mode='min', patience=5),
+        callbacks=[  #EarlyStopping(monitor="valid/loss", mode='min', patience=5),
            PredictionLogger(data="dms"),
            ModelChecker(log_every_nstep=1000, model=model),
         ] if USE_WANDB else [],
@@ -73,7 +73,7 @@ if __name__ == "__main__":
     )
 
     trainer.fit(model, datamodule=dm)
-    trainer.test(model, datamodule=dm)
+    # trainer.test(model, datamodule=dm)
     
     if USE_WANDB:
         wandb.finish()

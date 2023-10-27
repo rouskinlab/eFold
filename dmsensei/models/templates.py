@@ -54,9 +54,9 @@ class StructureModel(Model):
         mFMI = metrics.compute_mFMI(outputs, label, threshold=0.5)
 
         # Logging to Wandb
-        self.log("valid/loss", loss)
-        self.log("valid/f1", f1)
-        self.log("valid/mFMI", mFMI)
+        self.log("valid/loss", loss, sync_dist=True)
+        self.log("valid/f1", f1, sync_dist=True)
+        self.log("valid/mFMI", mFMI, sync_dist=True)
 
         return outputs, loss
 
@@ -92,16 +92,20 @@ class DMSModel(Model):
     def validation_step(self, batch, batch_idx):
         inputs, label = batch
 
-        mask = (inputs == seq2int["G"]) | (inputs == seq2int["U"])
-        assert (
-            label[mask] == UKN
-        ).all(), "Data is not consistent: G and U bases are not UKN."
+        # mask = (inputs == seq2int["G"]) | (inputs == seq2int["U"])
+        # assert (
+        #     label[mask] == UKN
+        # ).all(), "Data is not consistent: G and U bases are not UKN."
 
         outputs = self.forward(inputs)
 
         # Compute and log loss
         mask = label != UKN
         loss = self.loss_fn(outputs[mask], label[mask])
+        
+        # label[label==UKN] = -1
+        # loss = self.loss_fn(outputs, label)
+        
         r2_scores =  tensor(
                 [
                     metrics.r2_score(y_true, y_pred)
@@ -128,11 +132,11 @@ class DMSModel(Model):
         this_mean, this_std = metrics.mean_std_dms(outputs)
 
         # Logging to Wandb
-        self.log("valid/loss", loss)
-        self.log("valid/r2",  mean(r2_scores))
-        self.log("valid/mae", mae)
-        self.log("valid/mean", this_mean)
-        self.log("valid/std", this_std)
+        self.log("valid/loss", np.sqrt(loss.item()), sync_dist=True)
+        self.log("valid/r2",  mean(r2_scores), sync_dist=True)
+        self.log("valid/mae", mae, sync_dist=True)
+        self.log("valid/mean", this_mean, sync_dist=True)
+        self.log("valid/std", this_std, sync_dist=True)
         # wandb.log({"valid/r2_hist": wandb.Histogram(r2_scores)})
         # self.log("valid/mae_ACGU", mae_ACGU)
         
@@ -141,19 +145,24 @@ class DMSModel(Model):
     def training_step(self, batch, batch_idx):
         inputs, label = batch
 
-        mask = (inputs == seq2int["G"]) | (inputs == seq2int["U"])
-        assert (
-            label[mask] == UKN
-        ).all(), "Data is not consistent: G and U bases are not UKN."
+        # mask = (inputs == seq2int["G"]) | (inputs == seq2int["U"])
+        # assert (
+        #     label[mask] == UKN
+        # ).all(), "Data is not consistent: G and U bases are not UKN."
 
         outputs = self.forward(inputs)
 
         # Compute and log loss
         mask = label != UKN
         loss = self.loss_fn(outputs[mask], label[mask])
+        # mask = torch.zeros_like(label)
+        # mask[label != UKN] = 1
+        # loss = self.loss_fn(outputs*mask, label*mask)
+        # label[label==UKN] = -1
+        # loss = self.loss_fn(outputs, label)
 
         # Logging to TensorBoard
-        self.log("train/loss", np.sqrt(loss.item()))
+        self.log("train/loss", np.sqrt(loss.item()), sync_dist=True)
 
         return loss
 
@@ -180,7 +189,7 @@ class DMSModel(Model):
         )
 
         test_set_name = TEST_SETS_NAMES[self.data_type][dataloader_idx]
-        self.log(f"test/{test_set_name}/r2", r2, add_dataloader_idx=False)
-        self.log(f"test/{test_set_name}/mae", mae, add_dataloader_idx=False)
+        self.log(f"test/{test_set_name}/r2", r2, add_dataloader_idx=False, sync_dist=True)
+        self.log(f"test/{test_set_name}/mae", mae, add_dataloader_idx=False, sync_dist=True)
         
         return outputs
