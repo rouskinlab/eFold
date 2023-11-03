@@ -69,8 +69,8 @@ def r2_score(y_true, y_pred):
     return (
         1
         - torch.sum((y_true - y_pred) ** 2)
-        / torch.sum((y_true - torch.mean(y_true)) ** 2).item()
-    )
+        / torch.sum((y_true - torch.mean(y_true)) ** 2)
+    ).item()
 
 
 def mae_score(y_true, y_pred):
@@ -86,7 +86,7 @@ def mae_score(y_true, y_pred):
     y_pred = y_pred[mask]
     y_true = y_true[mask]
 
-    return torch.mean(torch.abs(y_true - y_pred))
+    return torch.mean(torch.abs(y_true - y_pred)).item()
 
 
 # def mae_score_ACGU(sequence, y_true, y_pred):
