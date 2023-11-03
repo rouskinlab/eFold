@@ -34,6 +34,7 @@ class Model(pl.LightningModule):
             return optimizer
 
         scheduler = {"scheduler": self.scheduler(optimizer, patience=5, factor=0.5, verbose=True), "interval": "epoch", "monitor": "valid/loss"}
+        # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=self.gamma)
         return [optimizer], [scheduler]
         
 
@@ -99,6 +100,13 @@ class DMSModel(Model):
 
         outputs = self.forward(inputs)
 
+        # Get either the DMS or the SHAPE part of the prediction
+        mask_GU = (inputs == seq2int["G"]) | (inputs == seq2int["U"]) 
+        isShape = ((label != UKN) & mask_GU).any(dim=1).long()
+        isShape = isShape.view(-1, 1).expand(-1, inputs.shape[1])
+
+        outputs = torch.gather(outputs, 2, isShape.unsqueeze(2)).squeeze(2)
+
         # Compute and log loss
         mask = label != UKN
         loss = self.loss_fn(outputs[mask], label[mask])
@@ -152,6 +160,13 @@ class DMSModel(Model):
 
         outputs = self.forward(inputs)
 
+        # Get either the DMS or the SHAPE part of the prediction
+        mask_GU = (inputs == seq2int["G"]) | (inputs == seq2int["U"]) 
+        isShape = ((label != UKN) & mask_GU).any(dim=1).long()
+        isShape = isShape.view(-1, 1).expand(-1, inputs.shape[1])
+
+        outputs = torch.gather(outputs, 2, isShape.unsqueeze(2)).squeeze(2)
+
         # Compute and log loss
         mask = label != UKN
         loss = self.loss_fn(outputs[mask], label[mask])
@@ -169,6 +184,16 @@ class DMSModel(Model):
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         inputs, label = batch
         outputs = self.forward(inputs)
+
+        # Get either the DMS or the SHAPE part of the prediction
+        # mask_GU = (inputs == seq2int["G"]) | (inputs == seq2int["U"]) 
+        # isShape = ((label != UKN) & mask_GU).any(dim=1).long()
+        # isShape = isShape.view(-1, 1).expand(-1, inputs.shape[1])
+
+        # outputs = torch.gather(outputs, 2, isShape.unsqueeze(2)).squeeze(2)
+
+        outputs = outputs[:,:,0]
+        # outputs = torch.ones_like(outputs)/2
 
         r2 = mean(
             tensor(

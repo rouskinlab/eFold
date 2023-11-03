@@ -66,11 +66,26 @@ class Transformer(DMSModel):
         # self.decoder.bias.data.zero_()
         # self.decoder.weight.data.uniform_(0, initrange)
 
-        self.resnet = ResLayer(n_blocks=4, dim_in=1, dim_out=1, kernel_size=3, dropout=dropout)
+        self.resnet = nn.Sequential(ResLayer(n_blocks=4, dim_in=1, dim_out=8, kernel_size=3, dropout=dropout),
+                                    # ResLayer(n_blocks=4, dim_in=4, dim_out=8, kernel_size=3, dropout=dropout),
+                                    # ResLayer(n_blocks=4, dim_in=8, dim_out=4, kernel_size=3, dropout=dropout),
+                                    ResLayer(n_blocks=4, dim_in=8, dim_out=1, kernel_size=3, dropout=dropout))
+                                    
 
         # self.sigmoid = nn.Sigmoid()
         # self.init_weights()
-        self.output_net = nn.Sequential(
+        self.output_net_DMS = nn.Sequential(
+            nn.Linear(d_model, d_model*2),
+            nn.LayerNorm(d_model*2),
+            nn.ReLU(inplace=True),
+            #nn.Flatten(start_dim=1, end_dim=-1),  
+            nn.Linear(d_model*2, d_model),
+            nn.LayerNorm(d_model),
+            nn.ReLU(inplace=True),  
+            nn.Linear(d_model, 1)
+        )
+
+        self.output_net_SHAPE = nn.Sequential(
             nn.Linear(d_model, d_model*2),
             nn.LayerNorm(d_model*2),
             nn.ReLU(inplace=True),
@@ -86,7 +101,8 @@ class Transformer(DMSModel):
                 torch.nn.init.xavier_uniform(m.weight*0.001)
                 m.bias.data.fill_(0.)
 
-        self.output_net.apply(init_weights)
+        self.output_net_DMS.apply(init_weights)
+        self.output_net_SHAPE.apply(init_weights)
         # self.train_losses = []
         # self.val_losses = []
         # self.val_corr = []
@@ -110,10 +126,10 @@ class Transformer(DMSModel):
 
         src = self.resnet(src.unsqueeze(dim=1)).squeeze(dim=1)
 
-        # output = self.output_net(src)
-        # output = self.sigmoid(torch.flatten(output, start_dim=1))
-        #print(src.flatten(start_dim=1, end_dim=-1).size())
-        return self.output_net(src).flatten(start_dim=1, end_dim=-1)
+        DMS = self.output_net_DMS(src)
+        SHAPE = self.output_net_SHAPE(src)
+        return torch.concatenate((DMS, SHAPE), dim=-1)
+        # return DMS.squeeze(dim=-1)
 
 
 class PositionalEncoding(nn.Module):

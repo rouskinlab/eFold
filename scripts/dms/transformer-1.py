@@ -4,6 +4,7 @@ sys.path.append(os.path.abspath("."))
 from dmsensei import DataModule, create_model, metrics
 from dmsensei.config import device
 from dmsensei.core.callbacks import PredictionLogger, ModelChecker
+from lightning.pytorch.callbacks import LearningRateMonitor
 from lightning.pytorch import Trainer
 from dmsensei.core.callbacks import PredictionLogger
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
@@ -16,28 +17,34 @@ import os
 from lightning.pytorch.loggers import WandbLogger
 import wandb 
 import numpy as np
+import torch
 
 sys.path.append(os.path.abspath("."))
 
 if __name__ == "__main__":
-    
+
     USE_WANDB = True
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        wandb_logger = WandbLogger(project="dms-alby_test")
+        wandb_logger = WandbLogger(project="dms-alby_test", name='baseline_TEST')
 
     model = 'transformer'
     data = 'dms'
 
+    d_model = 64
+    lr = 1e-3
+    gamma = 0.999
+    batch_size = 64
+
     # Create dataset
     dm = DataModule(
-        name="ribonanza",
+        name=["utr"],
         data=data,
         force_download=False,
-        batch_size=128,
+        batch_size=batch_size,
         num_workers=1,
-        train_split=25000,
-        valid_split=2857,
+        train_split=1000,
+        valid_split=234,
         overfit_mode=False
     )
 
@@ -46,34 +53,41 @@ if __name__ == "__main__":
         model=model,
         ntoken=5,
         n_struct=2,
-        d_model= 32,
+        d_model= d_model,
         nhead=16,
-        d_hid=32,
+        d_hid= d_model,
         nlayers=8,
         dropout=0.0,
-        lr=1e-3,
+        lr=lr,
         weight_decay=0,
         wandb=USE_WANDB,
+        gamma=gamma
     )
+
+    # model.load_state_dict(torch.load('/root/DMSensei/dmsensei/models/trained_models/smooth-blaze-41.pt',
+    #                                  map_location=torch.device('cuda')))
 
     if USE_WANDB:
         wandb_logger.watch(model, log="all")
 
     # train with both splits
     trainer = Trainer(
-        accelerator=device, devices=2, strategy="ddp",
-        max_epochs=1500,
+        accelerator=device, devices=1,# strategy="ddp",
+        precision="16-mixed",
+        accumulate_grad_batches=2,
+        max_epochs = 200,
         log_every_n_steps=100,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[  #EarlyStopping(monitor="valid/loss", mode='min', patience=5),
+            LearningRateMonitor(logging_interval='epoch'),
            PredictionLogger(data="dms"),
            ModelChecker(log_every_nstep=1000, model=model),
         ] if USE_WANDB else [],
         enable_checkpointing=False,
     )
 
-    trainer.fit(model, datamodule=dm)
-    # trainer.test(model, datamodule=dm)
+    # trainer.fit(model, datamodule=dm)
+    trainer.test(model, datamodule=dm)
     
     if USE_WANDB:
         wandb.finish()
