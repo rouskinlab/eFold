@@ -23,10 +23,12 @@ sys.path.append(os.path.abspath("."))
 
 if __name__ == "__main__":
 
+    wandb.login(relogin=True)
+
     USE_WANDB = True
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        wandb_logger = WandbLogger(project="dms-alby_test", name='baseline_TEST')
+        wandb_logger = WandbLogger(project="dms-alby_test")
 
     model = 'transformer'
     data = 'dms'
@@ -64,18 +66,18 @@ if __name__ == "__main__":
         gamma=gamma
     )
 
-    # model.load_state_dict(torch.load('/root/DMSensei/dmsensei/models/trained_models/smooth-blaze-41.pt',
-    #                                  map_location=torch.device('cuda')))
+    model.load_state_dict(torch.load('/root/DMSensei/dmsensei/models/trained_models/smooth-blaze-41.pt',
+                                     map_location=torch.device('cuda')))
 
     if USE_WANDB:
         wandb_logger.watch(model, log="all")
 
     # train with both splits
     trainer = Trainer(
-        accelerator=device, devices=1,# strategy="ddp",
+        accelerator=device, devices=2, strategy="ddp",
         precision="16-mixed",
         accumulate_grad_batches=2,
-        max_epochs = 200,
+        max_epochs = 100,
         log_every_n_steps=100,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[  #EarlyStopping(monitor="valid/loss", mode='min', patience=5),

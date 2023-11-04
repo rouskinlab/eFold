@@ -59,8 +59,6 @@ class Transformer(DMSModel):
         self.transformer_encoder = nn.Sequential(*[TransformerEncoderLayer(d_model,nhead,d_hid,dropout,batch_first=True,norm_first=True,activation="gelu",)for i in range(nlayers)])
         # self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
 
-        # self.decoder = nn.Linear(d_model, 1)
-        # self.output_train_end = None
         initrange = 1
         self.encoder.weight.data.uniform_(0, initrange)
         # self.decoder.bias.data.zero_()
@@ -72,7 +70,6 @@ class Transformer(DMSModel):
                                     ResLayer(n_blocks=4, dim_in=8, dim_out=1, kernel_size=3, dropout=dropout))
                                     
 
-        # self.sigmoid = nn.Sigmoid()
         # self.init_weights()
         self.output_net_DMS = nn.Sequential(
             nn.Linear(d_model, d_model*2),
@@ -103,11 +100,6 @@ class Transformer(DMSModel):
 
         self.output_net_DMS.apply(init_weights)
         self.output_net_SHAPE.apply(init_weights)
-        # self.train_losses = []
-        # self.val_losses = []
-        # self.val_corr = []
-        # self.epoch_count = 0
-        # self.sigmoid = nn.Sigmoid()
 
     def forward(self, src: Tensor) -> Tensor:
         """

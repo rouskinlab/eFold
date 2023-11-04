@@ -93,11 +93,6 @@ class DMSModel(Model):
     def validation_step(self, batch, batch_idx):
         inputs, label = batch
 
-        # mask = (inputs == seq2int["G"]) | (inputs == seq2int["U"])
-        # assert (
-        #     label[mask] == UKN
-        # ).all(), "Data is not consistent: G and U bases are not UKN."
-
         outputs = self.forward(inputs)
 
         # Get either the DMS or the SHAPE part of the prediction
@@ -111,15 +106,15 @@ class DMSModel(Model):
         mask = label != UKN
         loss = self.loss_fn(outputs[mask], label[mask])
         
-        # label[label==UKN] = -1
-        # loss = self.loss_fn(outputs, label)
-        
-        r2_scores =  tensor(
+        r2 = mean(
+            tensor(
                 [
                     metrics.r2_score(y_true, y_pred)
                     for y_true, y_pred in zip(label, outputs)
                 ]
             )
+        )
+        
         mae = mean(
             tensor(
                 [
@@ -141,22 +136,16 @@ class DMSModel(Model):
 
         # Logging to Wandb
         self.log("valid/loss", np.sqrt(loss.item()), sync_dist=True)
-        self.log("valid/r2",  mean(r2_scores), sync_dist=True)
+        self.log("valid/r2",  r2, sync_dist=True)
         self.log("valid/mae", mae, sync_dist=True)
         self.log("valid/mean", this_mean, sync_dist=True)
         self.log("valid/std", this_std, sync_dist=True)
-        # wandb.log({"valid/r2_hist": wandb.Histogram(r2_scores)})
         # self.log("valid/mae_ACGU", mae_ACGU)
         
         return outputs, loss
 
     def training_step(self, batch, batch_idx):
         inputs, label = batch
-
-        # mask = (inputs == seq2int["G"]) | (inputs == seq2int["U"])
-        # assert (
-        #     label[mask] == UKN
-        # ).all(), "Data is not consistent: G and U bases are not UKN."
 
         outputs = self.forward(inputs)
 
@@ -170,11 +159,6 @@ class DMSModel(Model):
         # Compute and log loss
         mask = label != UKN
         loss = self.loss_fn(outputs[mask], label[mask])
-        # mask = torch.zeros_like(label)
-        # mask[label != UKN] = 1
-        # loss = self.loss_fn(outputs*mask, label*mask)
-        # label[label==UKN] = -1
-        # loss = self.loss_fn(outputs, label)
 
         # Logging to TensorBoard
         self.log("train/loss", np.sqrt(loss.item()), sync_dist=True)
@@ -186,13 +170,13 @@ class DMSModel(Model):
         outputs = self.forward(inputs)
 
         # Get either the DMS or the SHAPE part of the prediction
-        # mask_GU = (inputs == seq2int["G"]) | (inputs == seq2int["U"]) 
-        # isShape = ((label != UKN) & mask_GU).any(dim=1).long()
-        # isShape = isShape.view(-1, 1).expand(-1, inputs.shape[1])
+        mask_GU = (inputs == seq2int["G"]) | (inputs == seq2int["U"]) 
+        isShape = ((label != UKN) & mask_GU).any(dim=1).long()
+        isShape = isShape.view(-1, 1).expand(-1, inputs.shape[1])
 
-        # outputs = torch.gather(outputs, 2, isShape.unsqueeze(2)).squeeze(2)
+        outputs = torch.gather(outputs, 2, isShape.unsqueeze(2)).squeeze(2)
 
-        outputs = outputs[:,:,0]
+        # outputs = outputs[:,:,0]
         # outputs = torch.ones_like(outputs)/2
 
         r2 = mean(
