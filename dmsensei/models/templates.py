@@ -34,6 +34,7 @@ class Model(pl.LightningModule):
             return optimizer
 
         scheduler = {"scheduler": self.scheduler(optimizer, patience=5, factor=0.5, verbose=True), "interval": "epoch", "monitor": "valid/loss"}
+        # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=self.gamma)
         return [optimizer], [scheduler]
         
 
@@ -54,9 +55,9 @@ class StructureModel(Model):
         mFMI = metrics.compute_mFMI(outputs, label, threshold=0.5)
 
         # Logging to Wandb
-        self.log("valid/loss", loss)
-        self.log("valid/f1", f1)
-        self.log("valid/mFMI", mFMI)
+        self.log("valid/loss", loss, sync_dist=True)
+        self.log("valid/f1", f1, sync_dist=True)
+        self.log("valid/mFMI", mFMI, sync_dist=True)
 
         return outputs, loss
 
@@ -92,22 +93,28 @@ class DMSModel(Model):
     def validation_step(self, batch, batch_idx):
         inputs, label = batch
 
-        mask = (inputs == seq2int["G"]) | (inputs == seq2int["U"])
-        assert (
-            label[mask] == UKN
-        ).all(), "Data is not consistent: G and U bases are not UKN."
-
         outputs = self.forward(inputs)
+
+        # Get either the DMS or the SHAPE part of the prediction
+        mask_GU = (inputs == seq2int["G"]) | (inputs == seq2int["U"]) 
+        isShape = ((label != UKN) & mask_GU).any(dim=1).long()
+        isShape = isShape.view(-1, 1).expand(-1, inputs.shape[1])
+
+        outputs = torch.gather(outputs, 2, isShape.unsqueeze(2)).squeeze(2)
 
         # Compute and log loss
         mask = label != UKN
         loss = self.loss_fn(outputs[mask], label[mask])
-        r2_scores =  tensor(
+        
+        r2 = mean(
+            tensor(
                 [
                     metrics.r2_score(y_true, y_pred)
                     for y_true, y_pred in zip(label, outputs)
                 ]
             )
+        )
+        
         mae = mean(
             tensor(
                 [
@@ -128,12 +135,11 @@ class DMSModel(Model):
         this_mean, this_std = metrics.mean_std_dms(outputs)
 
         # Logging to Wandb
-        self.log("valid/loss", loss)
-        self.log("valid/r2",  mean(r2_scores))
-        self.log("valid/mae", mae)
-        self.log("valid/mean", this_mean)
-        self.log("valid/std", this_std)
-        # wandb.log({"valid/r2_hist": wandb.Histogram(r2_scores)})
+        self.log("valid/loss", np.sqrt(loss.item()), sync_dist=True)
+        self.log("valid/r2",  r2, sync_dist=True)
+        self.log("valid/mae", mae, sync_dist=True)
+        self.log("valid/mean", this_mean, sync_dist=True)
+        self.log("valid/std", this_std, sync_dist=True)
         # self.log("valid/mae_ACGU", mae_ACGU)
         
         return outputs, loss
@@ -141,25 +147,37 @@ class DMSModel(Model):
     def training_step(self, batch, batch_idx):
         inputs, label = batch
 
-        mask = (inputs == seq2int["G"]) | (inputs == seq2int["U"])
-        assert (
-            label[mask] == UKN
-        ).all(), "Data is not consistent: G and U bases are not UKN."
-
         outputs = self.forward(inputs)
+
+        # Get either the DMS or the SHAPE part of the prediction
+        mask_GU = (inputs == seq2int["G"]) | (inputs == seq2int["U"]) 
+        isShape = ((label != UKN) & mask_GU).any(dim=1).long()
+        isShape = isShape.view(-1, 1).expand(-1, inputs.shape[1])
+
+        outputs = torch.gather(outputs, 2, isShape.unsqueeze(2)).squeeze(2)
 
         # Compute and log loss
         mask = label != UKN
         loss = self.loss_fn(outputs[mask], label[mask])
 
         # Logging to TensorBoard
-        self.log("train/loss", np.sqrt(loss.item()))
+        self.log("train/loss", np.sqrt(loss.item()), sync_dist=True)
 
         return loss
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         inputs, label = batch
         outputs = self.forward(inputs)
+
+        # Get either the DMS or the SHAPE part of the prediction
+        mask_GU = (inputs == seq2int["G"]) | (inputs == seq2int["U"]) 
+        isShape = ((label != UKN) & mask_GU).any(dim=1).long()
+        isShape = isShape.view(-1, 1).expand(-1, inputs.shape[1])
+
+        outputs = torch.gather(outputs, 2, isShape.unsqueeze(2)).squeeze(2)
+
+        # outputs = outputs[:,:,0]
+        # outputs = torch.ones_like(outputs)/2
 
         r2 = mean(
             tensor(
@@ -180,7 +198,7 @@ class DMSModel(Model):
         )
 
         test_set_name = TEST_SETS_NAMES[self.data_type][dataloader_idx]
-        self.log(f"test/{test_set_name}/r2", r2, add_dataloader_idx=False)
-        self.log(f"test/{test_set_name}/mae", mae, add_dataloader_idx=False)
+        self.log(f"test/{test_set_name}/r2", r2, add_dataloader_idx=False, sync_dist=True)
+        self.log(f"test/{test_set_name}/mae", mae, add_dataloader_idx=False, sync_dist=True)
         
         return outputs
