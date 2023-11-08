@@ -3,7 +3,8 @@ import torch
 
 DEFAULT_FORMAT = float32
 UKN = -1000.0
-
+VAL_G = 0.09
+VAL_U = 0.095
 device = (
     "cuda"
     if cuda.is_available()
@@ -14,6 +15,7 @@ device = (
 
 TEST_SETS_NAMES = {
     "structure": ["CT_files_pdbee"],
+    'sequence': [],
     "dms": ["sarah_supermodel", "utr", "SARS2", "pri-miRNA"],
 }
 

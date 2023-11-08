@@ -15,9 +15,9 @@ from dmsensei.config import device
 import sys
 import os
 from lightning.pytorch.loggers import WandbLogger
-import wandb 
+import wandb
 import numpy as np
-import torch
+import pickle
 
 sys.path.append(os.path.abspath("."))
 
@@ -26,10 +26,11 @@ if __name__ == "__main__":
     USE_WANDB = True
     print("Running on device: {}".format(device))
     if USE_WANDB:
+        wandb.login()       
         wandb_logger = WandbLogger(project="dms-alby_test")
 
-    model = 'transformer'
-    data = 'dms'
+    model = "transformer"
+    data = "dms"
 
     d_model = 64
     lr = 1e-3
@@ -45,7 +46,7 @@ if __name__ == "__main__":
         num_workers=1,
         train_split=1000,
         valid_split=234,
-        overfit_mode=False
+        overfit_mode=False,
     )
 
     model = create_model(
@@ -53,9 +54,9 @@ if __name__ == "__main__":
         model=model,
         ntoken=5,
         n_struct=2,
-        d_model= d_model,
+        d_model=d_model,
         nhead=16,
-        d_hid= d_model,
+        d_hid=d_model,
         nlayers=8,
         dropout=0.0,
         lr=lr,
@@ -64,30 +65,35 @@ if __name__ == "__main__":
         gamma=gamma
     )
 
-    # model.load_state_dict(torch.load('/root/DMSensei/dmsensei/models/trained_models/terrifying-skeleton-48.pt',
-    #                                  map_location=torch.device('cuda')))
 
     if USE_WANDB:
         wandb_logger.watch(model, log="all")
 
     # train with both splits
     trainer = Trainer(
-        accelerator=device, devices=2, strategy="ddp",
+        accelerator=device,
+        devices=2,
+        strategy="ddp",
         precision="16-mixed",
         accumulate_grad_batches=2,
-        max_epochs = 100,
+        max_epochs=100,
         log_every_n_steps=100,
         logger=wandb_logger if USE_WANDB else None,
-        callbacks=[  #EarlyStopping(monitor="valid/loss", mode='min', patience=5),
-            LearningRateMonitor(logging_interval='epoch'),
-           PredictionLogger(data="dms"),
-           ModelChecker(log_every_nstep=1000, model=model),
-        ] if USE_WANDB else [],
+        callbacks=[  # EarlyStopping(monitor="valid/loss", mode='min', patience=5),
+            LearningRateMonitor(logging_interval="epoch"),
+            PredictionLogger(data="dms"),
+            ModelChecker(log_every_nstep=1000, model=model),
+        ]
+        if USE_WANDB
+        else [],
         enable_checkpointing=False,
     )
 
-    # trainer.fit(model, datamodule=dm)
+    trainer.fit(model, datamodule=dm)
     trainer.test(model, datamodule=dm)
-    
+
+    if USE_WANDB:
+        pickle.dump(model, open(os.path.join('models', WandbLogger.name + ".pkl"), "wb"))
+
     if USE_WANDB:
         wandb.finish()
