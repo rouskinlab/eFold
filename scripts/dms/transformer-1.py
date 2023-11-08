@@ -23,8 +23,6 @@ sys.path.append(os.path.abspath("."))
 
 if __name__ == "__main__":
 
-    wandb.login(relogin=True)
-
     USE_WANDB = True
     print("Running on device: {}".format(device))
     if USE_WANDB:
@@ -42,7 +40,7 @@ if __name__ == "__main__":
     dm = DataModule(
         name=["utr"],
         data=data,
-        force_download=False,
+        force_download=True,
         batch_size=batch_size,
         num_workers=1,
         train_split=1000,
@@ -66,8 +64,8 @@ if __name__ == "__main__":
         gamma=gamma
     )
 
-    model.load_state_dict(torch.load('/root/DMSensei/dmsensei/models/trained_models/smooth-blaze-41.pt',
-                                     map_location=torch.device('cuda')))
+    # model.load_state_dict(torch.load('/root/DMSensei/dmsensei/models/trained_models/terrifying-skeleton-48.pt',
+    #                                  map_location=torch.device('cuda')))
 
     if USE_WANDB:
         wandb_logger.watch(model, log="all")
