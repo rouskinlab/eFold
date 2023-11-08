@@ -36,7 +36,6 @@ if __name__ == "__main__":
     lr = 1e-3
     gamma = 0.999
     batch_size = 64
-    device = "mps"
 
     # Create dataset
     dm = DataModule(
