@@ -101,11 +101,11 @@ if __name__ == "__main__":
             name=["ribo-test"],
             data='sequence',
             force_download=False,
-            batch_size=32,
+            batch_size=256,
             num_workers=1,
             train_split=0,
             valid_split=0,
-            predict_split=1.,
+            predict_split=3000,
             overfit_mode=False,
         ),
     ))
