@@ -11,6 +11,7 @@ import pandas as pd
 from rouskinhf import int2seq
 import plotly.graph_objects as go
 from ..config import TEST_SETS_NAMES
+from .metrics import pearson_coefficient
 
 
 class PredictionLogger(pl.Callback):
@@ -216,6 +217,25 @@ class PredictionLogger(pl.Callback):
             )
 
             wandb.log({f"test/{test_set_name}/score_vs_lenght": fig})
+
+
+            ## Log scatter of F1 score vs pearson ##
+            if self.data_type == "dms":
+                fig = go.Figure(
+                    data=go.Scatter(
+                        # x=[len(seq[seq != 0]) for seq in test_examples["seq"]],
+                        x=[pearson_coefficient(torch.tensor(y_true.astype(float)), torch.tensor(y_pred.astype(float))) for y_true, y_pred in zip(test_examples['true'], test_examples['pred'])],
+                        y=test_examples["score"],
+                        mode="markers",
+                    )
+                )
+                fig.update_layout(
+                    title=f'Pearson vs R2 score',
+                    xaxis_title="Pearson",
+                    yaxis_title='R2 score',
+                )
+
+                wandb.log({f"test/{test_set_name}/r2_vs_pearson": fig})
         
         
         # plot the whole validation set

@@ -15,6 +15,8 @@ from lightning.pytorch.loggers import WandbLogger
 from ..config import UKN
 import copy
 
+import numpy as np
+
 
 class DataModule(pl.LightningDataModule):
     def __init__(
@@ -216,6 +218,8 @@ class DMSDataset(TemplateDataset):
     def __getitem__(self, index) -> tuple:
         sequence = tensor(self.sequences[index], dtype=int64)
         dms = tensor(self.dms[index], dtype=DEFAULT_FORMAT)
+        # sequence = tensor(self.sequences[index].astype(int), dtype=int64)
+        # dms = tensor(self.dms[index].astype(float), dtype=DEFAULT_FORMAT)
 
         assert len(sequence) == len(dms), "Data is not consistent"
 
