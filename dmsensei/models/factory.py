@@ -1,12 +1,14 @@
 from .dms import MultiLayerPerceptron as dms_mlp
 from .dms import Transformer as dms_transformer
+from .dms import Evoformer as dms_evoformer
+
 import wandb as wandb_module
 
 
 class ModelFactory:
     def __init__(self):
         self.data = ["dms", "structure"]
-        self.models = {"dms": ["mlp", "transformer"], "structure": []}
+        self.models = {"dms": ["mlp", "transformer", "evoformer"], "structure": []}
 
     def __call__(self, data: str, model: str, **kwargs):
         data = data.lower()
@@ -21,6 +23,8 @@ class ModelFactory:
                 return dms_mlp(**kwargs)
             if model == "transformer":
                 return dms_transformer(*args, **kwargs)
+            if model== "evoformer":
+                return dms_evoformer(*args, **kwargs)
 
         raise NotImplementedError(f"Model {model} for data {data} not implemented.")
 

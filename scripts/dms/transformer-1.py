@@ -42,7 +42,7 @@ if __name__ == "__main__":
     dm = DataModule(
         name=["utr"],
         data=data,
-        force_download=False,
+        force_download=True,
         batch_size=batch_size,
         num_workers=1,
         train_split=1000,
@@ -63,8 +63,9 @@ if __name__ == "__main__":
         lr=lr,
         weight_decay=0,
         wandb=USE_WANDB,
-        gamma=gamma,
-    ).to(device)
+        gamma=gamma
+    )
+
 
     if USE_WANDB:
         wandb_logger.watch(model, log="all")

@@ -17,6 +17,7 @@ TEST_SETS_NAMES = {
     "structure": ["CT_files_pdbee"],
     "dms": ["sarah_supermodel", "utr", "SARS2"],
     'sequence': [],
+    "dms": ["sarah_supermodel", "utr", "SARS2", "pri-miRNA"],
 }
 
 

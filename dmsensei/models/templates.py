@@ -201,8 +201,18 @@ class DMSModel(Model):
             )
         )
 
+        pearson = mean(
+            tensor(
+                [
+                    metrics.pearson_coefficient(y_true, y_pred)
+                    for y_true, y_pred in zip(label, outputs)
+                ]
+            )
+        )
+
         test_set_name = TEST_SETS_NAMES[self.data_type][dataloader_idx]
         self.log(f"test/{test_set_name}/r2", r2, add_dataloader_idx=False, sync_dist=True)
+        self.log(f"test/{test_set_name}/pearson", pearson, add_dataloader_idx=False, sync_dist=True)
         self.log(f"test/{test_set_name}/mae", mae, add_dataloader_idx=False, sync_dist=True)
         
         return outputs

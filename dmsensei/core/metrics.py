@@ -2,6 +2,8 @@ import torch
 from rouskinhf import seq2int
 from ..config import UKN
 
+from scipy import stats
+
 def compute_f1(pred_matrix, target_matrix, threshold=0.5):
     """
     Compute the F1 score of the predictions.
@@ -71,6 +73,22 @@ def r2_score(y_true, y_pred):
         - torch.sum((y_true - y_pred) ** 2)
         / torch.sum((y_true - torch.mean(y_true)) ** 2)
     ).item()
+
+def pearson_coefficient(y_true, y_pred):
+    """
+    Compute the Pearson correlation coefficient of the predictions.
+
+    :param y_true: True values
+    :param y_pred: Predicted values
+    :return: pearson coefficient
+    """
+    mask = y_true != UKN
+    y_pred = y_pred[mask]
+    y_true = y_true[mask]
+
+    res = stats.pearsonr(y_true.detach().cpu().numpy(), y_pred.detach().cpu().numpy())
+
+    return res[0]
 
 
 def mae_score(y_true, y_pred):
