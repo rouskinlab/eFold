@@ -17,17 +17,16 @@ import os
 from lightning.pytorch.loggers import WandbLogger
 import wandb
 import numpy as np
-import torch
-from dmsensei.util.ribonanza import format_to_ribonanza
+import pickle
 
 sys.path.append(os.path.abspath("."))
 
 if __name__ == "__main__":
-    wandb.login()
 
-    USE_WANDB = False
+    USE_WANDB = True
     print("Running on device: {}".format(device))
     if USE_WANDB:
+        wandb.login()       
         wandb_logger = WandbLogger(project="dms-alby_test")
 
     model = "transformer"
@@ -40,16 +39,16 @@ if __name__ == "__main__":
     device = "mps"
 
     # Create dataset
-    # dm = DataModule(
-    #     name=["utr"],
-    #     data=data,
-    #     force_download=False,
-    #     batch_size=batch_size,
-    #     num_workers=1,
-    #     train_split=1000,
-    #     valid_split=234,
-    #     overfit_mode=False,
-    # )
+    dm = DataModule(
+        name=["utr"],
+        data=data,
+        force_download=False,
+        batch_size=batch_size,
+        num_workers=1,
+        train_split=1000,
+        valid_split=234,
+        overfit_mode=False,
+    )
 
     model = create_model(
         data=data,
@@ -67,19 +66,16 @@ if __name__ == "__main__":
         gamma=gamma,
     ).to(device)
 
-    # use on cpu
-    model.load_state_dict(torch.load('/Users/yvesmartin/src/DMSensei/model.pt', map_location=torch.device(device)))
-
     if USE_WANDB:
         wandb_logger.watch(model, log="all")
 
     # train with both splits
     trainer = Trainer(
         accelerator=device,
-        # devices=2,
-        # strategy="ddp",
-        # precision="16-mixed",
-        # accumulate_grad_batches=2,
+        devices=2,
+        strategy="ddp",
+        precision="16-mixed",
+        accumulate_grad_batches=2,
         max_epochs=100,
         log_every_n_steps=100,
         logger=wandb_logger if USE_WANDB else None,
@@ -93,26 +89,11 @@ if __name__ == "__main__":
         enable_checkpointing=False,
     )
 
-    # trainer.fit(model, datamodule=dm)
-    # trainer.test(model, datamodule=dm)
-    out = format_to_ribonanza(trainer.predict(
-        model,
-        datamodule=DataModule(
-            name=["ribo-test"],
-            data='sequence',
-            force_download=False,
-            batch_size=256,
-            num_workers=1,
-            train_split=0,
-            valid_split=0,
-            predict_split=3000,
-            overfit_mode=False,
-        ),
-    ))
+    trainer.fit(model, datamodule=dm)
+    trainer.test(model, datamodule=dm)
 
-    out.to_csv("submission.csv", index=False)
-
-
+    if USE_WANDB:
+        pickle.dump(model, open(os.path.join('models', WandbLogger.name + ".pkl"), "wb"))
 
     if USE_WANDB:
         wandb.finish()
