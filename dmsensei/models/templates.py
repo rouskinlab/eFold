@@ -5,7 +5,7 @@ import torch.nn as nn
 from torch import Tensor, tensor, zeros_like, mean
 import torch
 import numpy as np
-from ..config import TEST_SETS_NAMES, UKN
+from ..config import TEST_SETS_NAMES, UKN, VAL_G, VAL_U
 from scipy.stats.stats import pearsonr
 from rouskinhf import seq2int
 import wandb
@@ -37,7 +37,11 @@ class Model(pl.LightningModule):
         # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=self.gamma)
         return [optimizer], [scheduler]
         
-
+    def predict(self, inputs):
+        dms, shape = self.forward(inputs)
+        dms[(inputs == seq2int["G"])] = VAL_G
+        dms[(inputs == seq2int["U"])] = VAL_U
+        return dms, shape
 
 
 class StructureModel(Model):

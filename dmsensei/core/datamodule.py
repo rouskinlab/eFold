@@ -5,7 +5,7 @@ from numpy import array, ndarray
 from ..config import DEFAULT_FORMAT, device, TEST_SETS_NAMES
 from .embeddings import base_pairs_to_int_dot_bracket, sequence_to_int
 import torch
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, Subset
 from typing import Tuple
 import lightning.pytorch as pl
 import torch.nn.functional as F
@@ -14,7 +14,6 @@ import wandb
 from lightning.pytorch.loggers import WandbLogger
 from ..config import UKN
 import copy
-
 
 class DataModule(pl.LightningDataModule):
     def __init__(
@@ -26,6 +25,7 @@ class DataModule(pl.LightningDataModule):
         num_workers: int = 1,
         train_split: float = None,
         valid_split: float = 4096,
+        predict_split: float = 0,
         zero_padding_to=None,
         overfit_mode=False,
         shuffle_train=True,
@@ -43,6 +43,7 @@ class DataModule(pl.LightningDataModule):
             num_workers: number of workers for the dataloaders
             train_split: percentage of the dataset to use for training or number of samples to use for training. If None, the entire dataset minus the validation set is used for training
             valid_split: percentage of the dataset to use for validation or number of samples to use for validation
+            predict_split: percentage of the dataset to use for prediction or number of samples to use for prediction
             zero_padding_to: pad sequences to this length. If None, sequences are not padded.
             overfit_mode: if True, the train set is used for validation and testing. Useful for debugging. Default is False.
         """
@@ -53,7 +54,7 @@ class DataModule(pl.LightningDataModule):
         self.data = data
         self.force_download = force_download
         self.dataloader_args = {"batch_size": batch_size, "num_workers": num_workers}
-        self.splits = (train_split, valid_split)
+        self.splits = (train_split, valid_split, predict_split)
         self.zero_padding_to = zero_padding_to
         self.shuffle = {
             "train": shuffle_train,
@@ -85,9 +86,7 @@ class DataModule(pl.LightningDataModule):
         return merge
 
     def setup(self, stage: str = None):
-        if stage == "fit" or stage is None:
-            if not self._use_multiple_datasets(self.name):
-                self.name = [self.name]
+        if stage in ["fit", None, "predict"]:
             dataFull = self._dataset_merge(
                 [
                     Dataset(
@@ -99,14 +98,20 @@ class DataModule(pl.LightningDataModule):
                     for name in self.name
                 ]
             )
+        if stage == "fit" or stage is None:
+            if not self._use_multiple_datasets(self.name):
+                self.name = [self.name]
 
-            self.size_sets = _compute_size_sets(len(dataFull), *self.splits)
+            self.size_sets = _compute_size_sets(len(dataFull), *self.splits[:2])
             self.train_set, self.val_set, _ = random_split(dataFull, self.size_sets)
 
         if stage == "test" or stage is None:
             self.test_sets = self._select_test_dataset(
                 data=self.data, force_download=self.force_download
             )
+
+        if stage == "predict" or stage is None:
+            self.predict_set = Subset(dataFull, range(0, round(len(dataFull) * self.splits[2]) if type(self.splits[2]) == float else self.splits[2]))
 
         if stage is None:
             self.collate_fn = dataFull.collate_fn
@@ -139,7 +144,12 @@ class DataModule(pl.LightningDataModule):
         ]
 
     def predict_dataloader(self):
-        pass
+        return DataLoader(
+            self.predict_set,
+            shuffle = False,
+            collate_fn=self.collate_fn,
+            **self.dataloader_args,
+        )
 
     def teardown(self, stage: str):
         # Used to clean-up when the run is finished
@@ -166,6 +176,10 @@ class Dataset:
             )
         elif data == "structure":
             return StructureDataset(
+                name, force_download=force_download, zero_padding_to=zero_padding_to
+            )
+        elif data == "sequence":
+            return SequenceDataset(
                 name, force_download=force_download, zero_padding_to=zero_padding_to
             )
         else:
@@ -262,6 +276,63 @@ class DMSDataset(TemplateDataset):
         )
 
         return sequences, dms
+
+
+
+class SequenceDataset(TemplateDataset):
+    def __init__(self, name: str, force_download, zero_padding_to) -> None:
+        data = super().__init__(
+            name,
+            data="sequence",
+            force_download=force_download,
+            zero_padding_to=zero_padding_to,
+        )
+
+        # quality check
+        assert (
+            len(data["references"]) == len(data["sequences"])
+        ), "Data is not consistent"
+
+
+    def __getitem__(self, index) -> tuple:
+
+        sequence = tensor(self.sequences[index], dtype=int64)
+
+        return sequence
+
+    def __repr__(self) -> str:
+        return f"SequenceDataset(name={self.name}, len={len(self.sequences)})"
+
+    def collate_fn(self, batch):
+        """Creates mini-batch tensors from the list of tuples (sequence, dms). Zero-pads sequences and dms. The sequences have variable length.
+
+        Args:
+            batch: list of tuple (sequence, dms).
+
+        Returns:
+            sequences: torch tensor of shape (batch_size, max_sequence_length)
+        """
+
+        sequences = batch
+        padding_length = 0
+        # Find longest sequence in batch
+        if self.zero_padding_to != None:
+            max_all_sequences_length = max([len(sequence) for sequence in sequences])
+            padding_length = self.zero_padding_to - max_all_sequences_length
+
+            if padding_length < 0:
+                raise ValueError(
+                    "The maximum sequence length of the dataset is greater than the zero padding length. Please increase the zero padding length."
+                )
+
+        # Merge sequences (from tuple of 1D tensor to 2D tensor).
+        sequences = F.pad(
+            nn.utils.rnn.pad_sequence(sequences, batch_first=True),
+            (0, padding_length),
+            value=0,
+        )
+
+        return sequences
 
 
 class StructureDataset(TemplateDataset):
