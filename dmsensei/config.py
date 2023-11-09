@@ -3,7 +3,7 @@ import torch
 
 DEFAULT_FORMAT = float32
 UKN = -1000.0
-VAL_G = 0.09
+VAL_G = 0.095
 VAL_U = 0.095
 device = (
     "cuda"
