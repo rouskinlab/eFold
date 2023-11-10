@@ -8,3 +8,4 @@ torcheval>=0.0.6
 tensorboard>=2.11.2
 wandb
 rouskinhf
+einops
