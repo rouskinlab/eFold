@@ -35,11 +35,13 @@ def int_dot_bracket_to_one_hot(int_dot_bracket: torch.tensor):
 
 
 def base_pairs_to_pairing_matrix(base_pairs, sequence_length):
+    # TODO #6 #Vectorize this function
     pairing_matrix = torch.zeros((sequence_length, sequence_length))
     for i, j in base_pairs:
         pairing_matrix[i.item(), j.item()] = 1
         pairing_matrix[j.item(), i.item()] = 1
     return pairing_matrix
+
 
 def pairing_matrix_to_base_pairs(pairing_matrix):
     base_pairs = []

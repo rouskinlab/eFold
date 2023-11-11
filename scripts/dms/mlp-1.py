@@ -24,21 +24,26 @@ sys.path.append(os.path.abspath("."))
 
 if __name__ == "__main__":
     print("Running on device: {}".format(device))
-    
+
     BATCH_SIZE = 4
     LR = 5e-5
     WD = 1e-4
     EMBED = 128
     MODEL = 16
     DROPOUT = [0.5, 0.5, 0.3, 0.3, 0.2]
-    
-    wandb_logger = WandbLogger(project="dms mlp", name="mlp - 5L - lr {} - batch {} - wd {} - embed {} - model {} - dropout".format(LR, BATCH_SIZE, WD, EMBED, MODEL))
+
+    wandb_logger = WandbLogger(
+        project="dms mlp",
+        name="mlp - 5L - lr {} - batch {} - wd {} - embed {} - model {} - dropout".format(
+            LR, BATCH_SIZE, WD, EMBED, MODEL
+        ),
+    )
 
     MAX_LEN = 1024
 
     # Create dataset
     dm = DataModule(
-        name=['utr','utr'],
+        name=["utr", "utr"],
         data="dms",
         force_download=False,
         batch_size=BATCH_SIZE,

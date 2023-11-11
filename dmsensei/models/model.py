@@ -190,8 +190,12 @@ class Model(pl.LightningModule):
             if "dms" in data and "dms" in outputs
             else None,
             "shape": {
-                "r2": metrics.r2_score(pred=shape_preds, true=shape_targets, batch=True),
-                "mae": metrics.mae_score(pred=shape_preds, true=shape_targets, batch=True),
+                "r2": metrics.r2_score(
+                    pred=shape_preds, true=shape_targets, batch=True
+                ),
+                "mae": metrics.mae_score(
+                    pred=shape_preds, true=shape_targets, batch=True
+                ),
                 "pearson": metrics.pearson_coefficient(
                     pred=shape_preds, true=shape_targets, batch=True
                 ),

@@ -7,8 +7,8 @@ VAL_GU = 0.095
 device = (
     "cuda"
     if cuda.is_available()
-      else "mps" # moi j'aime bien le mps
-     if backends.mps.is_available()
+    else "mps"  # moi j'aime bien le mps
+    if backends.mps.is_available()
     else "cpu"
 )
 

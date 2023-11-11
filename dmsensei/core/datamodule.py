@@ -135,7 +135,7 @@ class DataModule(pl.LightningDataModule):
         return [
             Dataset(
                 name=name,
-                data_type = self.data_type,
+                data_type=self.data_type,
                 force_download=force_download,
             )
             for name in TEST_SETS_NAMES

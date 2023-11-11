@@ -23,17 +23,16 @@ import pickle
 sys.path.append(os.path.abspath("."))
 
 if __name__ == "__main__":
-
     USE_WANDB = False
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        wandb.login()       
+        wandb.login()
         wandb_logger = WandbLogger(project="dms-alby_test")
 
     d_model = 64
     lr = 1e-3
     gamma = 0.999
-    batch_size = 32
+    batch_size = 16
 
     # Create dataset
     dm = DataModule(
@@ -41,10 +40,10 @@ if __name__ == "__main__":
         data_type=["dms", "shape"],
         force_download=False,
         batch_size=batch_size,
-        num_workers=9,
+        num_workers=5,
         train_split=0,
         valid_split=0,
-        predict_split=100,
+        predict_split=1.0,
         overfit_mode=False,
     )
 
@@ -61,10 +60,16 @@ if __name__ == "__main__":
         lr=lr,
         weight_decay=0,
         wandb=USE_WANDB,
-        gamma=gamma
+        gamma=gamma,
     )
-    
-    model.load_state_dict(torch.load('/Users/yvesmartin/src/DMSensei/smooth-blaze-41.pt', map_location=torch.device('mps')))
+
+    model.load_state_dict(
+        torch.load(
+            "/Users/yvesmartin/src/DMSensei/smooth-blaze-41.pt",
+            map_location=torch.device("mps"),
+        )
+    )
+    model.to(device)
 
     if USE_WANDB:
         wandb_logger.watch(model, log="all")
@@ -92,19 +97,25 @@ if __name__ == "__main__":
     # trainer.fit(model, datamodule=dm)
     # trainer.test(model, datamodule=dm)
     out = trainer.predict(model, datamodule=dm)
-    
+
     # post process the prediction
     out = pd.DataFrame([unit for batch in out for unit in batch])
-    sequence_ids = pd.read_csv('test_sequences_ids.csv')
-    out = pd.merge(sequence_ids, out, on='reference')
-    dms, shape = np.concatenate(out['dms'].values), np.concatenate(out['shape'].values)
-    pd.DataFrame({'reactivity_DMS_MaP': dms, 'reactivity_2A3_MaP': shape}).reset_index().rename(columns={'index': 'id'}).to_csv('predictions.csv', index=False)
-    
+    sequence_ids = pd.read_csv("test_sequences_ids.csv")
+    out = pd.merge(sequence_ids, out, on="reference")
+    dms, shape = np.concatenate(out["dms"].values), np.concatenate(out["shape"].values)
+    pd.DataFrame(
+        {"reactivity_DMS_MaP": dms, "reactivity_2A3_MaP": shape}
+    ).reset_index().rename(columns={"index": "id"}).to_csv(
+        "predictions.csv", index=False
+    )
+
     # save predictions
     pickle.dump(out, open("predictions.pkl", "wb"))
 
     if USE_WANDB:
-        pickle.dump(model, open(os.path.join('models', WandbLogger.name + ".pkl"), "wb"))
+        pickle.dump(
+            model, open(os.path.join("models", WandbLogger.name + ".pkl"), "wb")
+        )
 
     if USE_WANDB:
         wandb.finish()
