@@ -24,8 +24,15 @@ from typing import Union
 import pdb
 from typing import List
 
+
 class Dataset(TorchDataset):
-    def __init__(self, name: str, data_type:List[str], force_download: bool, quality: float = 1.0) -> None:
+    def __init__(
+        self,
+        name: str,
+        data_type: List[str],
+        force_download: bool,
+        quality: float = 1.0,
+    ) -> None:
         super().__init__()
         self.name = name
         data = import_dataset(name, force_download=force_download)
@@ -53,22 +60,18 @@ class Dataset(TorchDataset):
 
         data, metadata = [], []
         for index in range(len(self)):
-            sequence = get_array("sequences", index, astype=np.int32)
-            dms = get_array("dms", index, astype=np.float32)
-            structure = get_array(
-                "base_pairs", index, astype=np.int32
-            )  # would be great to have a
-            shape = get_array("shape", index, astype=np.float32)
-
-            line = {
-                "sequence": sequence,
-                "dms": dms,
-                "structure": structure,
-                "shape": shape,
+            line = {}
+            astype = {
+                "dms": np.float32,
+                "structure": np.int32,
+                "shape": np.float32,
+                "base_pairs": np.int32,
             }
-            drop_keys = [k for k, v in line.items() if v is None]
-            for k in drop_keys:
-                del line[k]
+            for name in self.data_type:
+                arr = get_array(name, index, astype=astype[name])
+                if arr is not None:
+                    line[name] = arr
+
             data.append(line)
             metadata.append(
                 {
@@ -86,12 +89,9 @@ class Dataset(TorchDataset):
         padding_values = {
             "sequence": 0,
             "dms": UKN,
-            "structure": seq2int["X"],
             "shape": UKN,
         }
-        if data_type == "sequence":
-            return F.pad(arr, (0, L - len(arr)), value=padding_values[data_type])
-        elif data_type == "structure":
+        if data_type == "structure":
             return base_pairs_to_pairing_matrix(arr, L)
         else:
             return F.pad(arr, (0, L - len(arr)), value=padding_values[data_type])
@@ -104,10 +104,10 @@ class Dataset(TorchDataset):
         lengths = [len(d["sequence"]) for d in data]
         for k in self.data_type:
             padded_data = [
-                    (idx, self._pad(d[k], max(lengths), k))
-                    for idx, d in enumerate(data)
-                    if k in d
-                ]
+                (idx, self._pad(d[k], max(lengths), k))
+                for idx, d in enumerate(data)
+                if k in d
+            ]
             if len(padded_data) == 0:
                 continue
             indexes, values = zip(*padded_data)
@@ -116,7 +116,7 @@ class Dataset(TorchDataset):
             else:
                 data_out[k] = {"indexes": tensor(indexes), "values": stack(values)}
 
-        metadata_out = {'length': lengths}
+        metadata_out = {"length": lengths}
         for k in metadata[0].keys():
             metadata_out[k] = [d[k] for d in metadata]
 
