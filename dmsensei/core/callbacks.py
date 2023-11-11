@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 from ..config import TEST_SETS_NAMES
 from .metrics import pearson_coefficient
 
-
+# TODO: #10 update this guy to receive the batch_metrics from valid and test
 class PredictionLogger(pl.Callback):
     def __init__(self, data, n_best_worst=5, wandb_log=True):
         self.wandb_log = wandb_log
