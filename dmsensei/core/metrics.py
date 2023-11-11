@@ -4,8 +4,30 @@ from ..config import UKN
 
 from scipy import stats
 
+# def my_decorator(func):
+#     def wrapper(*args, **kwargs):
+#         print("Something is happening before the function is called.")
+#         result = func(*args, **kwargs)
+#         print("Something is happening after the function is called.")
+#         return result
+#     return wrapper
 
-def compute_f1(pred, true, threshold=0.5):
+
+# make a decorator to run the metrics on the batch
+def batch_mean(fn):
+    def wrapper(pred, true, batch=False, *args, **kwargs):
+        if not batch:
+            return fn(pred=pred, true=true, *args, **kwargs)
+        scores = []
+        for p, t in zip(pred, true):
+            scores.append(fn(pred=p, true=t, *args, **kwargs))
+        return torch.mean(torch.tensor(scores)).item()
+
+    return wrapper
+
+
+@batch_mean
+def compute_f1(pred, true, batch=None, threshold=0.5):
     """
     Compute the F1 score of the predictions.
 
@@ -24,28 +46,8 @@ def compute_f1(pred, true, threshold=0.5):
         return (2 * torch.sum(pred * true) / sum_pair).item()
 
 
-def compute_f1_batch(pred, true, threshold=0.5):
-    """
-    Compute the mean F1 score of the predictions for a batch.
-
-    :param pred: Predicted pairing matrix probability  (L,L)
-    :param true: True binary pairing matrix (L,L)
-    :return: F1 score for this RNA structure
-    """
-
-    scores = []
-    for pred, true in zip(pred, true):
-        scores.append(
-            compute_f1(
-                pred=pred,
-                true=true,
-                threshold=threshold,
-            )
-        )
-    return torch.mean(torch.tensor(scores)).item()
-
-
-def compute_mFMI(pred, true, threshold=0.5):
+@batch_mean
+def compute_mFMI(pred, true, batch=None, threshold=0.5):
     """
     Compute the mFMI score of the predictions.
 
@@ -74,28 +76,8 @@ def compute_mFMI(pred, true, threshold=0.5):
     return mFMI.item()
 
 
-def compute_mFMI_batch(pred, true, threshold=0.5):
-    """
-    Compute the mean mFMI score of the predictions for a batch.
-
-    :param pred: Predicted pairing matrix probability  (L,L)
-    :param true: True binary pairing matrix (L,L)
-    :return: mFMI score for this RNA structure
-    """
-
-    scores = []
-    for pred, true in zip(pred, true):
-        scores.append(
-            compute_mFMI(
-                pred=pred,
-                true=true,
-                threshold=threshold,
-            )
-        )
-    return torch.mean(torch.tensor(scores)).item()
-
-
-def r2_score(pred, true):
+@batch_mean
+def r2_score(pred, true, batch=None):
     """
     Compute the R2 score of the predictions.
 
@@ -113,22 +95,10 @@ def r2_score(pred, true):
     ).item()
 
 
-def r2_score_batch(pred, true):
-    """
-    Compute the mean R2 score of the predictions for a batch.
+@batch_mean
+def pearson_coefficient(pred, true, batch=None):
+    # TODO # 7
 
-    :param true: True values
-    :param pred: Predicted values
-    :return: R2 score
-    """
-
-    scores = []
-    for true, pred in zip(true, pred):
-        scores.append(r2_score(pred=pred, true=true))
-    return torch.mean(torch.tensor(scores)).item()
-
-
-def pearson_coefficient(pred, true):
     """
     Compute the Pearson correlation coefficient of the predictions.
 
@@ -147,22 +117,8 @@ def pearson_coefficient(pred, true):
     return res[0]
 
 
-def pearson_coefficient_batch(pred, true):
-    """
-    Compute the mean Pearson correlation coefficient of the predictions for a batch.
-
-    :param true: True values
-    :param pred: Predicted values
-    :return: pearson coefficient
-    """
-
-    scores = []
-    for true, pred in zip(true, pred):
-        scores.append(pearson_coefficient(pred=pred, true=true))
-    return torch.mean(torch.tensor(scores)).item()
-
-
-def mae_score(pred, true):
+@batch_mean
+def mae_score(pred, true, batch=None):
     """
     Compute the Mean Average Error of the predictions.
 
@@ -176,18 +132,3 @@ def mae_score(pred, true):
     true = true[mask]
 
     return torch.mean(torch.abs(true - pred)).item()
-
-
-def mae_score_batch(pred, true):
-    """
-    Compute the mean Mean Average Error of the predictions for a batch.
-
-    :param true: True values
-    :param pred: Predicted values
-    :return: MAE score
-    """
-
-    scores = []
-    for true, pred in zip(true, pred):
-        scores.append(mae_score(pred=pred, true=true))
-    return torch.mean(torch.tensor(scores)).item()
