@@ -89,9 +89,9 @@ class Model(pl.LightningModule):
                 "reference": metadata["reference"][i],
             }
             if "dms" in predictions.keys():
-                d["dms"] = predictions["dms"][i,:L].tolist()
+                d["dms"] = [round(d.item(),4) for d in predictions["dms"][i,:L]]
             if "shape" in predictions.keys():
-                d["shape"] = predictions["shape"][i,:L].tolist()
+                d["shape"] = [round(d.item(),4) for d in predictions["shape"][i,:L]]
             if "structure" in predictions.keys():
                 d["structure"] = pairing_matrix_to_base_pairs(predictions["structure"][i,:L])
             outputs.append(d)

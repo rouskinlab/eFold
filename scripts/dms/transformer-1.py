@@ -44,7 +44,7 @@ if __name__ == "__main__":
         num_workers=9,
         train_split=0,
         valid_split=0,
-        predict_split=1.,
+        predict_split=100,
         overfit_mode=False,
     )
 
@@ -92,7 +92,13 @@ if __name__ == "__main__":
     # trainer.fit(model, datamodule=dm)
     # trainer.test(model, datamodule=dm)
     out = trainer.predict(model, datamodule=dm)
-    out = [unit for batch in out for unit in batch]
+    
+    # post process the prediction
+    out = pd.DataFrame([unit for batch in out for unit in batch])
+    sequence_ids = pd.read_csv('test_sequences_ids.csv')
+    out = pd.merge(sequence_ids, out, on='reference')
+    dms, shape = np.concatenate(out['dms'].values), np.concatenate(out['shape'].values)
+    pd.DataFrame({'reactivity_DMS_MaP': dms, 'reactivity_2A3_MaP': shape}).reset_index().rename(columns={'index': 'id'}).to_csv('predictions.csv', index=False)
     
     # save predictions
     pickle.dump(out, open("predictions.pkl", "wb"))
