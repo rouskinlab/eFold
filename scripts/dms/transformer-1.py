@@ -17,6 +17,7 @@ import os
 from lightning.pytorch.loggers import WandbLogger
 import wandb
 import numpy as np
+import torch
 import pickle
 
 sys.path.append(os.path.abspath("."))
@@ -32,17 +33,18 @@ if __name__ == "__main__":
     d_model = 64
     lr = 1e-3
     gamma = 0.999
-    batch_size = 4
+    batch_size = 32
 
     # Create dataset
     dm = DataModule(
-        name=["ribonanza"],
+        name=["ribo-test"],
+        data_type=["dms", "shape"],
         force_download=False,
         batch_size=batch_size,
-        num_workers=1,
-        train_split=50,
-        valid_split=50,
-        predict_split=50,
+        num_workers=9,
+        train_split=0,
+        valid_split=0,
+        predict_split=1.,
         overfit_mode=False,
     )
 
@@ -61,6 +63,8 @@ if __name__ == "__main__":
         wandb=USE_WANDB,
         gamma=gamma
     )
+    
+    model.load_state_dict(torch.load('/Users/yvesmartin/src/DMSensei/smooth-blaze-41.pt', map_location=torch.device('mps')))
 
     if USE_WANDB:
         wandb_logger.watch(model, log="all")
@@ -85,9 +89,13 @@ if __name__ == "__main__":
         enable_checkpointing=False,
     )
 
-    trainer.fit(model, datamodule=dm)
-    trainer.test(model, datamodule=dm)
+    # trainer.fit(model, datamodule=dm)
+    # trainer.test(model, datamodule=dm)
     out = trainer.predict(model, datamodule=dm)
+    out = [unit for batch in out for unit in batch]
+    
+    # save predictions
+    pickle.dump(out, open("predictions.pkl", "wb"))
 
     if USE_WANDB:
         pickle.dump(model, open(os.path.join('models', WandbLogger.name + ".pkl"), "wb"))

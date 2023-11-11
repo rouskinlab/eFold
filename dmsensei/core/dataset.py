@@ -22,14 +22,14 @@ import copy
 import numpy as np
 from typing import Union
 import pdb
-
+from typing import List
 
 class Dataset(TorchDataset):
-    def __init__(self, name: str, force_download: bool, quality: float = 1.0) -> None:
+    def __init__(self, name: str, data_type:List[str], force_download: bool, quality: float = 1.0) -> None:
         super().__init__()
         self.name = name
         data = import_dataset(name, force_download=force_download)
-
+        self.data_type = data_type + ["sequence"]
         # save data
         self.references = data["references"]
         self.sequences = data["sequences"]
@@ -99,12 +99,10 @@ class Dataset(TorchDataset):
     def collate_fn(self, batch):
         data, metadata = zip(*batch)
 
-        data_types = ["sequence", "dms", "structure", "shape"]
-
         # pad and stack tensors
         data_out = {}
         lengths = [len(d["sequence"]) for d in data]
-        for k in data_types:
+        for k in self.data_type:
             padded_data = [
                     (idx, self._pad(d[k], max(lengths), k))
                     for idx, d in enumerate(data)

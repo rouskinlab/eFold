@@ -15,7 +15,7 @@ from lightning.pytorch.loggers import WandbLogger
 from ..config import UKN
 import copy
 import numpy as np
-from typing import Union
+from typing import Union, List
 from .dataset import Dataset
 
 
@@ -23,6 +23,7 @@ class DataModule(pl.LightningDataModule):
     def __init__(
         self,
         name: Union[str, list],
+        data_type: List[str] = ["dms", "shape", "structure"],
         force_download=False,
         batch_size: int = 32,
         num_workers: int = 1,
@@ -59,6 +60,7 @@ class DataModule(pl.LightningDataModule):
         self.force_download = force_download
         self.batch_size = batch_size
         self.num_workers = num_workers
+        self.data_type = data_type
         self.splits = {
             "train": train_split,
             "valid": valid_split,
@@ -97,6 +99,7 @@ class DataModule(pl.LightningDataModule):
             [
                 Dataset(
                     name=name,
+                    data_type=self.data_type,
                     force_download=self.force_download,
                 )
                 for name in self.name
@@ -132,6 +135,7 @@ class DataModule(pl.LightningDataModule):
         return [
             Dataset(
                 name=name,
+                data_type = self.data_type,
                 force_download=force_download,
             )
             for name in TEST_SETS_NAMES
