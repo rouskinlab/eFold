@@ -32,3 +32,20 @@ def sequence_to_one_hot(sequence_batch: torch.tensor):
 def int_dot_bracket_to_one_hot(int_dot_bracket: torch.tensor):
     """Converts a sequence to a one-hot encoding"""
     return nn.functional.one_hot(int_dot_bracket, len(dot2int))
+
+
+def base_pairs_to_pairing_matrix(base_pairs, sequence_length):
+    pairing_matrix = torch.zeros((sequence_length, sequence_length))
+    for i, j in base_pairs:
+        pairing_matrix[i.item(), j.item()] = 1
+        pairing_matrix[j.item(), i.item()] = 1
+    return pairing_matrix
+
+def pairing_matrix_to_base_pairs(pairing_matrix):
+    base_pairs = []
+    for i in range(pairing_matrix.shape[0]):
+        for j in range(pairing_matrix.shape[1]):
+            if pairing_matrix[i, j] == 1:
+                base_pairs.append([i, j])
+                pairing_matrix[j, i] = 0
+    return base_pairs

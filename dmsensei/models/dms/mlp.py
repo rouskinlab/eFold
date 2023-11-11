@@ -5,7 +5,7 @@ from ...config import DEFAULT_FORMAT, device
 from torch import optim, nn, utils, Tensor, tensor
 import lightning.pytorch as pl
 from ...core import metrics
-from ..templates import DMSModel
+from ..model import Model
 from ...core.embeddings import NUM_BASES
 from torcheval.metrics import R2Score
 
@@ -14,7 +14,7 @@ torch.seed()
 np.random.seed(0)
 
 
-class MultiLayerPerceptron(DMSModel):
+class MultiLayerPerceptron(Model):
     def __init__(
         self,
         input_dim,

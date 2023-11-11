@@ -10,29 +10,33 @@ from einops import rearrange
 import torch.nn.functional as F
 import numpy as np
 
-from ..templates import DMSModel
+from ..model import Model
 
 dir_name = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(dir_name, ".."))
 
-class Evoformer(DMSModel):
 
-    def __init__(self,
-                    ntoken: int,
-                    d_model: int,
-                    c_z: int,
-                    num_blocks: int,
-                    no_recycles: int,
-                    dropout: float = 0,
-                    lr: float = 1e-2,
-                    gamma: float = 1.0,
-                    loss_fn=nn.MSELoss(),
-                    optimizer_fn=torch.optim.Adam,
-                    **kwargs):
+class Evoformer(Model):
+    def __init__(
+        self,
+        ntoken: int,
+        d_model: int,
+        c_z: int,
+        num_blocks: int,
+        no_recycles: int,
+        dropout: float = 0,
+        lr: float = 1e-2,
+        gamma: float = 1.0,
+        loss_fn=nn.MSELoss(),
+        optimizer_fn=torch.optim.Adam,
+        **kwargs,
+    ):
         self.save_hyperparameters()
-        super(Evoformer, self).__init__(lr=lr, loss_fn=loss_fn, optimizer_fn=optimizer_fn, **kwargs)
+        super(Evoformer, self).__init__(
+            lr=lr, loss_fn=loss_fn, optimizer_fn=optimizer_fn, **kwargs
+        )
 
-        self.model_type = 'Evoformer'
+        self.model_type = "Evoformer"
         self.lr = lr
         self.gamma = gamma
         self.train_losses = []
@@ -40,56 +44,55 @@ class Evoformer(DMSModel):
 
         # Encoder layers
         self.encoder = nn.Embedding(ntoken, d_model)
-        self.encoder_adapter = nn.Linear(d_model, int(c_z/2))
+        self.encoder_adapter = nn.Linear(d_model, int(c_z / 2))
         self.activ = nn.ReLU()
         self.evoformer = EvoFold(
-            c_s = d_model,
-            c_z = c_z,
-            no_heads_s = 32,
-            no_heads_z = 4,
-            num_blocks = num_blocks,
+            c_s=d_model,
+            c_z=c_z,
+            no_heads_s=32,
+            no_heads_z=4,
+            num_blocks=num_blocks,
             dropout=dropout,
             no_recycles=no_recycles,
         )
 
         # self.output = ResLayer(dim_in=c_z,   dim_out=1, n_blocks=3, kernel_size=3, dropout=dropout)
-        self.output_net_DMS = nn.Sequential(#nn.Linear(d_model, d_model), 
-                                             #activation_map[activation],
-                                             nn.Linear(d_model, 1))
-        
-        self.output_net_SHAPE = nn.Sequential(#nn.Linear(d_model, d_model), 
-                                             #activation_map[activation],
-                                             nn.Linear(d_model, 1))
+        self.output_net_DMS = nn.Sequential(  # nn.Linear(d_model, d_model),
+            # activation_map[activation],
+            nn.Linear(d_model, 1)
+        )
 
+        self.output_net_SHAPE = nn.Sequential(  # nn.Linear(d_model, d_model),
+            # activation_map[activation],
+            nn.Linear(d_model, 1)
+        )
 
     def forward(self, src: Tensor) -> Tensor:
         # Encoding of RNA sequence
         # (N, L, d_model)
-        s = self.encoder(src)     
+        s = self.encoder(src)
 
         # (N, L, c_z / 2)
-        z = self.activ(self.encoder_adapter(s))   
+        z = self.activ(self.encoder_adapter(s))
         # Outer concatenation
         # (N,  c_z / 2, L, L)
-        z = z.unsqueeze(1).repeat(1,z.shape[1],1,1)                
+        z = z.unsqueeze(1).repeat(1, z.shape[1], 1, 1)
         # (N, c_z, L, L)
-        z = torch.cat((z, z.permute(0,2,1,3)), dim=-1)
+        z = torch.cat((z, z.permute(0, 2, 1, 3)), dim=-1)
 
         s = self.evoformer(s, z)
 
         # z = self.output(z.permute(0,3,1,2)).squeeze(1)
-        
+
         # Symmetrize
         # z = (z + z.permute(0,2,1)) / 2.0
 
         # output = self.output_adapter(s)
         # return output.squeeze(-1)
-    
+
         DMS = self.output_net_DMS(s)
         SHAPE = self.output_net_SHAPE(s)
         return torch.concatenate((DMS, SHAPE), dim=-1)
-
-
 
 
 class EvoBlock(nn.Module):
@@ -114,18 +117,16 @@ class EvoBlock(nn.Module):
         self.layernorm = nn.LayerNorm(c_s)
 
         # Adapter to add sequence rep to pair rep
-        self.sequence_to_pair = SequenceToPair(
-            c_s, c_z // 2, c_z
-        )
+        self.sequence_to_pair = SequenceToPair(c_s, c_z // 2, c_z)
 
         # bias attention heads
         self.pair_to_sequence = PairToSequence(c_z, no_heads_s)
 
-        self.seq_attention = Attention(
-            c_s, no_heads_s, c_s / no_heads_s, gated=True
-        )
+        self.seq_attention = Attention(c_s, no_heads_s, c_s / no_heads_s, gated=True)
 
-        self.resNet = ResLayer(dim_in=c_z, dim_out=c_z, n_blocks=2, kernel_size=3, dropout=dropout)
+        self.resNet = ResLayer(
+            dim_in=c_z, dim_out=c_z, n_blocks=2, kernel_size=3, dropout=dropout
+        )
 
         # self.tri_mul_out = TriangleMultiplicationOutgoing(
         #     c_z,
@@ -141,16 +142,13 @@ class EvoBlock(nn.Module):
         #     c_z,
         #     int(c_z / no_heads_z),
         #     no_heads_z,
-        # ) 
+        # )
 
         # self.tri_att_end = TriangleAttentionEndingNode(
         #     c_z,
         #     int(c_z / no_heads_z),
         #     no_heads_z,
-        # )  
-
-    
-
+        # )
 
         # Transition
         self.mlp_seq = ResidueMLP(c_s, 4 * c_s, dropout=dropout)
@@ -216,7 +214,9 @@ class EvoBlock(nn.Module):
         # Update pairwise state
         pairwise_state = pairwise_state + self.sequence_to_pair(sequence_state)
 
-        pairwise_state = self.resNet(pairwise_state.permute(0, 3, 1, 2)).permute(0,2,3,1)
+        pairwise_state = self.resNet(pairwise_state.permute(0, 3, 1, 2)).permute(
+            0, 2, 3, 1
+        )
 
         # # Axial attention
         # pairwise_state = pairwise_state + self.row_drop(
@@ -237,16 +237,19 @@ class EvoBlock(nn.Module):
 
         return sequence_state, pairwise_state
 
+
 class EvoFold(nn.Module):
-    def __init__(self,
-                  c_s = 1024,
-                  c_z = 128,
-                  no_heads_s = 32,
-                  no_heads_z = 4,
-                  num_blocks = 10, 
-                  position_bins = 32,
-                  dropout = 0.0,
-                  no_recycles = 2):
+    def __init__(
+        self,
+        c_s=1024,
+        c_z=128,
+        no_heads_s=32,
+        no_heads_z=4,
+        num_blocks=10,
+        position_bins=32,
+        dropout=0.0,
+        no_recycles=2,
+    ):
         super(EvoFold, self).__init__()
         """
         Inputs:
@@ -257,16 +260,16 @@ class EvoFold(nn.Module):
 
         # First 'recycle' is just the standard forward pass through the model.
         self.itters = no_recycles + 1
-        
+
         self.pairwise_positional_embedding = RelativePosition(position_bins, c_z)
 
         self.blocks = nn.ModuleList(
             [
                 EvoBlock(
-                    c_s = c_s,
-                    c_z = c_z,
-                    no_heads_s = no_heads_s,
-                    no_heads_z = no_heads_z,
+                    c_s=c_s,
+                    c_z=c_z,
+                    no_heads_s=no_heads_s,
+                    no_heads_z=no_heads_z,
                     dropout=dropout,
                 )
                 for i in range(num_blocks)
@@ -287,11 +290,10 @@ class EvoFold(nn.Module):
             pair_feats:    B x L x L x c_z      tensor of pair features
         """
 
-        
         B = seq_feats.shape[0]
         L = seq_feats.shape[1]
 
-        s = seq_feats 
+        s = seq_feats
         z = pair_feats
 
         res_index = torch.arange(L, device=z.device).expand((B, L))
@@ -304,8 +306,8 @@ class EvoFold(nn.Module):
             return s, z
 
         for itter in range(self.itters):
-           # Only compute gradients on last itter
-           with ExitStack() if itter == self.itters - 1 else torch.no_grad():
+            # Only compute gradients on last itter
+            with ExitStack() if itter == self.itters - 1 else torch.no_grad():
                 s = self.s_norm(s)
                 z = self.z_norm(z)
 
@@ -351,6 +353,7 @@ class SequenceToPair(nn.Module):
         x = self.o_proj(x)
 
         return x
+
 
 class Dropout(nn.Module):
     """
@@ -410,7 +413,7 @@ class ResidueMLP(nn.Module):
 
     def forward(self, x):
         return x + self.mlp(x)
-    
+
 
 class Attention(nn.Module):
     def __init__(self, embed_dim, num_heads, head_width, gated=False):
@@ -466,7 +469,6 @@ class Attention(nn.Module):
         y = self.o_proj(y)
 
         return y, rearrange(a, "... lq lk h -> ... h lq lk")
-    
 
 
 class RelativePosition(nn.Module):
@@ -504,15 +506,24 @@ class ResLayer(nn.Module):
         self.res_layers = []
         for i in range(n_blocks):
             # dilation = pow(2, (i % 3))
-            self.res_layers.append(ResBlock(inplanes=dim_in, planes=dim_in, kernel_size=kernel_size,
-                                            dilation1=12*(4 - i%4), dilation2=pow(2, (i % 4)), dropout=dropout))
+            self.res_layers.append(
+                ResBlock(
+                    inplanes=dim_in,
+                    planes=dim_in,
+                    kernel_size=kernel_size,
+                    dilation1=12 * (4 - i % 4),
+                    dilation2=pow(2, (i % 4)),
+                    dropout=dropout,
+                )
+            )
         self.res_blocks = nn.Sequential(*self.res_layers)
 
         # Adapter to change depth
-        self.conv_output = nn.Conv2d(dim_in, dim_out, kernel_size=7, padding=3, bias=True)
+        self.conv_output = nn.Conv2d(
+            dim_in, dim_out, kernel_size=7, padding=3, bias=True
+        )
 
     def forward(self, x: Tensor) -> Tensor:
-       
         x = self.res_blocks(x)
         x = self.conv_output(x)
 
@@ -526,19 +537,23 @@ class ResBlock(nn.Module):
         self,
         inplanes: int,
         planes: int,
-        kernel_size = 3,
+        kernel_size=3,
         dilation1: int = 1,
         dilation2: int = 1,
-        dropout=0.0
-        ) -> None:
+        dropout=0.0,
+    ) -> None:
         super(ResBlock, self).__init__()
 
         self.bn1 = nn.BatchNorm2d(inplanes)
         self.relu1 = nn.ReLU(inplace=True)
-        self.conv1 = conv3x3(inplanes, planes, dilation=dilation1, kernel_size=kernel_size)
+        self.conv1 = conv3x3(
+            inplanes, planes, dilation=dilation1, kernel_size=kernel_size
+        )
         self.dropout = nn.Dropout(p=dropout)
         self.relu2 = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3(planes, planes, dilation=dilation2, kernel_size=kernel_size)
+        self.conv2 = conv3x3(
+            planes, planes, dilation=dilation2, kernel_size=kernel_size
+        )
 
     def forward(self, x: Tensor) -> Tensor:
         identity = x
@@ -554,7 +569,16 @@ class ResBlock(nn.Module):
 
         return out
 
-def conv3x3(in_planes: int, out_planes: int, dilation: int = 1, kernel_size=3) -> nn.Conv2d:
+
+def conv3x3(
+    in_planes: int, out_planes: int, dilation: int = 1, kernel_size=3
+) -> nn.Conv2d:
     """3x3 convolution with padding"""
-    return nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size,
-                     padding=dilation, bias=False, dilation=dilation)
+    return nn.Conv2d(
+        in_planes,
+        out_planes,
+        kernel_size=kernel_size,
+        padding=dilation,
+        bias=False,
+        dilation=dilation,
+    )

@@ -4,50 +4,69 @@ from ..config import UKN
 
 from scipy import stats
 
-def compute_f1(pred_matrix, target_matrix, threshold=0.5):
+
+def compute_f1(pred, true, threshold=0.5):
     """
     Compute the F1 score of the predictions.
 
-    :param pred_matrix: Predicted pairing matrix probability  (L,L)
-    :param target_matrix: True binary pairing matrix (L,L)
+    :param pred: Predicted pairing matrix probability  (L,L)
+    :param true: True binary pairing matrix (L,L)
     :return: F1 score for this RNA structure
     """
 
-    pred_matrix = (pred_matrix > threshold).float()
+    pred = (pred > threshold).float()
 
-    sum_pair = torch.sum(pred_matrix) + torch.sum(target_matrix)
+    sum_pair = torch.sum(pred) + torch.sum(true)
 
     if sum_pair == 0:
         return 1.0
     else:
-        return (2 * torch.sum(pred_matrix * target_matrix) / sum_pair).item()
+        return (2 * torch.sum(pred * true) / sum_pair).item()
 
 
-def compute_mFMI(pred_matrix, target_matrix, threshold=0.5):
+def compute_f1_batch(pred, true, threshold=0.5):
+    """
+    Compute the mean F1 score of the predictions for a batch.
+
+    :param pred: Predicted pairing matrix probability  (L,L)
+    :param true: True binary pairing matrix (L,L)
+    :return: F1 score for this RNA structure
+    """
+
+    scores = []
+    for pred, true in zip(pred, true):
+        scores.append(
+            compute_f1(
+                pred=pred,
+                true=true,
+                threshold=threshold,
+            )
+        )
+    return torch.mean(torch.tensor(scores)).item()
+
+
+def compute_mFMI(pred, true, threshold=0.5):
     """
     Compute the mFMI score of the predictions.
 
-    :param pred_matrix: Predicted pairing matrix probability  (L,L)
-    :param target_matrix: True binary pairing matrix (L,L)
+    :param pred: Predicted pairing matrix probability  (L,L)
+    :param true: True binary pairing matrix (L,L)
     :return: mFMI score for this RNA structure
     """
 
-    pred_matrix = (pred_matrix > threshold).float()
+    pred = (pred > threshold).float()
 
-    TP = torch.sum(pred_matrix * target_matrix)
+    TP = torch.sum(pred * true)
 
-    prod_true = torch.sum(pred_matrix) * torch.sum(target_matrix)
+    prod_true = torch.sum(pred) * torch.sum(true)
     if prod_true > 0:
         FMI = TP / torch.sqrt(prod_true)
     else:
         FMI = 0
 
     u = (
-        torch.sum(
-            (~torch.sum(pred_matrix, dim=1).bool())
-            * (~torch.sum(target_matrix, dim=1).bool())
-        )
-        / pred_matrix.shape[-1]
+        torch.sum((~torch.sum(pred, dim=1).bool()) * (~torch.sum(true, dim=1).bool()))
+        / pred.shape[-1]
     )
 
     mFMI = u + (1 - u) * FMI
@@ -55,82 +74,120 @@ def compute_mFMI(pred_matrix, target_matrix, threshold=0.5):
     return mFMI.item()
 
 
-def r2_score(y_true, y_pred):
+def compute_mFMI_batch(pred, true, threshold=0.5):
+    """
+    Compute the mean mFMI score of the predictions for a batch.
+
+    :param pred: Predicted pairing matrix probability  (L,L)
+    :param true: True binary pairing matrix (L,L)
+    :return: mFMI score for this RNA structure
+    """
+
+    scores = []
+    for pred, true in zip(pred, true):
+        scores.append(
+            compute_mFMI(
+                pred=pred,
+                true=true,
+                threshold=threshold,
+            )
+        )
+    return torch.mean(torch.tensor(scores)).item()
+
+
+def r2_score(pred, true):
     """
     Compute the R2 score of the predictions.
 
-    :param y_true: True values
-    :param y_pred: Predicted values
+    :param true: True values
+    :param pred: Predicted values
     :return: R2 score
     """
 
-    mask = y_true != UKN
-    y_pred = y_pred[mask]
-    y_true = y_true[mask]
+    mask = true != UKN
+    pred = pred[mask]
+    true = true[mask]
 
     return (
-        1
-        - torch.sum((y_true - y_pred) ** 2)
-        / torch.sum((y_true - torch.mean(y_true)) ** 2)
+        1 - torch.sum((true - pred) ** 2) / torch.sum((true - torch.mean(true)) ** 2)
     ).item()
 
-def pearson_coefficient(y_true, y_pred):
+
+def r2_score_batch(pred, true):
+    """
+    Compute the mean R2 score of the predictions for a batch.
+
+    :param true: True values
+    :param pred: Predicted values
+    :return: R2 score
+    """
+
+    scores = []
+    for true, pred in zip(true, pred):
+        scores.append(r2_score(pred=pred, true=true))
+    return torch.mean(torch.tensor(scores)).item()
+
+
+def pearson_coefficient(pred, true):
     """
     Compute the Pearson correlation coefficient of the predictions.
 
-    :param y_true: True values
-    :param y_pred: Predicted values
+    :param true: True values
+    :param pred: Predicted values
     :return: pearson coefficient
     """
-    mask = y_true != UKN
-    y_pred = y_pred[mask]
-    y_true = y_true[mask]
+    mask = true != UKN
+    pred = pred[mask]
+    true = true[mask]
 
-    res = stats.pearsonr(y_true.detach().cpu().numpy(), y_pred.detach().cpu().numpy())
+    res = stats.pearsonr(
+        true.detach().cpu().numpy().flatten(), pred.detach().cpu().numpy().flatten()
+    )
 
     return res[0]
 
 
-def mae_score(y_true, y_pred):
+def pearson_coefficient_batch(pred, true):
+    """
+    Compute the mean Pearson correlation coefficient of the predictions for a batch.
+
+    :param true: True values
+    :param pred: Predicted values
+    :return: pearson coefficient
+    """
+
+    scores = []
+    for true, pred in zip(true, pred):
+        scores.append(pearson_coefficient(pred=pred, true=true))
+    return torch.mean(torch.tensor(scores)).item()
+
+
+def mae_score(pred, true):
     """
     Compute the Mean Average Error of the predictions.
 
-    :param y_true: True values
-    :param y_pred: Predicted values
+    :param true: True values
+    :param pred: Predicted values
     :return: MAE score
     """
 
-    mask = y_true != UKN
-    y_pred = y_pred[mask]
-    y_true = y_true[mask]
+    mask = true != UKN
+    pred = pred[mask]
+    true = true[mask]
 
-    return torch.mean(torch.abs(y_true - y_pred)).item()
-
-
-# def mae_score_ACGU(sequence, y_true, y_pred):
-#     """
-#     Compute the Mean Average Error of the predictions. Weighted by the number of A, C, G and U bases.
-
-#     :param sequence: RNA sequence
-#     :param y_true: True values
-#     :param y_pred: Predicted values
-#     :return: MAE score
-#     """
-
-#     MEAN_GU = 0.1
-#     nGU = torch.sum(sequence == seq2int["G"]) + torch.sum(sequence == seq2int["U"])
-#     nAC = torch.sum(sequence == seq2int["A"]) + torch.sum(sequence == seq2int["C"])
-#     mae = mae_score(y_true, y_pred)
-    
-#     return (nGU * MEAN_GU + nAC * mae) / (nGU + nAC)
+    return torch.mean(torch.abs(true - pred)).item()
 
 
-def mean_std_dms(y_pred):
+def mae_score_batch(pred, true):
     """
-    Compute the mean and standard deviation of the predictions.
+    Compute the mean Mean Average Error of the predictions for a batch.
 
-    :param y_pred: Predicted values
-    :return: Mean and standard deviation
+    :param true: True values
+    :param pred: Predicted values
+    :return: MAE score
     """
 
-    return torch.mean(y_pred), torch.std(y_pred)
+    scores = []
+    for true, pred in zip(true, pred):
+        scores.append(mae_score(pred=pred, true=true))
+    return torch.mean(torch.tensor(scores)).item()

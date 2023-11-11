@@ -1,3 +1,3 @@
 from .mlp import MultiLayerPerceptron
-from .transformer import Transformer
-from .evoformer import Evoformer
+from ..multi.transformer import Transformer
+from ..multi.evoformer import Evoformer

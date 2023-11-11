@@ -22,8 +22,8 @@ matplotlib_colors = [
     "navy",
 ]
 
+
 def plot_r2_distribution(r2_scores):
-    
     fig, ax = plt.subplots()
     ax.hist(r2_scores, bins=20)
     ax.set_xlabel("R2 score")

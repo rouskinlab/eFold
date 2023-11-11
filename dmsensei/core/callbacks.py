@@ -22,18 +22,24 @@ class PredictionLogger(pl.Callback):
 
         self.n_best_worst = n_best_worst
 
-        self.test_examples = [{
-            "seq": [],
-            "pred": [],
-            "true": [],
-            "score": [],
-        } for _ in range(len(TEST_SETS_NAMES[self.data_type]))]  # Predictions on test set
-        self.valid_examples = [{
-            "seq": [],
-            "pred": [],
-            "true": [],
-            "score": [],
-        } for _ in range(len(TEST_SETS_NAMES[self.data_type]))]  # Predictions on one element of the valid set over epochs
+        self.test_examples = [
+            {
+                "seq": [],
+                "pred": [],
+                "true": [],
+                "score": [],
+            }
+            for _ in range(len(TEST_SETS_NAMES[self.data_type]))
+        ]  # Predictions on test set
+        self.valid_examples = [
+            {
+                "seq": [],
+                "pred": [],
+                "true": [],
+                "score": [],
+            }
+            for _ in range(len(TEST_SETS_NAMES[self.data_type]))
+        ]  # Predictions on one element of the valid set over epochs
 
         self.best_score = -np.inf
 
@@ -42,7 +48,8 @@ class PredictionLogger(pl.Callback):
         )
 
     def on_validation_batch_end(
-        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
+        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0
+    ):
         features, labels = batch
         predictions = outputs[0]
 
@@ -50,12 +57,20 @@ class PredictionLogger(pl.Callback):
         if batch_idx == 0:
             len_seq = torch.count_nonzero(features[0]).item()
 
-            self.valid_examples[dataloader_idx]["seq"].append(features[0].cpu()[:len_seq])
+            self.valid_examples[dataloader_idx]["seq"].append(
+                features[0].cpu()[:len_seq]
+            )
 
             if self.data_type == "dms":
-                self.valid_examples[dataloader_idx]["pred"].append(predictions[0].cpu()[:len_seq])
-                self.valid_examples[dataloader_idx]["true"].append(labels[0].cpu()[:len_seq])
-                self.valid_examples[dataloader_idx]["score"].append(r2_score(labels[0], predictions[0]))
+                self.valid_examples[dataloader_idx]["pred"].append(
+                    predictions[0].cpu()[:len_seq]
+                )
+                self.valid_examples[dataloader_idx]["true"].append(
+                    labels[0].cpu()[:len_seq]
+                )
+                self.valid_examples[dataloader_idx]["score"].append(
+                    r2_score(labels[0], predictions[0])
+                )
 
             else:
                 self.valid_examples[dataloader_idx]["pred"].append(
@@ -79,7 +94,9 @@ class PredictionLogger(pl.Callback):
             if score > self.best_score:
                 self.best_score = score
                 os.makedirs(self.model_path, exist_ok=True)
-                self.best_model_path = os.path.join(self.model_path, trainer.logger.experiment.name + ".pt")
+                self.best_model_path = os.path.join(
+                    self.model_path, trainer.logger.experiment.name + ".pt"
+                )
                 torch.save(
                     pl_module.state_dict(),
                     self.best_model_path,
@@ -124,19 +141,25 @@ class PredictionLogger(pl.Callback):
     #     )
 
     def on_test_batch_end(
-        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
+        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0
+    ):
         features, labels = batch
         predictions = outputs
 
         for i in range(predictions.shape[0]):
             len_seq = torch.count_nonzero(features[i]).item()
 
-
-            self.test_examples[dataloader_idx]["seq"].append(features[i].cpu()[:len_seq].numpy())
+            self.test_examples[dataloader_idx]["seq"].append(
+                features[i].cpu()[:len_seq].numpy()
+            )
 
             if self.data_type == "dms":
-                self.test_examples[dataloader_idx]["pred"].append(predictions[i].cpu()[:len_seq].numpy())
-                self.test_examples[dataloader_idx]["true"].append(labels[i].cpu()[:len_seq].numpy())
+                self.test_examples[dataloader_idx]["pred"].append(
+                    predictions[i].cpu()[:len_seq].numpy()
+                )
+                self.test_examples[dataloader_idx]["true"].append(
+                    labels[i].cpu()[:len_seq].numpy()
+                )
                 self.test_examples[dataloader_idx]["score"].append(
                     r2_score(labels[i], predictions[i])
                 )
@@ -155,7 +178,7 @@ class PredictionLogger(pl.Callback):
     def on_test_end(self, trainer, pl_module):
         if not self.wandb_log or rank_zero_only.rank != 0:
             return
-        
+
         for dataloader_idx in range(len(TEST_SETS_NAMES[self.data_type])):
             test_examples = self.test_examples[dataloader_idx]
             test_set_name = TEST_SETS_NAMES[self.data_type][dataloader_idx]
@@ -170,7 +193,7 @@ class PredictionLogger(pl.Callback):
             # Select best and worst predictions
             idx_sorted = np.argsort(test_examples["score"])
             best_worst_idx = np.concatenate(
-                (idx_sorted[:self.n_best_worst], idx_sorted[-self.n_best_worst:])
+                (idx_sorted[: self.n_best_worst], idx_sorted[-self.n_best_worst :])
             )
 
             sequences = test_examples["seq"][best_worst_idx]
@@ -180,9 +203,13 @@ class PredictionLogger(pl.Callback):
 
             # Plot best and worst predictions
             fig_list = []
-            for true_output, pred_output, score in zip(true_outputs, pred_outputs, scores):
+            for true_output, pred_output, score in zip(
+                true_outputs, pred_outputs, scores
+            ):
                 if self.data_type == "dms":
-                    fig_list.append(plot_dms(true_output, pred_output, score, layout='scatter'))
+                    fig_list.append(
+                        plot_dms(true_output, pred_output, score, layout="scatter")
+                    )
                 else:
                     fig_list.append(plot_structure(true_output, pred_output))
 
@@ -218,26 +245,32 @@ class PredictionLogger(pl.Callback):
 
             wandb.log({f"test/{test_set_name}/score_vs_lenght": fig})
 
-
             ## Log scatter of F1 score vs pearson ##
             if self.data_type == "dms":
                 fig = go.Figure(
                     data=go.Scatter(
                         # x=[len(seq[seq != 0]) for seq in test_examples["seq"]],
-                        x=[pearson_coefficient(torch.tensor(y_true.astype(float)), torch.tensor(y_pred.astype(float))) for y_true, y_pred in zip(test_examples['true'], test_examples['pred'])],
+                        x=[
+                            pearson_coefficient(
+                                torch.tensor(y_true.astype(float)),
+                                torch.tensor(y_pred.astype(float)),
+                            )
+                            for y_true, y_pred in zip(
+                                test_examples["true"], test_examples["pred"]
+                            )
+                        ],
                         y=test_examples["score"],
                         mode="markers",
                     )
                 )
                 fig.update_layout(
-                    title=f'Pearson vs R2 score',
+                    title=f"Pearson vs R2 score",
                     xaxis_title="Pearson",
-                    yaxis_title='R2 score',
+                    yaxis_title="R2 score",
                 )
 
                 wandb.log({f"test/{test_set_name}/r2_vs_pearson": fig})
-        
-        
+
         # plot the whole validation set
         # figs = []
         # for true_output, pred_output in zip(self.valid_examples["true"], self.valid_examples["pred"]):
@@ -246,7 +279,6 @@ class PredictionLogger(pl.Callback):
         #     else:
         #         figs.append(plot_structure(true_output, pred_output))
         # wandb.log({"valid/whole_set": wandb.Image(figs)})
-        
 
     # def log_valid_example(self):
     #     fig_list = []
@@ -281,7 +313,7 @@ class ModelChecker(pl.Callback):
             params = torch.cat(params).cpu().detach().numpy()
 
             # Compute histogram
-            if rank_zero_only.rank == 0 and self.model in ['mlp']:
+            if rank_zero_only.rank == 0 and self.model in ["mlp"]:
                 wandb.log({"model_params": wandb.Histogram(params)})
 
         self.step_number += 1
