@@ -38,8 +38,8 @@ class Dataset(TorchDataset):
         data = import_dataset(name, force_download=force_download)
         self.data_type = data_type + ["sequence"]
         # save data
-        self.references = data["references"]
-        self.sequences = data["sequences"]
+        self.reference = data["references"]
+        self.sequence = data["sequences"]
         self.dms = data["dms"] if "dms" in data else None
         self.base_pairs = data["base_pairs"] if "base_pairs" in data else None
         self.shape = data["shape"] if "shape" in data else None
@@ -47,16 +47,16 @@ class Dataset(TorchDataset):
         self.data, self.metadata = self._wrangle_data()
 
     def __len__(self) -> int:
-        return len(self.sequences)
+        return len(self.sequence)
 
     def _wrangle_data(self):
+        # TODO #5 group the sequences by length
         def get_array(attr, index, astype=None):
             if not hasattr(self, attr) or getattr(self, attr) is None:
                 return None
             d = tensor(getattr(self, attr)[index].astype(astype))
-            if torch.isnan(d).all():
-                return None
-            return d
+            if not torch.isnan(d).all():
+                return d
 
         data, metadata = [], []
         for index in range(len(self)):
@@ -65,17 +65,17 @@ class Dataset(TorchDataset):
                 "dms": np.float32,
                 "structure": np.int32,
                 "shape": np.float32,
-                "base_pairs": np.int32,
+                "sequence": np.int32,
             }
             for name in self.data_type:
                 arr = get_array(name, index, astype=astype[name])
-                if arr is not None:
+                if arr != None:
                     line[name] = arr
 
             data.append(line)
             metadata.append(
                 {
-                    "reference": self.references[index],
+                    "reference": self.reference[index],
                     "index": index,
                     "quality": self.quality,
                 }

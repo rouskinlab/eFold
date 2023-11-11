@@ -2,7 +2,13 @@ from typing import Any
 import lightning.pytorch as pl
 from lightning.pytorch.utilities.types import STEP_OUTPUT
 from ..core import metrics
-from ..core.embeddings import NUM_BASES, sequence_to_one_hot, int_dot_bracket_to_one_hot, pairing_matrix_to_base_pairs, int_to_sequence
+from ..core.embeddings import (
+    NUM_BASES,
+    sequence_to_one_hot,
+    int_dot_bracket_to_one_hot,
+    pairing_matrix_to_base_pairs,
+    int_to_sequence,
+)
 import torch.nn as nn
 from torch import Tensor, tensor, zeros_like, mean
 import torch
@@ -56,12 +62,16 @@ class Model(pl.LightningModule):
             target = data["dms"]["values"]
             mask = target != UKN
             loss += F.mse_loss(
-                input=outputs["dms"][data["dms"]["indexes"]][mask].squeeze(-1), target=target[mask]
+                input=outputs["dms"][data["dms"]["indexes"]][mask].squeeze(-1),
+                target=target[mask],
             )
         if "shape" in data.keys() and "shape" in outputs.keys():
             target = data["shape"]["values"]
             mask = target != UKN
-            loss += F.mse_loss(input=outputs["shape"][data["shape"]["indexes"]][mask].squeeze(-1), target=target[mask])
+            loss += F.mse_loss(
+                input=outputs["shape"][data["shape"]["indexes"]][mask].squeeze(-1),
+                target=target[mask],
+            )
         if "structure" in data.keys() and "structure" in outputs.keys():
             loss += F.binary_cross_entropy(
                 input=outputs["structure"], target=data["structure"]
@@ -76,11 +86,11 @@ class Model(pl.LightningModule):
         # Hardcoded values for DMS G/U bases
         if "dms" in predictions.keys():
             predictions["dms"][
-                (data['sequence'] == seq2int["G"]) | (data['sequence'] == seq2int["U"])
+                (data["sequence"] == seq2int["G"]) | (data["sequence"] == seq2int["U"])
             ] = VAL_GU
-        
+
         # group by reference
-        
+
         outputs = []
         for i in range(len(metadata["reference"])):
             L = metadata["length"][i]
@@ -89,13 +99,15 @@ class Model(pl.LightningModule):
                 "reference": metadata["reference"][i],
             }
             if "dms" in predictions.keys():
-                d["dms"] = [round(d.item(),4) for d in predictions["dms"][i,:L]]
+                d["dms"] = [round(d.item(), 4) for d in predictions["dms"][i, :L]]
             if "shape" in predictions.keys():
-                d["shape"] = [round(d.item(),4) for d in predictions["shape"][i,:L]]
+                d["shape"] = [round(d.item(), 4) for d in predictions["shape"][i, :L]]
             if "structure" in predictions.keys():
-                d["structure"] = pairing_matrix_to_base_pairs(predictions["structure"][i,:L])
+                d["structure"] = pairing_matrix_to_base_pairs(
+                    predictions["structure"][i, :L]
+                )
             outputs.append(d)
-            
+
         return outputs
 
     def training_step(self, batch, batch_idx):
@@ -153,33 +165,35 @@ class Model(pl.LightningModule):
 
         return {
             "structure": {
-                "f1": metrics.compute_f1_batch(
+                "f1": metrics.compute_f1(
                     pred=struct_preds,
                     true=struct_targets,
                     threshold=0.5,
+                    batch=True,
                 ),
-                "mFMI": metrics.compute_mFMI_batch(
+                "mFMI": metrics.compute_mFMI(
                     pred=struct_preds,
                     true=struct_targets,
                     threshold=0.5,
+                    batch=True,
                 ),
             }
             if "structure" in data and "structure" in outputs
             else None,
             "dms": {
-                "r2": metrics.r2_score_batch(pred=dms_preds, true=dms_targets),
-                "mae": metrics.mae_score_batch(pred=dms_preds, true=dms_targets),
-                "pearson": metrics.pearson_coefficient_batch(
-                    pred=dms_preds, true=dms_targets
+                "r2": metrics.r2_score(pred=dms_preds, true=dms_targets, batch=True),
+                "mae": metrics.mae_score(pred=dms_preds, true=dms_targets, batch=True),
+                "pearson": metrics.pearson_coefficient(
+                    pred=dms_preds, true=dms_targets, batch=True
                 ),
             }
             if "dms" in data and "dms" in outputs
             else None,
             "shape": {
-                "r2": metrics.r2_score_batch(pred=shape_preds, true=shape_targets),
-                "mae": metrics.mae_score_batch(pred=shape_preds, true=shape_targets),
-                "pearson": metrics.pearson_coefficient_batch(
-                    pred=shape_preds, true=shape_targets
+                "r2": metrics.r2_score(pred=shape_preds, true=shape_targets, batch=True),
+                "mae": metrics.mae_score(pred=shape_preds, true=shape_targets, batch=True),
+                "pearson": metrics.pearson_coefficient(
+                    pred=shape_preds, true=shape_targets, batch=True
                 ),
             }
             if "shape" in data and "shape" in outputs
