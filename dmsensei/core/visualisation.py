@@ -35,22 +35,20 @@ def plot_r2_distribution(r2_scores):
     return img
 
 
-def plot_dms(true_dms, pred_dms, r2=None, layout="bar", interval=100):
+def plot_dms(pred, true, r2=None, layout="bar", interval=100, **kwargs):
     fig, ax = plt.subplots()
 
     # Base position with no coverage or G/U base are removed
-    mask = true_dms != UKN
-    pred_dms = pred_dms[mask]
-    true_dms = true_dms[mask]
+    mask = true != UKN
+    pred = pred[mask]
+    true = true[mask]
 
     if layout == "bar":
         # Create and convert plot
+        ax.bar(np.arange(len(true)), true, color="b", alpha=0.5, label="True DMS")
         ax.bar(
-            np.arange(len(true_dms)), true_dms, color="b", alpha=0.5, label="True DMS"
-        )
-        ax.bar(
-            np.arange(len(pred_dms)),
-            pred_dms,
+            np.arange(len(pred)),
+            pred,
             color="r",
             alpha=0.5,
             label="Predicted DMS",
@@ -59,9 +57,9 @@ def plot_dms(true_dms, pred_dms, r2=None, layout="bar", interval=100):
         ax.set_ylabel("DMS reactivity")
 
     if layout == "scatter":
-        for i in range(int(np.ceil(len(true_dms) / interval))):
-            segment_true_dms = true_dms[i * interval : (i + 1) * interval]
-            segment_pred_dms = pred_dms[i * interval : (i + 1) * interval]
+        for i in range(int(np.ceil(len(true) / interval))):
+            segment_true_dms = true[i * interval : (i + 1) * interval]
+            segment_pred_dms = pred[i * interval : (i + 1) * interval]
             ax.scatter(
                 segment_true_dms,
                 segment_pred_dms,
@@ -82,13 +80,13 @@ def plot_dms(true_dms, pred_dms, r2=None, layout="bar", interval=100):
     return img
 
 
-def plot_dms_padding(true_dms, pred_dms):
+def plot_dms_padding(pred, true, **kwargs):
     fig, ax = plt.subplots()
 
-    pred_dms = pred_dms[true_dms == UKN]
-    true_dms = true_dms[true_dms == UKN]
+    pred = pred[true == UKN]
+    true = true[true == UKN]
 
-    ax.scatter(true_dms, pred_dms)
+    ax.scatter(true, pred)
     ax.set_xlabel("True DMS")
     ax.set_ylabel("Predicted DMS")
 
@@ -98,13 +96,11 @@ def plot_dms_padding(true_dms, pred_dms):
     return img
 
 
-def plot_structure(true_struct, pred_struct):
+def plot_structure(pred, true, **kwargs):
     fig, ax = plt.subplots()
-    im = ax.imshow(
-        pred_struct, cmap="YlOrRd", interpolation="none", alpha=0.8, vmin=0, vmax=1
-    )
+    im = ax.imshow(pred, cmap="YlOrRd", interpolation="none", alpha=0.8, vmin=0, vmax=1)
 
-    x, y = np.where(true_struct == 1)
+    x, y = np.where(true == 1)
 
     plt.scatter(x, y, marker="+", color="black", s=2)
 
@@ -116,3 +112,6 @@ def plot_structure(true_struct, pred_struct):
     fig = plt.close(fig)
 
     return img
+
+
+plot_factory = {"dms": plot_dms, "shape": plot_dms, "structure": plot_structure}  # TODO

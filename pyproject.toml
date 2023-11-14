@@ -29,3 +29,6 @@ pythonpath = [
 ]
 testpaths = ['tests', 'dmsensei']
 junit_family = "xunit2"
+
+[tool.poetry.include]
+include = ["dmsensei/resources/*.csv"]

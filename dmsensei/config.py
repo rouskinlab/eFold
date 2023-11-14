@@ -20,4 +20,8 @@ TEST_SETS_NAMES = {
 
 TEST_SETS_NAMES = [i for j in TEST_SETS_NAMES.values() for i in j]
 
+DATA_TYPES = ["structure", "dms", "shape"]
+REFERENCE_METRIC = {"structure": "f1", "dms": "mae", "shape": "mae"}
+REF_METRIC_SIGN = {"structure": 1, "dms": -1, "shape": -1}
+
 torch.set_default_dtype(torch.float32)

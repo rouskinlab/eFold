@@ -5,7 +5,7 @@ from ...config import DEFAULT_FORMAT, device
 from torch import optim, nn, utils, Tensor, tensor
 import lightning.pytorch as pl
 from ...core import metrics
-from ..model import Model
+from ...core.model import Model
 from ...core.embeddings import NUM_BASES
 from torcheval.metrics import R2Score
 

@@ -33,6 +33,7 @@ class DataModule(pl.LightningDataModule):
         overfit_mode=False,
         shuffle_train=True,
         shuffle_valid=False,
+        tqdm=True,
         **kwargs,
     ):
         """DataModule for the Rouskin lab datasets.
@@ -70,6 +71,7 @@ class DataModule(pl.LightningDataModule):
             "train": shuffle_train,
             "valid": shuffle_valid,
         }
+        self.tqdm = tqdm
 
         # we need to know the max sequence length for padding
         self.overfit_mode = overfit_mode
@@ -94,26 +96,44 @@ class DataModule(pl.LightningDataModule):
         merge.collate_fn = collate_fn
         return merge
 
+    def find_one_index_per_data_type(self, dataset_name: str):
+        index = {}
+        dataset = {
+            "train": self.train_set,
+            "valid": self.val_set,
+            "predict": self.predict_set,
+        }[dataset_name]
+        for data_type in self.data_type:
+            for i, data in enumerate(dataset):
+                if data_type in data[0].keys():
+                    index[data_type] = i
+                    break
+        return index
+
     def setup(self, stage: str = None):
-        all_datasets = self._dataset_merge(
-            [
-                Dataset(
-                    name=name,
-                    data_type=self.data_type,
-                    force_download=self.force_download,
-                )
-                for name in self.name
-            ]
-        )
-        self.collate_fn = all_datasets.collate_fn
+        if stage == None:
+            self.all_datasets = self._dataset_merge(
+                [
+                    Dataset(
+                        name=name,
+                        data_type=self.data_type,
+                        force_download=self.force_download,
+                        tqdm=self.tqdm,
+                    )
+                    for name in self.name
+                ]
+            )
+            self.collate_fn = self.all_datasets.collate_fn
 
         if stage == "fit" or stage is None:
             self.size_sets = _compute_size_sets(
-                len(all_datasets),
+                len(self.all_datasets),
                 train_split=self.splits["train"],
                 valid_split=self.splits["valid"],
             )
-            self.train_set, self.val_set, _ = random_split(all_datasets, self.size_sets)
+            self.train_set, self.val_set, _ = random_split(
+                self.all_datasets, self.size_sets
+            )
 
         if stage == "test" or stage is None:
             self.test_sets = self._select_test_dataset(
@@ -122,10 +142,10 @@ class DataModule(pl.LightningDataModule):
 
         if stage == "predict" or stage is None:
             self.predict_set = Subset(
-                all_datasets,
+                self.all_datasets,
                 range(
                     0,
-                    round(len(all_datasets) * self.splits["predict"])
+                    round(len(self.all_datasets) * self.splits["predict"])
                     if type(self.splits["predict"]) == float
                     else self.splits["predict"],
                 ),
@@ -137,6 +157,7 @@ class DataModule(pl.LightningDataModule):
                 name=name,
                 data_type=self.data_type,
                 force_download=force_download,
+                tqdm=self.tqdm,
             )
             for name in TEST_SETS_NAMES
         ]

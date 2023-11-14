@@ -10,7 +10,7 @@ from einops import rearrange
 import torch.nn.functional as F
 import numpy as np
 
-from ..model import Model
+from ...core.model import Model
 
 dir_name = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(dir_name, ".."))

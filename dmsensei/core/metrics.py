@@ -132,3 +132,12 @@ def mae_score(pred, true, batch=None):
     true = true[mask]
 
     return torch.mean(torch.abs(true - pred)).item()
+
+
+metric_factory = {
+    "f1": compute_f1,
+    "mFMI": compute_mFMI,
+    "r2": r2_score,
+    "pearson": pearson_coefficient,
+    "mae": mae_score,
+}

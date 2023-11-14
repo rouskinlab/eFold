@@ -7,7 +7,7 @@ from scipy.stats.stats import pearsonr
 
 import lightning.pytorch as pl
 
-from ..model import Model
+from ...core.model import Model
 import wandb
 
 import sys, os

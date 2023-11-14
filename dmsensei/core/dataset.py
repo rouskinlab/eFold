@@ -23,6 +23,7 @@ import numpy as np
 from typing import Union
 import pdb
 from typing import List
+from tqdm import tqdm as tqdm_fun
 
 
 class Dataset(TorchDataset):
@@ -32,6 +33,7 @@ class Dataset(TorchDataset):
         data_type: List[str],
         force_download: bool,
         quality: float = 1.0,
+        tqdm=True,
     ) -> None:
         super().__init__()
         self.name = name
@@ -44,12 +46,12 @@ class Dataset(TorchDataset):
         self.base_pairs = data["base_pairs"] if "base_pairs" in data else None
         self.shape = data["shape"] if "shape" in data else None
         self.quality = quality
-        self.data, self.metadata = self._wrangle_data()
+        self.data, self.metadata = self._wrangle_data(tqdm)
 
     def __len__(self) -> int:
         return len(self.sequence)
 
-    def _wrangle_data(self):
+    def _wrangle_data(self, tqdm):
         # TODO #5 group the sequences by length
         def get_array(attr, index, astype=None):
             if not hasattr(self, attr) or getattr(self, attr) is None:
@@ -59,7 +61,12 @@ class Dataset(TorchDataset):
                 return d
 
         data, metadata = [], []
-        for index in range(len(self)):
+        for index in tqdm_fun(
+            range(len(self)),
+            desc="Wrangling data for {}".format(self.name),
+            total=len(self),
+            disable=not tqdm,
+        ):
             line = {}
             astype = {
                 "dms": np.float32,
@@ -110,11 +117,8 @@ class Dataset(TorchDataset):
             ]
             if len(padded_data) == 0:
                 continue
-            indexes, values = zip(*padded_data)
-            if k == "sequence":
-                data_out[k] = stack(values)
-            else:
-                data_out[k] = {"indexes": tensor(indexes), "values": stack(values)}
+            index, values = zip(*padded_data)
+            data_out[k] = {"index": tensor(index), "values": stack(values)}
 
         metadata_out = {"length": lengths}
         for k in metadata[0].keys():
