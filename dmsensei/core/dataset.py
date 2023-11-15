@@ -24,6 +24,7 @@ from typing import Union
 import pdb
 from typing import List
 from tqdm import tqdm as tqdm_fun
+from .datapoint import Datapoint
 
 
 class Dataset(TorchDataset):
@@ -46,7 +47,7 @@ class Dataset(TorchDataset):
         self.base_pairs = data["base_pairs"] if "base_pairs" in data else None
         self.shape = data["shape"] if "shape" in data else None
         self.quality = quality
-        self.data, self.metadata = self._wrangle_data(tqdm)
+        self.list_of_datapoints = self._wrangle_data(tqdm)
 
     def __len__(self) -> int:
         return len(self.sequence)
@@ -60,14 +61,14 @@ class Dataset(TorchDataset):
             if not torch.isnan(d).all():
                 return d
 
-        data, metadata = [], []
+        list_of_datapoints = []
         for index in tqdm_fun(
             range(len(self)),
             desc="Wrangling data for {}".format(self.name),
             total=len(self),
             disable=not tqdm,
         ):
-            line = {}
+            data = {}
             astype = {
                 "dms": np.float32,
                 "structure": np.int32,
@@ -77,20 +78,23 @@ class Dataset(TorchDataset):
             for name in self.data_type:
                 arr = get_array(name, index, astype=astype[name])
                 if arr != None:
-                    line[name] = arr
+                    data[name] = arr
 
-            data.append(line)
-            metadata.append(
-                {
-                    "reference": self.reference[index],
-                    "index": index,
-                    "quality": self.quality,
-                }
-            )
-        return data, metadata
+            metadata = {
+                "reference": self.reference[index],
+                "index": index,
+                "quality": self.quality,
+            }
+
+            list_of_datapoints.append(Datapoint(data, metadata))
+
+        return list_of_datapoints
 
     def __getitem__(self, index) -> tuple:
-        return self.data[index], self.metadata[index]
+        return (
+            self.list_of_datapoints[index].data,
+            self.list_of_datapoints[index].metadata,
+        )
 
     def _pad(self, arr, L, data_type):
         padding_values = {
@@ -108,20 +112,20 @@ class Dataset(TorchDataset):
 
         # pad and stack tensors
         data_out = {}
-        lengths = [len(d["sequence"]) for d in data]
-        for k in self.data_type:
+        lengths = [len(datapoint["sequence"]) for datapoint in data]
+        for data_type in self.data_type:
             padded_data = [
-                (idx, self._pad(d[k], max(lengths), k))
-                for idx, d in enumerate(data)
-                if k in d
+                (idx, self._pad(datapoint[data_type], max(lengths), data_type))
+                for idx, datapoint in enumerate(data)
+                if data_type in datapoint
             ]
             if len(padded_data) == 0:
                 continue
             index, values = zip(*padded_data)
-            data_out[k] = {"index": tensor(index), "values": stack(values)}
+            data_out[data_type] = {"index": tensor(index), "values": stack(values)}
 
         metadata_out = {"length": lengths}
-        for k in metadata[0].keys():
-            metadata_out[k] = [d[k] for d in metadata]
+        for data_type in metadata[0].keys():
+            metadata_out[data_type] = [datapoint[data_type] for datapoint in metadata]
 
         return data_out, metadata_out

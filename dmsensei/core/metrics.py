@@ -3,14 +3,7 @@ from rouskinhf import seq2int
 from ..config import UKN
 
 from scipy import stats
-
-# def my_decorator(func):
-#     def wrapper(*args, **kwargs):
-#         print("Something is happening before the function is called.")
-#         result = func(*args, **kwargs)
-#         print("Something is happening after the function is called.")
-#         return result
-#     return wrapper
+import sklearn
 
 
 # make a decorator to run the metrics on the batch
@@ -20,14 +13,17 @@ def batch_mean(fn):
             return fn(pred=pred, true=true, *args, **kwargs)
         scores = []
         for p, t in zip(pred, true):
-            scores.append(fn(pred=p, true=t, *args, **kwargs))
-        return torch.mean(torch.tensor(scores)).item()
-
+            scores.append(fn(pred=p.squeeze(), true=t.squeeze(), *args, **kwargs))
+        avg = torch.mean(torch.tensor(scores))
+        if ~torch.isnan(avg):
+            return avg.item()
+        else:
+            print('NaN encountered in metric, returning None')
     return wrapper
 
 
 @batch_mean
-def compute_f1(pred, true, batch=None, threshold=0.5):
+def f1(pred, true, batch=None, threshold=0.5):
     """
     Compute the F1 score of the predictions.
 
@@ -47,7 +43,7 @@ def compute_f1(pred, true, batch=None, threshold=0.5):
 
 
 @batch_mean
-def compute_mFMI(pred, true, batch=None, threshold=0.5):
+def mFMI(pred, true, batch=None, threshold=0.5):
     """
     Compute the mFMI score of the predictions.
 
@@ -90,9 +86,9 @@ def r2_score(pred, true, batch=None):
     pred = pred[mask]
     true = true[mask]
 
-    return (
-        1 - torch.sum((true - pred) ** 2) / torch.sum((true - torch.mean(true)) ** 2)
-    ).item()
+    return sklearn.metrics.r2_score(
+        true.detach().cpu().numpy(), pred.detach().cpu().numpy()
+    )
 
 
 @batch_mean
@@ -129,14 +125,14 @@ def mae_score(pred, true, batch=None):
 
     mask = true != UKN
     pred = pred[mask]
-    true = true[mask]
+    true = true[mask].to(pred.device)
 
     return torch.mean(torch.abs(true - pred)).item()
 
 
 metric_factory = {
-    "f1": compute_f1,
-    "mFMI": compute_mFMI,
+    "f1": f1,
+    "mFMI": mFMI,
     "r2": r2_score,
     "pearson": pearson_coefficient,
     "mae": mae_score,

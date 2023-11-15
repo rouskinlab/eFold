@@ -18,6 +18,10 @@ import numpy as np
 from typing import Union, List
 from .dataset import Dataset
 
+# set seed
+torch.manual_seed(0)
+np.random.seed(0)
+
 
 class DataModule(pl.LightningDataModule):
     def __init__(
@@ -89,26 +93,29 @@ class DataModule(pl.LightningDataModule):
         raise ValueError("name must be a string or a list of strings")
 
     def _dataset_merge(self, datasets):
+        # TODO #11
         merge = datasets[0]
         collate_fn = merge.collate_fn
         for dataset in datasets[1:]:
             merge = merge + dataset
         merge.collate_fn = collate_fn
+        for index, datapoint in enumerate(merge.list_of_datapoints):
+            datapoint.metadata["index"] = index
         return merge
 
-    def find_one_index_per_data_type(self, dataset_name: str):
-        index = {}
+    def find_one_reference_per_data_type(self, dataset_name: str):
+        refs = {}
         dataset = {
             "train": self.train_set,
             "valid": self.val_set,
             "predict": self.predict_set,
         }[dataset_name]
         for data_type in self.data_type:
-            for i, data in enumerate(dataset):
-                if data_type in data[0].keys():
-                    index[data_type] = i
+            for data, metadata in dataset:
+                if data_type in data.keys():
+                    refs[data_type] = metadata["reference"]
                     break
-        return index
+        return refs
 
     def setup(self, stage: str = None):
         if stage == None:
@@ -134,6 +141,22 @@ class DataModule(pl.LightningDataModule):
             self.train_set, self.val_set, _ = random_split(
                 self.all_datasets, self.size_sets
             )
+
+            # # # TODO: change this
+            # self.train_set = Subset(
+            #     self.all_datasets,
+            #     range(
+            #         0,
+            #         self.splits["train"],
+            #     ),
+            # )
+            # self.val_set = Subset(
+            #     self.all_datasets,
+            #     range(
+            #         self.splits["train"],
+            #         self.splits["train"] + self.splits["valid"],
+            #     ),
+            # )
 
         if stage == "test" or stage is None:
             self.test_sets = self._select_test_dataset(

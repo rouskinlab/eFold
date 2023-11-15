@@ -1,38 +1,46 @@
 import wandb
 from ..config import *
+import numpy as np
+import lightning.pytorch as pl
 
 
-def train_loss(loss):
-    wandb.log({"train/loss": torch.sqrt(loss).item()}, commit=False)
+class Logger:
+    def __init__(self, pl_module: pl.LightningModule, batch_size) -> None:
+        self._model = pl_module
+        self._batch_size = batch_size
 
+    def log(self, stage, metric, value, data_type=None):
+        self._model.log(
+            name="/".join([k for k in [stage, data_type, metric] if k is not None]),
+            value=value,
+            sync_dist=True,
+            on_step=False,
+            on_epoch=True,
+            batch_size=self._batch_size,
+        )
 
-def valid_loss(loss):
-    wandb.log({"valid/loss": torch.sqrt(loss).item()}, commit=False)
+    def final_score(self, average_score, data_type):
+        wandb.log({"final/{}_best_{}".format(data_type, REFERENCE_METRIC[data_type]): average_score})
+
+    def train_loss(self, loss):
+        self.log("train", "loss", loss)
+
+    def valid_loss(self, loss):
+        self.log("valid", "loss", loss)
+
+    def valid_plot(self, data_type, name, plot):
+        wandb.log(
+            {"/".join(['valid', data_type, name]): plot},
+        )
     
-def log_metric(stage, data_type, metric, value):
-    wandb.log({"{}/{}/{}".format(stage, data_type, metric): value}, commit=False)
+    def test_plot(self, dataloader, data_type, name, plot):
+        wandb.log(
+            {"/".join(['test', dataloader, data_type, name]): plot},
+        )
 
-
-def _plot(stage, data_type, metric, plot):
-    wandb.log({"{}/{}/plot_{}".format(stage, data_type, metric): plot})
-
-
-def valid_plot(data_type, plot):
-    _plot("valid", data_type, REFERENCE_METRIC[data_type], plot)
-
-
-def test_plot(data_type, plot):
-    _plot("test", data_type, REFERENCE_METRIC[data_type], plot)
-
-
-def final_score(data_type, average_score):
-    wandb.log(
-        {
-            "final/{}/best_{}".format(
-                data_type, REFERENCE_METRIC[data_type]
-            ): average_score
-        }
-    )
-
-def epoch(trainer):
-    wandb.log({"epoch": trainer.current_epoch})
+    def error_metrics_pack(self, stage, metrics_pack):
+        for data_type, data in metrics_pack.items():
+            if data is None:
+                continue
+            for name_metric, metric in data.items():
+                self.log(stage, name_metric, metric, data_type)

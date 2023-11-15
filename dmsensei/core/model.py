@@ -76,11 +76,8 @@ class Model(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         data, metadata = batch
-
         predictions = self.forward(data["sequence"]["values"])
         loss = self.loss_fn(predictions, data)
-        
-        wandb.log({"train/loss": torch.sqrt(loss).item(), 'epoch': self.current_epoch})
 
         return loss
 
@@ -88,9 +85,7 @@ class Model(pl.LightningModule):
         data, metadata = batch
         predictions = self.forward(data["sequence"]["values"])
         loss = self.loss_fn(predictions, data)
-        
-        wandb.log({"valid/loss": torch.sqrt(loss).item(), 'epoch': self.current_epoch})
-        
+
         return predictions, loss
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
@@ -111,8 +106,7 @@ class Model(pl.LightningModule):
                 | (data["sequence"]["values"] == seq2int["U"])
             ] = VAL_GU
 
-        # group by reference
-
+        # pack predictions into lines
         outputs = []
         for i in range(len(metadata["reference"])):
             L = metadata["length"][i]
@@ -120,10 +114,9 @@ class Model(pl.LightningModule):
                 "sequence": int_to_sequence(data["sequence"]["values"][i])[:L],
                 "reference": metadata["reference"][i],
             }
-            if "dms" in predictions.keys():
-                d["dms"] = [round(d.item(), 4) for d in predictions["dms"][i, :L]]
-            if "shape" in predictions.keys():
-                d["shape"] = [round(d.item(), 4) for d in predictions["shape"][i, :L]]
+            for signal in ["dms", "shape"]:
+                if signal in predictions.keys():
+                    d[signal] = [round(d.item(), 4) for d in predictions[signal][i, :L]]
             if "structure" in predictions.keys():
                 d["structure"] = pairing_matrix_to_base_pairs(
                     predictions["structure"][i, :L]

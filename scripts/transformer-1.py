@@ -38,12 +38,12 @@ if __name__ == "__main__":
         data_type=["dms", "shape"],
         force_download=False,
         batch_size=batch_size,
-        num_workers=5,
+        num_workers=0,
         train_split=500,
-        valid_split=500,
+        valid_split=250,
         predict_split=0,
         overfit_mode=False,
-        shuffle_valid=True,
+        shuffle_valid=False,
     )
 
     model = create_model(
@@ -80,13 +80,13 @@ if __name__ == "__main__":
         # strategy="ddp",
         # precision="16-mixed",
         # accumulate_grad_batches=2,
-        max_epochs=8,
-        log_every_n_steps=10,
+        max_epochs=1,
+        # log_every_n_steps=10,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[  # EarlyStopping(monitor="valid/loss", mode='min', patience=5),
     #         # LearningRateMonitor(logging_interval="epoch"),
-            MyWandbLogger(dm=dm, model=model),
-            KaggleLogger(),
+            MyWandbLogger(dm=dm, model=model, batch_size=batch_size),
+            KaggleLogger(push_to_kaggle=False),
     #         # ModelChecker(log_every_nstep=1000, model=model),
         ]
     #     if USE_WANDB
@@ -94,10 +94,9 @@ if __name__ == "__main__":
     #     enable_checkpointing=False,
     )
 
-    trainer.fit(model, datamodule=dm)
-    
-    # trainer.test(model, datamodule=dm)
-    # trainer.predict(model, datamodule=dm)
+    # trainer.fit(model, datamodule=dm)
+    trainer.test(model, datamodule=dm)
+    trainer.predict(model, datamodule=dm)
 
     if USE_WANDB:
         wandb.finish()

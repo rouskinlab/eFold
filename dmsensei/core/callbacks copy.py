@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from torch import Tensor, tensor
 import wandb
-from .metrics import compute_f1, r2_score
+from .metrics import f1, r2_score
 from .visualisation import plot_structure, plot_dms, plot_dms_padding
 from lightning.pytorch.utilities import rank_zero_only
 import os
@@ -11,7 +11,7 @@ import pandas as pd
 from rouskinhf import int2seq
 import plotly.graph_objects as go
 from ..config import TEST_SETS_NAMES
-from .metrics import pearson_coefficient, compute_f1, r2_score, compute_mFMI
+from .metrics import pearson_coefficient, f1, r2_score, mFMI
 
 
 class PredictionLogger(pl.Callback):
@@ -80,7 +80,7 @@ class PredictionLogger(pl.Callback):
                     labels[0].cpu()[:len_seq, :len_seq].bool()
                 )
                 self.valid_examples[dataloader_idx]["score"].append(
-                    compute_f1(labels[0], predictions[0])
+                    f1(labels[0], predictions[0])
                 )
 
     def on_validation_end(self, trainer, pl_module, dataloader_idx=0):
@@ -172,7 +172,7 @@ class PredictionLogger(pl.Callback):
                     labels[i].cpu()[:len_seq, :len_seq].bool().numpy()
                 )
                 self.test_examples[dataloader_idx]["score"].append(
-                    compute_f1(predictions[i], labels[i])
+                    f1(predictions[i], labels[i])
                 )
 
     def on_test_end(self, trainer, pl_module):
