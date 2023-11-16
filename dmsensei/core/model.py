@@ -97,8 +97,8 @@ class Model(pl.LightningModule):
         # Hardcoded values for DMS G/U bases
         if "dms" in predictions.keys():
             predictions["dms"][
-                (batch.get_values("sequence") == seq2int["G"])
-                | (batch.get_values("sequence") == seq2int["U"])
+              (batch.get_values("sequence", return_prediction=False) == seq2int["G"])
+                | (batch.get_values("sequence", return_prediction=False) == seq2int["U"])
             ] = VAL_GU
 
         batch.integrate_prediction(predictions)
