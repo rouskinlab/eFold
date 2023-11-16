@@ -55,41 +55,38 @@ class Batch(pl.LightningDataModule):
         self.batch_size = batch_size
 
     @classmethod
-    def from_list_of_datapoints(cls, list_of_datapoints, data_type, padding=True):
-        data_out, metadata_out = {}, {}
-        lengths = [len(dp.data.sequence) for dp in list_of_datapoints]
+    def from_list_of_datapoints(cls, list_of_datapoints, data_type):
+        data, metadata = {}, {}
+        lengths = [dp.get("length") for dp in list_of_datapoints]
         L = max(lengths)
         for dt in data_type:
-            padded_data = [
-                (idx, _pad(getattr(datapoint.data, dt), L, dt))
-                if padding
-                else (idx, datapoint[data_type])
-                for idx, datapoint in enumerate(list_of_datapoints)
-                if getattr(datapoint.data, dt) is not None
-            ]
-            if len(padded_data) == 0:
-                continue
-            index, values = zip(*padded_data)
-            data_out[dt] = {
-                "index": tensor(index).to(device),
-                "values": stack(values).to(device),
-            }
+            index, values = [], []
+            for idx, dp in enumerate(list_of_datapoints):
+                signal = dp.get(dt)
+                if signal is not None and len(signal) > 0:
+                    index.append(idx)
+                    values.append(_pad(signal, L, dt))
+            if len(index):
+                data[dt] = {
+                    "index": tensor(index).to(device),
+                    "values": stack(values).to(device),
+                }
 
-        metadata_out = {"length": lengths}
+        metadata = {"length": lengths}
         for metadata_type in ["reference", "quality"]:
-            metadata_out[metadata_type] = [
-                getattr(dp.metadata, metadata_type) for dp in list_of_datapoints
+            metadata[metadata_type] = [
+                dp.get(metadata_type) for dp in list_of_datapoints
             ]
 
         return cls(
-            data=data_out,
-            metadata=metadata_out,
+            data=data,
+            metadata=metadata,
             data_type=data_type,
             L=L,
             batch_size=len(list_of_datapoints),
         )
 
-    def to_list_of_datapoints(self)->ListOfDatapoints:
+    def to_list_of_datapoints(self) -> ListOfDatapoints:
         list_of_datapoints = []
         for idx in range(len(self.metadata["reference"])):
             data = Data(sequence=self.get("sequence", index=idx))
@@ -99,9 +96,15 @@ class Batch(pl.LightningDataModule):
             )
             ######## This part is the tricky one ########
             prediction = (
-                Data(sequence=self.get("sequence", index=idx),
-                     **{dt: self.get(dt, pred=True, true=False, index=idx)[: metadata.length] for dt in self.prediction.keys()}
-                     )
+                Data(
+                    sequence=self.get("sequence", index=idx),
+                    **{
+                        dt: self.get(dt, pred=True, true=False, index=idx)[
+                            : metadata.length
+                        ]
+                        for dt in self.prediction.keys()
+                    },
+                )
                 if self.prediction is not None
                 else None
             )
@@ -109,7 +112,11 @@ class Batch(pl.LightningDataModule):
                 if dt in self.data and idx in self.get_index(dt):
                     local_idx = torch.where(self.data[dt]["index"] == idx)[0].item()
                     setattr(
-                        data, dt, self.data[dt]["values"][local_idx][: metadata.length] # trims the padded part!
+                        data,
+                        dt,
+                        self.data[dt]["values"][local_idx][
+                            : metadata.length
+                        ],  # trims the padded part!
                     )
             #############################################
             for metadata_type in Metadata.__annotations__.keys():
@@ -123,8 +130,8 @@ class Batch(pl.LightningDataModule):
         assert len(prediction[list(prediction.keys())[0]]) == len(
             self.data["sequence"]["index"]
         ), "outputs and batch must have the same length"
-        self.prediction = {k:v.squeeze(axis=2) for k,v in prediction.items()}
-    
+        self.prediction = prediction
+        
     def get_pairs(self, data_type):
         if not data_type in DATA_TYPES:
             raise ValueError("data_type must be either dms or shape")
@@ -133,7 +140,7 @@ class Batch(pl.LightningDataModule):
         pred = self.prediction[data_type][self.data[data_type]["index"]]
         true = self.data[data_type]["values"]
         return pred, true
-    
+
     @unzip
     def get(self, data_type, pred=False, true=True, index=None):
         prefix = set_prefix(data_type)
@@ -149,16 +156,18 @@ class Batch(pl.LightningDataModule):
                 out["true"] = self.metadata[data_type]
         if index != None:
             if prefix == "data":
-                # if index != 0 or len(out["true"].shape) > 1:
-                #     out = {k: v[index] for k, v in out.items()}
-                return [out[v][:self.get('length', index=index)].squeeze() for v in ["pred", "true"] if v in out.keys()]
+                return [
+                    out[v][: self.get("length", index=index)].squeeze()
+                    for v in ["pred", "true"]
+                    if v in out.keys()
+                ]
             else:
                 return out["true"][index]
         if prefix == "data":
-            return [out[v].squeeze() for v in ["pred", "true"] if v in out.keys()]
+            return [out[v] for v in ["pred", "true"] if v in out.keys()]
         else:
             return out["true"]
-        
+
     def get_index(self, data_type):
         return self.data[data_type]["index"]
 

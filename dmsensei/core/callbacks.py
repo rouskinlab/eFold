@@ -84,11 +84,12 @@ class MyWandbLogger(pl.Callback):
         self,
         trainer: Trainer,
         pl_module: LightningModule,
-        outputs: STEP_OUTPUT,
+        outputs,
         batch: Any,
         batch_idx: int,
     ) -> None:
-        self.logger.train_loss(torch.sqrt(outputs["loss"]).item())
+        loss = outputs['loss']
+        self.logger.train_loss(torch.sqrt(loss).item())
 
     def on_train_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
         pass
@@ -103,7 +104,7 @@ class MyWandbLogger(pl.Callback):
     ):
         ### LOG ###
         # Log loss to Wandb
-        _, loss = outputs
+        loss = outputs
         self.logger.valid_loss(torch.sqrt(loss).item())
 
         # Store scores for averaging by batch
@@ -186,7 +187,7 @@ class MyWandbLogger(pl.Callback):
             pl_module.load_state_dict(weights)
 
     def on_test_batch_end(
-        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0
+        self, trainer, pl_module, outputs, batch:Batch, batch_idx, dataloader_idx=0
     ):
         # compute scores
         list_of_datapoints = batch.to_list_of_datapoints()

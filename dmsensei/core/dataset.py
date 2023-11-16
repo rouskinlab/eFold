@@ -50,5 +50,5 @@ class Dataset(TorchDataset):
         return self.list_of_datapoints[index]
 
     def collate_fn(self, batch_data):
-        batch = Batch.from_list_of_datapoints(batch_data, self.data_type, padding=True)
+        batch = Batch.from_list_of_datapoints(batch_data, self.data_type)
         return batch

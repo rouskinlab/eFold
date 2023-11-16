@@ -81,20 +81,18 @@ class Model(pl.LightningModule):
         )
         batch.integrate_prediction(predictions)
         loss = self.loss_fn(batch)
-        return batch, loss
+        return loss
 
     def test_step(self, batch:Batch, batch_idx:int, dataloader_idx=0):
         predictions = self.forward(
             batch.get("sequence")
         )
         batch.integrate_prediction(predictions)
-        return predictions
 
     def predict_step(self, batch:Batch, batch_idx:int):
         predictions = self.forward(
             batch.get("sequence")
         )
-
         # Hardcoded values for DMS G/U bases
         if "dms" in predictions.keys():
             predictions["dms"][
@@ -103,4 +101,3 @@ class Model(pl.LightningModule):
             ] = VAL_GU
 
         batch.integrate_prediction(predictions)
-        return batch

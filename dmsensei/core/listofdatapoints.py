@@ -95,5 +95,4 @@ class ListOfDatapoints:
                     metadata=md,
                 )
             )
-
         return self

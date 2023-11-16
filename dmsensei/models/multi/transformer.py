@@ -134,9 +134,10 @@ class Transformer(Model):
 
         src = self.resnet(src.unsqueeze(dim=1)).squeeze(dim=1)
 
-        DMS = self.output_net_DMS(src)
-        SHAPE = self.output_net_SHAPE(src)
-        return {"dms": DMS, "shape": SHAPE}
+        return {
+            "dms": self.output_net_DMS(src).squeeze(axis=2),
+            "shape": self.output_net_SHAPE(src).squeeze(axis=2),
+        }
 
 
 class PositionalEncoding(nn.Module):
