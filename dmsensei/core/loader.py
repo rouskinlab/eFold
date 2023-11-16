@@ -3,6 +3,7 @@ from os import makedirs
 import pickle
 import torch
 import wandb
+import os
 
 
 class Loader:
@@ -30,8 +31,13 @@ class Loader:
     def load_from_pickle(self):
         return pickle.load(open(self.get_path(), "rb"))
 
-    def load_from_weights(self):
-        return torch.load(self.get_path(extension=".pt"))
+    def load_from_weights(self, safe_load=True):
+        if (
+            safe_load
+            and os.path.exists(self.get_path(extension=".pt"))
+            or not safe_load
+        ):
+            return torch.load(self.get_path(extension=".pt"))
 
     def dump(self, model):
         torch.save(model.state_dict(), self.get_path(extension=".pt"))

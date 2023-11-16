@@ -12,7 +12,13 @@ import os
 import pandas as pd
 from rouskinhf import int2seq
 import plotly.graph_objects as go
-from ..config import TEST_SETS_NAMES, REF_METRIC_SIGN, REFERENCE_METRIC, DATA_TYPES, POSSIBLE_METRICS
+from ..config import (
+    TEST_SETS_NAMES,
+    REF_METRIC_SIGN,
+    REFERENCE_METRIC,
+    DATA_TYPES,
+    POSSIBLE_METRICS,
+)
 from .metrics import metric_factory
 
 from ..core.datamodule import DataModule
@@ -26,6 +32,8 @@ from lightning.pytorch import Trainer
 from lightning.pytorch import LightningModule
 from kaggle.api.kaggle_api_extended import KaggleApi
 import pickle
+from .batch import Batch
+from .listofdatapoints import ListOfDatapoints
 
 
 class MyWandbLogger(pl.Callback):
@@ -51,7 +59,7 @@ class MyWandbLogger(pl.Callback):
         # )
         self.val_losses = []
         self.batch_scores = {d: {} for d in self.data_type}
-        self.best_score = {d: -torch.inf*REF_METRIC_SIGN[d] for d in self.data_type}
+        self.best_score = {d: -torch.inf * REF_METRIC_SIGN[d] for d in self.data_type}
         self.validation_examples_references = {
             data_type: None for data_type in self.data_type
         }
@@ -93,55 +101,56 @@ class MyWandbLogger(pl.Callback):
         batch,
         batch_idx,
     ):
-        data, metadata = batch
-        predictions, loss = outputs
+        ### LOG ###
+        # Log loss to Wandb
+        _, loss = outputs
         self.logger.valid_loss(torch.sqrt(loss).item())
 
         # Store scores for averaging by batch
-        error_metrics_pack = compute_error_metrics_pack(predictions, data)
-        self.logger.error_metrics_pack("valid", error_metrics_pack)
+        list_of_datapoints = batch.to_list_of_datapoints()
+        # Compute metrics
+        for dp in list_of_datapoints:
+            dp.compute_error_metrics_pack()
+            for data_type in dp.metrics.keys():
+                metric = REFERENCE_METRIC[data_type]
+                if metric not in self.batch_scores[data_type]:
+                    self.batch_scores[data_type][metric] = []
+                self.batch_scores[data_type][metric].append(
+                    dp.metrics[data_type][REFERENCE_METRIC[data_type]]
+                )
+        # Log metrics to Wandb
+        self.logger.error_metrics_pack("valid", list_of_datapoints)
+        ### END LOG ###
 
-        for data_type, metric_data in error_metrics_pack.items():
-            if metric_data is None:
-                continue
-            for metric_name, metric in metric_data.items():
-                if metric_name not in self.batch_scores[data_type]:
-                    self.batch_scores[data_type][metric_name] = []
-                self.batch_scores[data_type][metric_name].append(metric)
-
+        #### PLOT ####
         # plot one example per epoch and per data_type
         # initialisation: choose one reference per data_type
         for data_type in self.data_type:
             if self.validation_examples_references[data_type] is None:
-                for d, md in self.dm.val_set:
-                    if data_type in d:
-                        self.validation_examples_references[data_type] = md["reference"]
+                for dp in self.dm.val_set:
+                    if hasattr(dp.data, data_type):
+                        self.validation_examples_references[
+                            data_type
+                        ] = dp.metadata.reference
                         break
-
         # plot the examples
         for data_type, name in plot_factory.keys():
-            if (
-                data_type in data
-                and data_type in predictions
-                and self.validation_examples_references[data_type]
-                in set(metadata["reference"])
-            ):
-                idx = metadata["reference"].index(
+            if batch.contains(data_type) and self.validation_examples_references[
+                data_type
+            ] in set(batch.get_values("reference")):
+                idx = batch.get_values("reference").index(
                     self.validation_examples_references[data_type]
                 )
-                batch_idx = data[data_type]["index"].cpu().numpy().tolist().index(idx)
-                true, pred = (
-                    data[data_type]["values"][batch_idx],
-                    predictions[data_type][idx],
-                )
+                pred, true = batch.get_value(data_type, idx)
                 plot = plot_factory[(data_type, name)](
                     pred=pred,
                     true=true,
-                    sequence=data["sequence"]["values"][idx],
-                    reference=metadata["reference"][idx],
-                    length=metadata["length"][idx],
+                    sequence=batch.get_value("sequence", idx),
+                    reference=batch.get_value("reference", idx),
+                    length=batch.get_value("length", idx),
                 )
                 self.logger.valid_plot(data_type, name, plot)
+        #### END PLOT ####
 
     def on_validation_end(self, trainer, pl_module, dataloader_idx=0):
         # Save best model
@@ -149,7 +158,11 @@ class MyWandbLogger(pl.Callback):
         for data_type, scores in self.batch_scores.items():
             # if best metric, save metric as best
             average_score = np.nanmean(scores[REFERENCE_METRIC[data_type]])
-            if average_score  * REF_METRIC_SIGN[data_type] > self.best_score[data_type] * REF_METRIC_SIGN[data_type]:
+            # The definition of best depends on the metric
+            if (
+                average_score * REF_METRIC_SIGN[data_type]
+                > self.best_score[data_type] * REF_METRIC_SIGN[data_type]
+            ):
                 self.best_score[data_type] = average_score
                 self.logger.final_score(average_score, data_type)
                 # save model for the best r2
@@ -167,52 +180,20 @@ class MyWandbLogger(pl.Callback):
         loader = Loader()
 
         # Load best model for testing
-        pl_module.load_state_dict(loader.load_from_weights())
+        weights = loader.load_from_weights(safe_load=True)
+        if weights is not None:
+            pl_module.load_state_dict(weights)
 
     def on_test_batch_end(
         self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0
     ):
-        data, metadata = batch
-        predictions = outputs
+        # compute scores
+        list_of_datapoints = batch.to_list_of_datapoints()
+        for dp in list_of_datapoints:
+            dp.compute_error_metrics_pack()
 
         # Logging metrics to Wandb
-        self.logger.error_metrics_pack(
-            stage="test", metrics_pack=compute_error_metrics_pack(predictions, data)
-        )
-
-        # rebuild this into a series of lines
-        lines = []
-        for idx in range(len(metadata["index"])):
-            line = {}
-            for k, v in metadata.items():
-                line[k] = v[idx]
-            for k, v in predictions.items():
-                line["pred_{}".format(k)] = v[idx]
-            lines.append(line)
-        for data_type, vals in data.items():
-            for k, v in zip(vals["index"], vals["values"].tolist()):
-                name = (
-                    "true_{}".format(data_type)
-                    if data_type != "sequence"
-                    else "sequence"
-                )
-                lines[k.item()][name] = v
-
-        # compute scores
-        for data_type in ["dms", "shape"]:
-            for line in lines:
-                if not (
-                    "true_{}".format(data_type) in line
-                    and "pred_{}".format(data_type) in line
-                ):
-                    continue
-                line["score_{}".format(data_type)] = metric_factory[
-                    REFERENCE_METRIC[data_type]
-                ](
-                    pred=tensor(line["pred_{}".format(data_type)]),
-                    true=tensor(line["true_{}".format(data_type)]),
-                    batch=False,
-                )
+        self.logger.error_metrics_pack("test", list_of_datapoints)
 
         for data_type in self.data_type:
             # wait to have a full buffer to start stacking
@@ -221,7 +202,7 @@ class MyWandbLogger(pl.Callback):
                 < 2 * self.n_best_worst
             ):
                 self.test_start_buffer[dataloader_idx][data_type].extend(
-                    line for line in lines if "score_{}".format(data_type) in line
+                    dp for dp in list_of_datapoints if data_type in dp.metrics.keys()
                 )
             else:
                 # initialise the stacks here
@@ -230,12 +211,13 @@ class MyWandbLogger(pl.Callback):
                     and self.test_stacks[dataloader_idx][data_type]["worse"].is_empty()
                 ):
                     merged_buffer_and_current_lines = (
-                        lines.copy() + self.test_start_buffer[dataloader_idx][data_type]
+                        list_of_datapoints.copy()
+                        + self.test_start_buffer[dataloader_idx][data_type]
                     )
                     merged_buffer_and_current_lines.sort(
-                        key=lambda x: x["score_{}".format(data_type)]
+                        key=lambda dp: dp.read_reference_metric(data_type)
                     )
-                    for idx in range(10):
+                    for idx in range(self.n_best_worst):
                         self.test_stacks[dataloader_idx][data_type]["worse"].try_to_add(
                             merged_buffer_and_current_lines[idx]
                         )
@@ -245,7 +227,7 @@ class MyWandbLogger(pl.Callback):
 
                 # when initialisation is done, start stacking here
                 else:
-                    for line in lines:
+                    for line in list_of_datapoints:
                         if not self.test_stacks[dataloader_idx][data_type][
                             "best"
                         ].try_to_add(line):
@@ -274,14 +256,16 @@ class MyWandbLogger(pl.Callback):
                 lengths = df_examples["length"].values
 
                 # Plot best and worst predictions
-                for true, pred, sequence, reference, length in zip(true_outputs, pred_outputs, sequences, references, lengths):
+                for true, pred, sequence, reference, length in zip(
+                    true_outputs, pred_outputs, sequences, references, lengths
+                ):
                     for plot_data_type, plot_name in plot_factory.keys():
                         if plot_data_type != data_type:
                             continue
                         plot = plot_factory[(plot_data_type, plot_name)](
                             pred=pred,
                             true=true,
-                            sequence=sequence, 
+                            sequence=sequence,
                             reference=reference,
                             lengths=length,
                         )  # add arguments here if you want
@@ -367,22 +351,16 @@ class ModelChecker(pl.Callback):
         self.step_number += 1
 
 
-def compute_error_metrics_pack(pred_batch, true_batch):
-    data_stack = {}
-    for data_type in DATA_TYPES:
-        if data_type in true_batch and data_type in pred_batch:
-            data_stack[data_type] = {
-                "pred": pred_batch[data_type][true_batch[data_type]["index"]],
-                "true": true_batch[data_type]["values"].to(pred_batch[data_type].device),
-                "is_batch": len(true_batch[data_type]["index"]) > 1,
-            }
-
+def compute_error_metrics_pack(batch):
     return {
         data_type: {
             metric_name: metric_factory[metric_name](
-                pred=data_stack[data_type]["pred"],
-                true=data_stack[data_type]["true"],
-                batch=data_stack[data_type]["is_batch"],
-            ) for metric_name in POSSIBLE_METRICS[data_type]}
-        for data_type in data_stack.keys()
+                pred=batch.get_values(data_type)[0],
+                true=batch.get_values(data_type)[1],
+                batch=len(batch.get_index(data_type)) > 1,
+            )
+            for metric_name in POSSIBLE_METRICS[data_type]
+        }
+        for data_type in DATA_TYPES
+        if batch.contains(data_type)
     }

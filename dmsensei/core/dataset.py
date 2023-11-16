@@ -23,8 +23,8 @@ import numpy as np
 from typing import Union
 import pdb
 from typing import List
-from tqdm import tqdm as tqdm_fun
-from .datapoint import Datapoint, ListOfDatapoints, Batch
+from .batch import Batch
+from .listofdatapoints import ListOfDatapoints
 
 
 class Dataset(TorchDataset):
@@ -45,10 +45,10 @@ class Dataset(TorchDataset):
 
     def __len__(self) -> int:
         return len(self.list_of_datapoints)
-    
+
     def __getitem__(self, index) -> tuple:
         return self.list_of_datapoints[index]
 
     def collate_fn(self, batch_data):
         batch = Batch.from_list_of_datapoints(batch_data, self.data_type, padding=True)
-        return batch.data, batch.metadata
+        return batch

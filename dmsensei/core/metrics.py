@@ -18,7 +18,8 @@ def batch_mean(fn):
         if ~torch.isnan(avg):
             return avg.item()
         else:
-            print('NaN encountered in metric, returning None')
+            print("NaN encountered in metric, returning None")
+
     return wrapper
 
 

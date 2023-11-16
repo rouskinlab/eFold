@@ -65,7 +65,7 @@ class DataModule(pl.LightningDataModule):
         self.force_download = force_download
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.data_type = data_type 
+        self.data_type = data_type
         self.splits = {
             "train": train_split,
             "valid": valid_split,
@@ -97,7 +97,9 @@ class DataModule(pl.LightningDataModule):
         merge = datasets[0]
         collate_fn = merge.collate_fn
         for dataset in datasets[1:]:
-            merge.list_of_datapoints = merge.list_of_datapoints + dataset.list_of_datapoints
+            merge.list_of_datapoints = (
+                merge.list_of_datapoints + dataset.list_of_datapoints
+            )
         merge.collate_fn = collate_fn
         for index, datapoint in enumerate(merge.list_of_datapoints):
             datapoint.metadata.index = index

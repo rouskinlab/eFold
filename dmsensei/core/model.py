@@ -51,76 +51,55 @@ class Model(pl.LightningModule):
         # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=self.gamma)
         return [optimizer], [scheduler]
 
-    def loss_fn(self, outputs, data):
+    def loss_fn(self, batch):
         loss = torch.tensor(0.0, device=self.device)
-        L = len(data["sequence"]["values"][0])
-        if "dms" in data.keys() and "dms" in outputs.keys():
-            target = data["dms"]["values"]
-            mask = target != UKN
-            loss += F.mse_loss(
-                input=outputs["dms"][data["dms"]["index"]][mask].squeeze(-1),
-                target=target[mask],
-            )
-        if "shape" in data.keys() and "shape" in outputs.keys():
-            target = data["shape"]["values"]
-            mask = target != UKN
-            loss += F.mse_loss(
-                input=outputs["shape"][data["shape"]["index"]][mask].squeeze(-1),
-                target=target[mask],
-            )
-        if "structure" in data.keys() and "structure" in outputs.keys():
-            loss += F.binary_cross_entropy(
-                input=outputs["structure"], target=data["structure"]
-            )
+        if batch.contains("dms"):
+            pred, true = batch.get_values("dms")
+            mask = true != UKN
+            loss += F.mse_loss(input=pred[mask].squeeze(), target=true[mask].squeeze())
+        if batch.contains("shape"):
+            pred, true = batch.get_values("shape")
+            mask = true != UKN
+            loss += F.mse_loss(input=pred[mask].squeeze(), target=true[mask].squeeze())
+        if batch.contains("structure"):
+            pred, true = batch.get_values("structure")
+            loss += F.binary_cross_entropy(input=pred, target=true)
         return loss
 
     def training_step(self, batch, batch_idx):
-        data, metadata = batch
-        predictions = self.forward(data["sequence"]["values"])
-        loss = self.loss_fn(predictions, data)
-
+        predictions = self.forward(
+            batch.get_values("sequence", return_prediction=False)
+        )
+        batch.integrate_prediction(predictions)
+        loss = self.loss_fn(batch)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        data, metadata = batch
-        predictions = self.forward(data["sequence"]["values"])
-        loss = self.loss_fn(predictions, data)
-                
-        return predictions, loss
+        predictions = self.forward(
+            batch.get_values("sequence", return_prediction=False)
+        )
+        batch.integrate_prediction(predictions)
+        loss = self.loss_fn(batch)
+        return batch, loss
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
-        data, metadata = batch
-        predictions = self.forward(data["sequence"]["values"])
-
+        predictions = self.forward(
+            batch.get_values("sequence", return_prediction=False)
+        )
+        batch.integrate_prediction(predictions)
         return predictions
 
     def predict_step(self, batch, batch_idx):
-        data, metadata = batch
-
-        predictions = self.forward(data["sequence"]["values"])
+        predictions = self.forward(
+            batch.get_values("sequence", return_prediction=False)
+        )
 
         # Hardcoded values for DMS G/U bases
         if "dms" in predictions.keys():
             predictions["dms"][
-                (data["sequence"]["values"] == seq2int["G"])
-                | (data["sequence"]["values"] == seq2int["U"])
+                (batch.get_values("sequence") == seq2int["G"])
+                | (batch.get_values("sequence") == seq2int["U"])
             ] = VAL_GU
 
-        # pack predictions into lines
-        outputs = []
-        for i in range(len(metadata["reference"])):
-            L = metadata["length"][i]
-            d = {
-                "sequence": int_to_sequence(data["sequence"]["values"][i])[:L],
-                "reference": metadata["reference"][i],
-            }
-            for signal in ["dms", "shape"]:
-                if signal in predictions.keys():
-                    d[signal] = [round(d.item(), 4) for d in predictions[signal][i, :L]]
-            if "structure" in predictions.keys():
-                d["structure"] = pairing_matrix_to_base_pairs(
-                    predictions["structure"][i, :L]
-                )
-            outputs.append(d)
-
-        return outputs
+        batch.integrate_prediction(predictions)
+        return batch
