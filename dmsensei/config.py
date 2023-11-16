@@ -1,5 +1,7 @@
 from torch import nn, tensor, float32, cuda, backends
 import torch
+import numpy as np
+
 
 DEFAULT_FORMAT = float32
 UKN = -1000.0
@@ -28,5 +30,6 @@ POSSIBLE_METRICS = {
     'shape': ['mae', 'r2', 'pearson']
 }
 REF_METRIC_SIGN = {"structure": 1, "dms": -1, "shape": -1}
+
 
 torch.set_default_dtype(torch.float32)

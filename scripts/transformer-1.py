@@ -94,7 +94,7 @@ if __name__ == "__main__":
     #     enable_checkpointing=False,
     )
 
-    # trainer.fit(model, datamodule=dm)
+    trainer.fit(model, datamodule=dm)
     trainer.test(model, datamodule=dm)
     trainer.predict(model, datamodule=dm)
 

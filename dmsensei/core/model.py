@@ -85,7 +85,7 @@ class Model(pl.LightningModule):
         data, metadata = batch
         predictions = self.forward(data["sequence"]["values"])
         loss = self.loss_fn(predictions, data)
-
+                
         return predictions, loss
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):

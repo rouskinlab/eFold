@@ -65,7 +65,7 @@ class DataModule(pl.LightningDataModule):
         self.force_download = force_download
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.data_type = data_type
+        self.data_type = data_type 
         self.splits = {
             "train": train_split,
             "valid": valid_split,
@@ -97,10 +97,10 @@ class DataModule(pl.LightningDataModule):
         merge = datasets[0]
         collate_fn = merge.collate_fn
         for dataset in datasets[1:]:
-            merge = merge + dataset
+            merge.list_of_datapoints = merge.list_of_datapoints + dataset.list_of_datapoints
         merge.collate_fn = collate_fn
         for index, datapoint in enumerate(merge.list_of_datapoints):
-            datapoint.metadata["index"] = index
+            datapoint.metadata.index = index
         return merge
 
     def find_one_reference_per_data_type(self, dataset_name: str):
@@ -141,22 +141,6 @@ class DataModule(pl.LightningDataModule):
             self.train_set, self.val_set, _ = random_split(
                 self.all_datasets, self.size_sets
             )
-
-            # # # TODO: change this
-            # self.train_set = Subset(
-            #     self.all_datasets,
-            #     range(
-            #         0,
-            #         self.splits["train"],
-            #     ),
-            # )
-            # self.val_set = Subset(
-            #     self.all_datasets,
-            #     range(
-            #         self.splits["train"],
-            #         self.splits["train"] + self.splits["valid"],
-            #     ),
-            # )
 
         if stage == "test" or stage is None:
             self.test_sets = self._select_test_dataset(
