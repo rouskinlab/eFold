@@ -57,19 +57,23 @@ class Datapoint:
     def compute_error_metrics_pack(self):
         self.metrics = {}
         for data_type in DATA_TYPES:
-            if hasattr(self.data, data_type) and hasattr(self.prediction, data_type):
-                true = getattr(self.data, data_type)
-                pred = getattr(self.prediction, data_type)
-                if true is not None and pred is not None:
-                    true, pred = true.squeeze(), pred.squeeze()
-                    self.metrics[data_type] = {}
-                    for metric_name in POSSIBLE_METRICS[data_type]:
-                        self.metrics[data_type][metric_name] = metric_factory[
-                            metric_name
-                        ](true, pred, batch=False)
+            if not (hasattr(self.data, data_type) and hasattr(self.prediction, data_type)):
+                continue
+            true = getattr(self.data, data_type)
+            pred = getattr(self.prediction, data_type)
+            if not (true is not None and pred is not None):
+                continue
+            true, pred = true.squeeze(), pred.squeeze()
+            self.metrics[data_type] = {}
+            for metric_name in POSSIBLE_METRICS[data_type]:
+                self.metrics[data_type][metric_name] = metric_factory[
+                    metric_name
+                ](true=true, pred=pred, batch=False)
         return self.metrics
 
     def read_reference_metric(self, data_type):
+        if not data_type in self.metrics:
+            return np.nan
         return self.metrics[data_type][REFERENCE_METRIC[data_type]]
 
     def contains(self, data_type):

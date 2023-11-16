@@ -62,12 +62,12 @@ if __name__ == "__main__":
         gamma=gamma,
     )
 
-    # model.load_state_dict(
-    #     torch.load(
-    #         "/Users/yvesmartin/src/DMSensei/smooth-blaze-41.pt",
-    #         map_location=torch.device("mps"),
-    #     )
-    # )
+    model.load_state_dict(
+        torch.load(
+            "/Users/yvesmartin/src/DMSensei/smooth-blaze-41.pt",
+            map_location=torch.device("mps"),
+        )
+    )
     model.to(device)
 
     if USE_WANDB:
@@ -94,9 +94,9 @@ if __name__ == "__main__":
     #     enable_checkpointing=False,
     )
 
-    trainer.fit(model, datamodule=dm)
+    # trainer.fit(model, datamodule=dm)
     trainer.test(model, datamodule=dm)
-    trainer.predict(model, datamodule=dm)
+    # trainer.predict(model, datamodule=dm)
 
     if USE_WANDB:
         wandb.finish()

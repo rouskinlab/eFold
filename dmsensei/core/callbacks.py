@@ -193,7 +193,7 @@ class MyWandbLogger(pl.Callback):
             dp.compute_error_metrics_pack()
 
         # Logging metrics to Wandb
-        self.logger.error_metrics_pack("test", list_of_datapoints)
+        self.logger.error_metrics_pack("test/{}".format(TEST_SETS_NAMES[dataloader_idx]), list_of_datapoints)
 
         for data_type in self.data_type:
             # wait to have a full buffer to start stacking
@@ -215,7 +215,7 @@ class MyWandbLogger(pl.Callback):
                         + self.test_start_buffer[dataloader_idx][data_type]
                     )
                     merged_buffer_and_current_lines.sort(
-                        key=lambda dp: dp.read_reference_metric(data_type)
+                        key=lambda dp: dp.read_reference_metric(data_type) if dp.read_reference_metric(data_type) is not None else -np.inf,
                     )
                     for idx in range(self.n_best_worst):
                         self.test_stacks[dataloader_idx][data_type]["worse"].try_to_add(
@@ -241,40 +241,55 @@ class MyWandbLogger(pl.Callback):
 
         for dataloader_idx in range(len(TEST_SETS_NAMES)):
             for data_type in self.data_type:
-                df_examples = pd.DataFrame(
-                    self.test_stacks[dataloader_idx][data_type]["best"].vals
-                    + self.test_stacks[dataloader_idx][data_type]["worse"].vals
-                )
+                
+                def extract(dp, data_type):
+                    return {
+                        "sequence": dp.data.sequence,
+                        "reference": dp.metadata.reference,
+                        "length": dp.metadata.length,
+                        "true_{}".format(data_type): getattr(dp.data, data_type),
+                        "pred_{}".format(data_type): getattr(dp.prediction, data_type),
+                        "score_{}".format(data_type): dp.metrics[data_type][
+                            REFERENCE_METRIC[data_type]
+                        ],
+                    }
+                
+                for rank in ['best', 'worse']:
+                    df_examples = pd.DataFrame(
+                        [extract(dp, data_type) for dp in self.test_stacks[dataloader_idx][data_type][rank].vals] 
+                    )
 
-                ## Log best and worst predictions of test dataset ##
-                df_examples.sort_values(by=["score_{}".format(data_type)], inplace=True)
+                    if len(df_examples) == 0:
+                        continue
+                    ## Log best and worst predictions of test dataset ##
+                    df_examples.sort_values(by=["score_{}".format(data_type)], inplace=True)
 
-                true_outputs = df_examples["true_{}".format(data_type)].values
-                pred_outputs = df_examples["pred_{}".format(data_type)].values
-                sequences = df_examples["sequence"].values
-                references = df_examples["reference"].values
-                lengths = df_examples["length"].values
+                    true_outputs = df_examples["true_{}".format(data_type)].values
+                    pred_outputs = df_examples["pred_{}".format(data_type)].values
+                    sequences = df_examples["sequence"].values
+                    references = df_examples["reference"].values
+                    lengths = df_examples["length"].values
 
-                # Plot best and worst predictions
-                for true, pred, sequence, reference, length in zip(
-                    true_outputs, pred_outputs, sequences, references, lengths
-                ):
-                    for plot_data_type, plot_name in plot_factory.keys():
-                        if plot_data_type != data_type:
-                            continue
-                        plot = plot_factory[(plot_data_type, plot_name)](
-                            pred=pred,
-                            true=true,
-                            sequence=sequence,
-                            reference=reference,
-                            lengths=length,
-                        )  # add arguments here if you want
-                        self.logger.test_plot(
-                            dataloader=TEST_SETS_NAMES[dataloader_idx],
-                            data_type=data_type,
-                            name=plot_name,
-                            plot=plot,
-                        )
+                    # Plot best and worst predictions
+                    for true, pred, sequence, reference, length in zip(
+                        true_outputs, pred_outputs, sequences, references, lengths
+                    ):
+                        for plot_data_type, plot_name in plot_factory.keys():
+                            if plot_data_type != data_type:
+                                continue
+                            plot = plot_factory[(plot_data_type, plot_name)](
+                                pred=pred,
+                                true=true,
+                                sequence=sequence,
+                                reference=reference,
+                                length=length,
+                            )  # add arguments here if you want
+                            self.logger.test_plot(
+                                dataloader=TEST_SETS_NAMES[dataloader_idx],
+                                data_type=data_type,
+                                name=plot_name+ '_' + rank,
+                                plot=plot,
+                            )
 
 
 class KaggleLogger(pl.Callback):

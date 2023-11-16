@@ -1,6 +1,6 @@
 from ..config import REFERENCE_METRIC
-
-
+import numpy as np
+from ..core.datapoint import Datapoint
 class Stack:
     def __init__(self, L, mode, data_type):
         self.L = L
@@ -11,12 +11,12 @@ class Stack:
 
     def _sort(self):
         self.vals.sort(
-            key=lambda dp: self._get_scores(dp),
+            key=lambda dp: self._get_scores(dp) if self._get_scores(dp) is not None else -np.inf,
             reverse=self.mode == "best",
         )
         
-    def _get_scores(self, dp):
-        return dp.metrics[self.data_type][REFERENCE_METRIC[self.data_type]]
+    def _get_scores(self, dp:Datapoint):
+        return dp.read_reference_metric(self.data_type)
         
 
     def _should_replace(self, current_score, new_score):
