@@ -98,7 +98,7 @@ class MyWandbLogger(pl.Callback):
         trainer,
         pl_module,
         outputs,
-        batch,
+        batch:Batch,
         batch_idx,
     ):
         ### LOG ###
@@ -111,15 +111,16 @@ class MyWandbLogger(pl.Callback):
         # Compute metrics
         for dp in list_of_datapoints:
             dp.compute_error_metrics_pack()
+            # save scores for averaging by epoch
             for data_type in dp.metrics.keys():
                 metric = REFERENCE_METRIC[data_type]
                 if metric not in self.batch_scores[data_type]:
                     self.batch_scores[data_type][metric] = []
                 self.batch_scores[data_type][metric].append(
-                    dp.metrics[data_type][REFERENCE_METRIC[data_type]]
+                    dp.read_reference_metric(data_type)
                 )
         # Log metrics to Wandb
-        self.logger.error_metrics_pack("valid", list_of_datapoints)
+        self.logger.error_metrics_pack(stage="valid", list_of_datapoints=list_of_datapoints)
         ### END LOG ###
 
         #### PLOT ####
@@ -128,26 +129,26 @@ class MyWandbLogger(pl.Callback):
         for data_type in self.data_type:
             if self.validation_examples_references[data_type] is None:
                 for dp in self.dm.val_set:
-                    if hasattr(dp.data, data_type):
+                    if dp.contains(data_type):
                         self.validation_examples_references[
                             data_type
-                        ] = dp.metadata.reference
+                        ] = dp.get('reference')
                         break
         # plot the examples
         for data_type, name in plot_factory.keys():
             if batch.contains(data_type) and self.validation_examples_references[
                 data_type
-            ] in set(batch.get_values("reference")):
-                idx = batch.get_values("reference").index(
+            ] in set(batch.get('reference')):
+                idx = batch.get('reference').index(
                     self.validation_examples_references[data_type]
                 )
-                pred, true = batch.get_value(data_type, idx)
+                pred, true = batch.get(data_type, pred=True, true=True, index=idx)
                 plot = plot_factory[(data_type, name)](
                     pred=pred,
                     true=true,
-                    sequence=batch.get_value("sequence", idx),
-                    reference=batch.get_value("reference", idx),
-                    length=batch.get_value("length", idx),
+                    sequence=batch.get("sequence", index=idx),
+                    reference=batch.get("reference", index=idx),
+                    length=batch.get("length", index=idx),
                 )
                 self.logger.valid_plot(data_type, name, plot)
         #### END PLOT ####
@@ -195,6 +196,7 @@ class MyWandbLogger(pl.Callback):
         # Logging metrics to Wandb
         self.logger.error_metrics_pack("test/{}".format(TEST_SETS_NAMES[dataloader_idx]), list_of_datapoints)
 
+        # stack best and worse predictions
         for data_type in self.data_type:
             # wait to have a full buffer to start stacking
             if (
@@ -244,14 +246,12 @@ class MyWandbLogger(pl.Callback):
                 
                 def extract(dp, data_type):
                     return {
-                        "sequence": dp.data.sequence,
-                        "reference": dp.metadata.reference,
-                        "length": dp.metadata.length,
-                        "true_{}".format(data_type): getattr(dp.data, data_type),
-                        "pred_{}".format(data_type): getattr(dp.prediction, data_type),
-                        "score_{}".format(data_type): dp.metrics[data_type][
-                            REFERENCE_METRIC[data_type]
-                        ],
+                        "sequence": dp.get("sequence"),
+                        "reference": dp.get("reference"),
+                        "length": dp.get("length"),
+                        "true_{}".format(data_type): dp.get(data_type),
+                        "pred_{}".format(data_type): dp.get(data_type, pred=True, true=False),
+                        "score_{}".format(data_type): dp.read_reference_metric(data_type),
                     }
                 
                 for rank in ['best', 'worse']:
@@ -293,9 +293,10 @@ class MyWandbLogger(pl.Callback):
 
 
 class KaggleLogger(pl.Callback):
-    def __init__(self, push_to_kaggle=True) -> None:
+    def __init__(self, dm, push_to_kaggle=True) -> None:
         # prediction
         self.predictions = []
+        self.dm = dm
         self.push_to_kaggle = push_to_kaggle
 
     def on_predict_batch_end(
@@ -303,11 +304,15 @@ class KaggleLogger(pl.Callback):
         trainer: Trainer,
         pl_module: LightningModule,
         outputs: Any,
-        batch: Any,
+        batch: Batch,
         batch_idx: int,
         dataloader_idx: int = 0,
     ) -> None:
-        self.predictions.extend(outputs)
+        for dp in batch.to_list_of_datapoints():   
+            d = {'reference': dp.get('reference')}
+            for data_type in self.dm.data_type:
+                d[data_type] = dp.get(data_type, pred=True, true=False, to_numpy=True)
+            self.predictions.append(d)
 
     def on_predict_end(self, trainer, pl_module):
         # load data
@@ -366,12 +371,13 @@ class ModelChecker(pl.Callback):
         self.step_number += 1
 
 
-def compute_error_metrics_pack(batch):
+def compute_error_metrics_pack(batch:Batch):
+    pred, true = batch.get_pairs("dms")
     return {
         data_type: {
             metric_name: metric_factory[metric_name](
-                pred=batch.get_values(data_type)[0],
-                true=batch.get_values(data_type)[1],
+                pred=pred,
+                true=true,
                 batch=len(batch.get_index(data_type)) > 1,
             )
             for metric_name in POSSIBLE_METRICS[data_type]

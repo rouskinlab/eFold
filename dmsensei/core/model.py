@@ -18,6 +18,7 @@ from scipy.stats.stats import pearsonr
 from rouskinhf import seq2int
 import wandb
 import torch.nn.functional as F
+from .batch import Batch
 
 
 class Model(pl.LightningModule):
@@ -51,54 +52,54 @@ class Model(pl.LightningModule):
         # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=self.gamma)
         return [optimizer], [scheduler]
 
-    def loss_fn(self, batch):
+    def loss_fn(self, batch:Batch):
         loss = torch.tensor(0.0, device=self.device)
         if batch.contains("dms"):
-            pred, true = batch.get_values("dms")
+            pred, true = batch.get_pairs("dms")
             mask = true != UKN
-            loss += F.mse_loss(input=pred[mask].squeeze(), target=true[mask].squeeze())
+            loss += F.mse_loss(input=pred[mask], target=true[mask])
         if batch.contains("shape"):
-            pred, true = batch.get_values("shape")
+            pred, true = batch.get_pairs("shape")
             mask = true != UKN
-            loss += F.mse_loss(input=pred[mask].squeeze(), target=true[mask].squeeze())
+            loss += F.mse_loss(input=pred[mask], target=true[mask])
         if batch.contains("structure"):
-            pred, true = batch.get_values("structure")
+            pred, true = batch.get_pairs("structure")
             loss += F.binary_cross_entropy(input=pred, target=true)
         return loss
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch:Batch, batch_idx:int):
         predictions = self.forward(
-            batch.get_values("sequence", return_prediction=False)
+            batch.get("sequence")
         )
         batch.integrate_prediction(predictions)
         loss = self.loss_fn(batch)
         return loss
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch:Batch, batch_idx:int):
         predictions = self.forward(
-            batch.get_values("sequence", return_prediction=False)
+            batch.get("sequence")
         )
         batch.integrate_prediction(predictions)
         loss = self.loss_fn(batch)
         return batch, loss
 
-    def test_step(self, batch, batch_idx, dataloader_idx=0):
+    def test_step(self, batch:Batch, batch_idx:int, dataloader_idx=0):
         predictions = self.forward(
-            batch.get_values("sequence", return_prediction=False)
+            batch.get("sequence")
         )
         batch.integrate_prediction(predictions)
         return predictions
 
-    def predict_step(self, batch, batch_idx):
+    def predict_step(self, batch:Batch, batch_idx:int):
         predictions = self.forward(
-            batch.get_values("sequence", return_prediction=False)
+            batch.get("sequence")
         )
 
         # Hardcoded values for DMS G/U bases
         if "dms" in predictions.keys():
             predictions["dms"][
-              (batch.get_values("sequence", return_prediction=False) == seq2int["G"])
-                | (batch.get_values("sequence", return_prediction=False) == seq2int["U"])
+              (batch.get("sequence") == seq2int["G"])
+                | (batch.get("sequence") == seq2int["U"])
             ] = VAL_GU
 
         batch.integrate_prediction(predictions)

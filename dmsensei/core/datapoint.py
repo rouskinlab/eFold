@@ -14,7 +14,16 @@ from .embeddings import (
 )
 import torch.nn.functional as F
 from .metrics import metric_factory
+from ..util import unzip
 
+def set_prefix(data_type):
+    if data_type in ["length", "reference", "quality"]:
+        prefix = "metadata"
+    elif data_type in ['sequence', 'dms', 'shape', 'structure']:
+        prefix = "data"
+    else: 
+        raise ValueError("data_type must be in {}".format(DATA_TYPES))
+    return prefix
 
 class Metadata:
     def __init__(self, reference, length, index=None, quality=1.0):
@@ -78,3 +87,26 @@ class Datapoint:
 
     def contains(self, data_type):
         return hasattr(self.data, data_type) and hasattr(self.prediction, data_type)
+
+    @unzip
+    def get(self, data_type, pred=False, true=True, to_numpy=False):
+        prefix = set_prefix(data_type)
+        out = {}
+        if pred and self.prediction is None and prefix == "data":
+            raise ValueError("No prediction available")
+        if pred and prefix == "data":
+            out["pred"] = getattr(self.prediction, data_type)
+        if true:
+            if prefix == "data":
+                out["true"] = getattr(self.data, data_type)
+            else:
+                out["true"] = getattr(self.metadata, data_type)
+        if to_numpy and prefix == "data":
+            for k in out.keys():
+                if out[k] is not None and hasattr(out[k], "cpu"):
+                    out[k] = out[k].squeeze().cpu().numpy()
+        if prefix == "data":
+            return [out[v] for v in ["pred", "true"] if v in out.keys() and out[v] is not None]
+        else:
+            return out["true"]
+        

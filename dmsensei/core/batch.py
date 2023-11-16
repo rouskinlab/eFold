@@ -7,11 +7,12 @@ from ..config import UKN, DATA_TYPES
 from torch import nn, tensor, float32, int64, stack, uint8
 import numpy as np
 import torch.nn.functional as F
-from .datapoint import Datapoint, Data, Metadata
+from .datapoint import Datapoint, Data, Metadata, set_prefix
 from .embeddings import base_pairs_to_pairing_matrix
 from .listofdatapoints import ListOfDatapoints
 import lightning.pytorch as pl
 from ..config import device
+from ..util import unzip
 
 
 def _pad(arr, L, data_type):
@@ -29,7 +30,7 @@ def _pad(arr, L, data_type):
 class Batch(pl.LightningDataModule):
     """Batch class to handle padding and stacking of tensors"""
 
-    def __init__(self, data, metadata, data_type, L):
+    def __init__(self, data, metadata, data_type, L, batch_size):
         """Batch class to handle padding and stacking of tensors
 
         Format of data and metadata:
@@ -51,6 +52,7 @@ class Batch(pl.LightningDataModule):
         self.data_type = data_type
         self.prediction = None
         self.L = L
+        self.batch_size = batch_size
 
     @classmethod
     def from_list_of_datapoints(cls, list_of_datapoints, data_type, padding=True):
@@ -84,33 +86,32 @@ class Batch(pl.LightningDataModule):
             metadata=metadata_out,
             data_type=data_type,
             L=L,
+            batch_size=len(list_of_datapoints),
         )
 
-    def to_list_of_datapoints(self):
+    def to_list_of_datapoints(self)->ListOfDatapoints:
         list_of_datapoints = []
         for idx in range(len(self.metadata["reference"])):
-            data = Data(sequence=self.get_value("sequence", idx))
+            data = Data(sequence=self.get("sequence", index=idx))
             metadata = Metadata(
-                reference=self.get_value("reference", idx),
-                length=self.metadata["length"][idx],
+                reference=self.get("reference", index=idx),
+                length=self.get("length", index=idx),
             )
+            ######## This part is the tricky one ########
             prediction = (
-                Data(sequence=self.get_value("sequence", idx))
+                Data(sequence=self.get("sequence", index=idx),
+                     **{dt: self.get(dt, pred=True, true=False, index=idx)[: metadata.length] for dt in self.prediction.keys()}
+                     )
                 if self.prediction is not None
                 else None
             )
             for dt in self.data_type:
-                if dt in self.data and idx in self.data[dt]["index"]:
-                    ######## This part is the tricky one ########
+                if dt in self.data and idx in self.get_index(dt):
                     local_idx = torch.where(self.data[dt]["index"] == idx)[0].item()
                     setattr(
-                        data, dt, self.data[dt]["values"][local_idx][: metadata.length]
+                        data, dt, self.data[dt]["values"][local_idx][: metadata.length] # trims the padded part!
                     )
-                    if prediction is not None and dt in self.prediction:
-                        setattr(
-                            prediction, dt, self.prediction[dt][idx][: metadata.length]
-                        )
-                    #############################################
+            #############################################
             for metadata_type in Metadata.__annotations__.keys():
                 setattr(metadata, metadata_type, self.metadata[metadata_type][idx])
             list_of_datapoints.append(
@@ -122,45 +123,42 @@ class Batch(pl.LightningDataModule):
         assert len(prediction[list(prediction.keys())[0]]) == len(
             self.data["sequence"]["index"]
         ), "outputs and batch must have the same length"
-        self.prediction = prediction
-
-    def get_value(self, data_type, index, return_prediction=True):
-        if data_type in ["sequence", "length", "reference", "quality"]:
-            return_prediction = False
-        if return_prediction:
-            pred, true = self.get_values(data_type, return_prediction=return_prediction)
-            return pred[index], true[index]
-        else:
-            return self.get_values(data_type, return_prediction=return_prediction)[
-                index
-            ]
-
-    def get_values(self, data_type, return_prediction=True):
-        if return_prediction and self.prediction is None:
+        self.prediction = {k:v.squeeze(axis=2) for k,v in prediction.items()}
+    
+    def get_pairs(self, data_type):
+        if not data_type in DATA_TYPES:
+            raise ValueError("data_type must be either dms or shape")
+        if not self.contains(data_type):
+            return None
+        pred = self.prediction[data_type][self.data[data_type]["index"]]
+        true = self.data[data_type]["values"]
+        return pred, true
+    
+    @unzip
+    def get(self, data_type, pred=False, true=True, index=None):
+        prefix = set_prefix(data_type)
+        out = {}
+        if pred and self.prediction is None and prefix == "data":
             raise ValueError("No prediction available")
-        if data_type in ["sequence", "length", "reference", "quality"]:
-            return_prediction = False
-        if data_type in self.data.keys():
-            prefix = "data"
-        elif data_type in self.metadata.keys():
-            prefix = "metadata"
-            return_prediction = False
-        else:
-            raise ValueError("data_type must be in data or metadata")
-
-        if not return_prediction:
-            return (
-                getattr(self, prefix)[data_type]["values"]
-                if prefix == "data"
-                else getattr(self, prefix)[data_type]
-            )
+        if pred and prefix == "data":
+            out["pred"] = self.prediction[data_type][index]
+        if true:
+            if prefix == "data":
+                out["true"] = self.data[data_type]["values"]
+            else:
+                out["true"] = self.metadata[data_type]
+        if index != None:
+            if prefix == "data":
+                # if index != 0 or len(out["true"].shape) > 1:
+                #     out = {k: v[index] for k, v in out.items()}
+                return [out[v][:self.get('length', index=index)].squeeze() for v in ["pred", "true"] if v in out.keys()]
+            else:
+                return out["true"][index]
         if prefix == "data":
-            return (
-                self.prediction[data_type][self.data[data_type]["index"]],
-                self.data[data_type]["values"],
-            )
-        return self.prediction[data_type], getattr(self, prefix)[data_type]
-
+            return [out[v].squeeze() for v in ["pred", "true"] if v in out.keys()]
+        else:
+            return out["true"]
+        
     def get_index(self, data_type):
         return self.data[data_type]["index"]
 

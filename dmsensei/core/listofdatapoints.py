@@ -38,13 +38,13 @@ class ListOfDatapoints:
     def __len__(self):
         return len(self.list_of_datapoints)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index)->Datapoint:
         return self.list_of_datapoints[index]
 
-    def __call__(self):
+    def __call__(self)->list:
         return self.list_of_datapoints
 
-    def __iter__(self):
+    def __iter__(self)->Datapoint:
         return iter(self.list_of_datapoints)
 
     def tolist(self):
@@ -73,7 +73,7 @@ class ListOfDatapoints:
         for index in tqdm_fun(
             range(len(data["references"])),
             desc="Wrangling data for {}".format(name),
-            total=len(self),
+            total=len(data["references"]),
             disable=not tqdm,
             colour="green",
         ):
