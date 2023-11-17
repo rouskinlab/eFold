@@ -52,51 +52,44 @@ class Model(pl.LightningModule):
         # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=self.gamma)
         return [optimizer], [scheduler]
 
-    def loss_fn(self, batch:Batch):
+    def loss_fn(self, batch: Batch):
         loss = torch.tensor(0.0, device=self.device)
+        count = {dt: batch.count(dt) for dt in batch.data_type if batch.contains(dt)}
         if batch.contains("dms"):
             pred, true = batch.get_pairs("dms")
             mask = true != UKN
-            loss += F.mse_loss(input=pred[mask], target=true[mask])
+            loss += count["dms"] * F.mse_loss(input=pred[mask], target=true[mask])
         if batch.contains("shape"):
             pred, true = batch.get_pairs("shape")
             mask = true != UKN
-            loss += F.mse_loss(input=pred[mask], target=true[mask])
+            loss += count["shape"] * F.mse_loss(input=pred[mask], target=true[mask])
         if batch.contains("structure"):
             pred, true = batch.get_pairs("structure")
-            loss += F.binary_cross_entropy(input=pred, target=true)
-        return loss
+            loss += count["structure"] * F.binary_cross_entropy(input=pred, target=true)
+        return loss / np.sum(list(count.values()))
 
-    def training_step(self, batch:Batch, batch_idx:int):
-        predictions = self.forward(
-            batch.get("sequence")
-        )
+    def training_step(self, batch: Batch, batch_idx: int):
+        predictions = self.forward(batch.get("sequence"))
         batch.integrate_prediction(predictions)
         loss = self.loss_fn(batch)
         return loss
 
-    def validation_step(self, batch:Batch, batch_idx:int):
-        predictions = self.forward(
-            batch.get("sequence")
-        )
+    def validation_step(self, batch: Batch, batch_idx: int):
+        predictions = self.forward(batch.get("sequence"))
         batch.integrate_prediction(predictions)
         loss = self.loss_fn(batch)
         return loss
 
-    def test_step(self, batch:Batch, batch_idx:int, dataloader_idx=0):
-        predictions = self.forward(
-            batch.get("sequence")
-        )
+    def test_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
+        predictions = self.forward(batch.get("sequence"))
         batch.integrate_prediction(predictions)
 
-    def predict_step(self, batch:Batch, batch_idx:int):
-        predictions = self.forward(
-            batch.get("sequence")
-        )
+    def predict_step(self, batch: Batch, batch_idx: int):
+        predictions = self.forward(batch.get("sequence"))
         # Hardcoded values for DMS G/U bases
         if "dms" in predictions.keys():
             predictions["dms"][
-              (batch.get("sequence") == seq2int["G"])
+                (batch.get("sequence") == seq2int["G"])
                 | (batch.get("sequence") == seq2int["U"])
             ] = VAL_GU
 

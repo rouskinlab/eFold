@@ -166,7 +166,7 @@ class MyWandbLogger(pl.Callback):
                 > self.best_score[data_type] * REF_METRIC_SIGN[data_type]
             ):
                 self.best_score[data_type] = average_score
-                self.logger.final_score(average_score, data_type)
+                self.logger.best_score(average_score, data_type)
                 # save model for the best r2
                 if (
                     data_type == "dms" and rank_zero_only.rank == 0
@@ -179,9 +179,8 @@ class MyWandbLogger(pl.Callback):
         if not self.wandb_log or rank_zero_only.rank != 0:
             return
 
-        loader = Loader()
-
         # Load best model for testing
+        loader = Loader()
         weights = loader.load_from_weights(safe_load=True)
         if weights is not None:
             pl_module.load_state_dict(weights)
@@ -293,12 +292,24 @@ class MyWandbLogger(pl.Callback):
                             )
 
 
+
 class KaggleLogger(pl.Callback):
-    def __init__(self, dm, push_to_kaggle=True) -> None:
+    def __init__(self, dm:DataModule, push_to_kaggle=True) -> None:
         # prediction
-        self.predictions = []
+        self.predictions = [None] * len(dm.predict_set)
+        self.predictions_idx = 0
         self.dm = dm
         self.push_to_kaggle = push_to_kaggle
+
+    def on_predict_start(self, trainer, pl_module):
+        if not self.wandb_log or rank_zero_only.rank != 0:
+            return
+
+        loader = Loader()
+        # Load best model for testing
+        weights = loader.load_from_weights(safe_load=True)
+        if weights is not None:
+            pl_module.load_state_dict(weights)      
 
     def on_predict_batch_end(
         self,
@@ -310,10 +321,10 @@ class KaggleLogger(pl.Callback):
         dataloader_idx: int = 0,
     ) -> None:
         for dp in batch.to_list_of_datapoints():   
-            d = {'reference': dp.get('reference')}
-            for data_type in self.dm.data_type:
-                d[data_type] = dp.get(data_type, pred=True, true=False, to_numpy=True)
-            self.predictions.append(d)
+            self.predictions[self.predictions_idx] = {'reference':dp.get('reference')}
+            for dt in self.dm.data_type:
+                self.predictions[self.predictions_idx][dt] = dp.get(dt, pred=True, true=False, to_numpy = True)
+            self.predictions_idx += 1
 
     def on_predict_end(self, trainer, pl_module):
         # load data
@@ -327,9 +338,8 @@ class KaggleLogger(pl.Callback):
         df = pd.merge(sequence_ids, df, on="reference")
 
         # save predictions as csv
-        dms, shape = np.concatenate(df["dms"].values), np.concatenate(
-            df["shape"].values
-        )
+        dms = np.concatenate(df["dms"].values)
+        shape = np.concatenate(df["shape"].values)
         dms, shape = np.clip(dms, 0, 1), np.clip(shape, 0, 1)
         pd.DataFrame(
             {"reactivity_DMS_MaP": dms, "reactivity_2A3_MaP": shape}

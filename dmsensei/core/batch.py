@@ -140,6 +140,9 @@ class Batch(pl.LightningDataModule):
         pred = self.prediction[data_type][self.data[data_type]["index"]]
         true = self.data[data_type]["values"]
         return pred, true
+    
+    def count(self, data_type):
+        return len(self.data[data_type]["index"])
 
     @unzip
     def get(self, data_type, pred=False, true=True, index=None):

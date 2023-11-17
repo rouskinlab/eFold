@@ -20,7 +20,7 @@ class Logger:
             batch_size=self._batch_size,
         )
 
-    def final_score(self, average_score, data_type):
+    def best_score(self, average_score, data_type):
         wandb.log(
             {
                 "final/{}_best_{}".format(
