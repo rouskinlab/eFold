@@ -16,9 +16,9 @@ device = (
 )
 
 TEST_SETS_NAMES = {
-    "structure": [],#["CT_files_pdbee"],
+    "structure": ["CT_files_pdbee"],
     "sequence": [],
-    "dms": ["ribonanza"], #"utr", "sarah_supermodel", "SARS2", "pri-miRNA"],
+    "dms": ["utr", "sarah_supermodel", "SARS2", "pri-miRNA"],
 }
 
 TEST_SETS_NAMES = [i for j in TEST_SETS_NAMES.values() for i in j]
