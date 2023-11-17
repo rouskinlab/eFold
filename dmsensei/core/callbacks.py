@@ -12,6 +12,7 @@ import os
 import pandas as pd
 from rouskinhf import int2seq
 import plotly.graph_objects as go
+
 from ..config import (
     TEST_SETS_NAMES,
     REF_METRIC_SIGN,

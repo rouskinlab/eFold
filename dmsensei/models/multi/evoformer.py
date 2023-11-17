@@ -92,6 +92,7 @@ class Evoformer(Model):
 
         DMS = self.output_net_DMS(s)
         SHAPE = self.output_net_SHAPE(s)
+        # TODO #8 : reformat into dictionary
         return torch.concatenate((DMS, SHAPE), dim=-1)
 
 
