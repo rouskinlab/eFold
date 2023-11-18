@@ -35,7 +35,7 @@ if __name__ == "__main__":
     d_model = 64
     lr = 1e-3
     gamma = 0.999
-    batch_size = 64
+    batch_size = 16
 
     # Create dataset
     dm = DataModule(
@@ -44,7 +44,7 @@ if __name__ == "__main__":
         force_download=True,
         batch_size=batch_size,
         num_workers=1,
-        train_split=1000,
+        train_split=100,
         valid_split=234,
         overfit_mode=False,
     )
@@ -72,11 +72,11 @@ if __name__ == "__main__":
     # train with both splits
     trainer = Trainer(
         accelerator=device,
-        devices=2,
+        devices=1,
         strategy="ddp",
         precision="16-mixed",
         accumulate_grad_batches=2,
-        max_epochs=100,
+        max_epochs=1,
         log_every_n_steps=100,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[  # EarlyStopping(monitor="valid/loss", mode='min', patience=5),
