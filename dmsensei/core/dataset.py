@@ -23,6 +23,8 @@ import numpy as np
 from typing import Union
 import pdb
 from typing import List
+from .batch import Batch
+from .listofdatapoints import ListOfDatapoints
 
 
 class Dataset(TorchDataset):
@@ -31,93 +33,22 @@ class Dataset(TorchDataset):
         name: str,
         data_type: List[str],
         force_download: bool,
-        quality: float = 1.0,
+        tqdm=True,
     ) -> None:
         super().__init__()
         self.name = name
         data = import_dataset(name, force_download=force_download)
         self.data_type = data_type + ["sequence"]
-        # save data
-        self.references = data["references"]
-        self.sequences = data["sequences"]
-        self.dms = data["dms"] if "dms" in data else None
-        self.base_pairs = data["base_pairs"] if "base_pairs" in data else None
-        self.shape = data["shape"] if "shape" in data else None
-        self.quality = quality
-        self.data, self.metadata = self._wrangle_data()
+        self.list_of_datapoints = ListOfDatapoints.from_rouskinhf(
+            data, data_type, name=name, tqdm=tqdm
+        )
 
     def __len__(self) -> int:
-        return len(self.sequences)
-
-    def _wrangle_data(self):
-        def get_array(attr, index, astype=None):
-            if not hasattr(self, attr) or getattr(self, attr) is None:
-                return None
-            d = tensor(getattr(self, attr)[index].astype(astype))
-            if torch.isnan(d).all():
-                return None
-            return d
-
-        data, metadata = [], []
-        for index in range(len(self)):
-            line = {}
-            astype = {
-                "dms": np.float32,
-                "structure": np.int32,
-                "shape": np.float32,
-                "base_pairs": np.int32,
-            }
-            for name in self.data_type:
-                arr = get_array(name, index, astype=astype[name])
-                if arr is not None:
-                    line[name] = arr
-
-            data.append(line)
-            metadata.append(
-                {
-                    "reference": self.references[index],
-                    "index": index,
-                    "quality": self.quality,
-                }
-            )
-        return data, metadata
+        return len(self.list_of_datapoints)
 
     def __getitem__(self, index) -> tuple:
-        return self.data[index], self.metadata[index]
+        return self.list_of_datapoints[index]
 
-    def _pad(self, arr, L, data_type):
-        padding_values = {
-            "sequence": 0,
-            "dms": UKN,
-            "shape": UKN,
-        }
-        if data_type == "structure":
-            return base_pairs_to_pairing_matrix(arr, L)
-        else:
-            return F.pad(arr, (0, L - len(arr)), value=padding_values[data_type])
-
-    def collate_fn(self, batch):
-        data, metadata = zip(*batch)
-
-        # pad and stack tensors
-        data_out = {}
-        lengths = [len(d["sequence"]) for d in data]
-        for k in self.data_type:
-            padded_data = [
-                (idx, self._pad(d[k], max(lengths), k))
-                for idx, d in enumerate(data)
-                if k in d
-            ]
-            if len(padded_data) == 0:
-                continue
-            indexes, values = zip(*padded_data)
-            if k == "sequence":
-                data_out[k] = stack(values)
-            else:
-                data_out[k] = {"indexes": tensor(indexes), "values": stack(values)}
-
-        metadata_out = {"length": lengths}
-        for k in metadata[0].keys():
-            metadata_out[k] = [d[k] for d in metadata]
-
-        return data_out, metadata_out
+    def collate_fn(self, batch_data):
+        batch = Batch.from_list_of_datapoints(batch_data, self.data_type)
+        return batch

@@ -1,307 +1,371 @@
+from typing import Any
 import lightning.pytorch as pl
+from lightning.pytorch.utilities.types import STEP_OUTPUT
 import torch
 import numpy as np
 from torch import Tensor, tensor
 import wandb
-from .metrics import compute_f1, r2_score
-from .visualisation import plot_structure, plot_dms, plot_dms_padding
+from .metrics import f1, r2_score
+from .visualisation import plot_factory
 from lightning.pytorch.utilities import rank_zero_only
 import os
 import pandas as pd
 from rouskinhf import int2seq
 import plotly.graph_objects as go
-from ..config import TEST_SETS_NAMES
-from .metrics import pearson_coefficient
 
-# TODO: #10 update this guy to receive the batch_metrics from valid and test
-class PredictionLogger(pl.Callback):
-    def __init__(self, data, n_best_worst=5, wandb_log=True):
+from ..config import (
+    TEST_SETS_NAMES,
+    REF_METRIC_SIGN,
+    REFERENCE_METRIC,
+    DATA_TYPES,
+    POSSIBLE_METRICS,
+)
+from .metrics import metric_factory
+
+from ..core.datamodule import DataModule
+from . import metrics
+from .loader import Loader
+from os.path import join
+from . import logger
+from ..util.stack import Stack
+import pandas as pd
+from lightning.pytorch import Trainer
+from lightning.pytorch import LightningModule
+from kaggle.api.kaggle_api_extended import KaggleApi
+import pickle
+from .batch import Batch
+from .listofdatapoints import ListOfDatapoints
+
+
+class MyWandbLogger(pl.Callback):
+    def __init__(
+        self,
+        dm: DataModule,
+        model: LightningModule,
+        batch_size: int,
+        n_best_worst: int = 10,
+        wandb_log: bool = True,
+    ):
+        # init
         self.wandb_log = wandb_log
-        self.data_type = data
-        self.best_r2 = -np.inf
+        self.dm = dm
+        self.data_type = dm.data_type
+        self.model = model
+        self.logger = logger.Logger(model, batch_size)
 
+        # validation
+        # TODO: #12 the validation examples aren't in the validation set
+        # self.validation_examples_refs = dm.find_one_reference_per_data_type(
+        #     dataset_name="valid"
+        # )
+        self.val_losses = []
+        self.batch_scores = {d: {} for d in self.data_type}
+        self.best_score = {d: -torch.inf * REF_METRIC_SIGN[d] for d in self.data_type}
+        self.validation_examples_references = {
+            data_type: None for data_type in self.data_type
+        }
+        # testing
         self.n_best_worst = n_best_worst
-
-        self.test_examples = [
+        self.test_stacks = [
             {
-                "seq": [],
-                "pred": [],
-                "true": [],
-                "score": [],
+                d: {
+                    "best": Stack(L=n_best_worst, mode="best", data_type=d),
+                    "worse": Stack(L=n_best_worst, mode="worse", data_type=d),
+                }
+                for d in self.data_type
             }
-            for _ in range(len(TEST_SETS_NAMES[self.data_type]))
-        ]  # Predictions on test set
-        self.valid_examples = [
-            {
-                "seq": [],
-                "pred": [],
-                "true": [],
-                "score": [],
-            }
-            for _ in range(len(TEST_SETS_NAMES[self.data_type]))
-        ]  # Predictions on one element of the valid set over epochs
+            for _ in TEST_SETS_NAMES
+        ]
 
-        self.best_score = -np.inf
+        self.test_start_buffer = [
+            {d: [] for d in self.data_type} for _ in TEST_SETS_NAMES
+        ]
 
-        self.model_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "..", "models", "trained_models"
-        )
+    def on_train_batch_end(
+        self,
+        trainer: Trainer,
+        pl_module: LightningModule,
+        outputs,
+        batch: Any,
+        batch_idx: int,
+    ) -> None:
+        loss = outputs['loss']
+        self.logger.train_loss(torch.sqrt(loss).item())
+
+    def on_train_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        pass
 
     def on_validation_batch_end(
-        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0
+        self,
+        trainer,
+        pl_module,
+        outputs,
+        batch:Batch,
+        batch_idx,
     ):
-        features, labels = batch
-        predictions = outputs[0]
+        ### LOG ###
+        # Log loss to Wandb
+        loss = outputs
+        self.logger.valid_loss(torch.sqrt(loss).item())
 
-        # Only works because valid dataset is not shuffled !! -> should use indices retrieval
-        if batch_idx == 0:
-            len_seq = torch.count_nonzero(features[0]).item()
+        # Store scores for averaging by batch
+        list_of_datapoints = batch.to_list_of_datapoints()
+        # Compute metrics
+        for dp in list_of_datapoints:
+            dp.compute_error_metrics_pack()
+            # save scores for averaging by epoch
+            for data_type in dp.metrics.keys():
+                metric = REFERENCE_METRIC[data_type]
+                if metric not in self.batch_scores[data_type]:
+                    self.batch_scores[data_type][metric] = []
+                self.batch_scores[data_type][metric].append(
+                    dp.read_reference_metric(data_type)
+                )
+        # Log metrics to Wandb
+        self.logger.error_metrics_pack(stage="valid", list_of_datapoints=list_of_datapoints)
+        ### END LOG ###
 
-            self.valid_examples[dataloader_idx]["seq"].append(
-                features[0].cpu()[:len_seq]
-            )
-
-            if self.data_type == "dms":
-                self.valid_examples[dataloader_idx]["pred"].append(
-                    predictions[0].cpu()[:len_seq]
+        #### PLOT ####
+        # plot one example per epoch and per data_type
+        # initialisation: choose one reference per data_type
+        for data_type in self.data_type:
+            if self.validation_examples_references[data_type] is None:
+                for dp in self.dm.val_set:
+                    if dp.contains(data_type):
+                        self.validation_examples_references[
+                            data_type
+                        ] = dp.get('reference')
+                        break
+        # plot the examples
+        for data_type, name in plot_factory.keys():
+            if batch.contains(data_type) and self.validation_examples_references[
+                data_type
+            ] in set(batch.get('reference')):
+                idx = batch.get('reference').index(
+                    self.validation_examples_references[data_type]
                 )
-                self.valid_examples[dataloader_idx]["true"].append(
-                    labels[0].cpu()[:len_seq]
+                pred, true = batch.get(data_type, pred=True, true=True, index=idx)
+                plot = plot_factory[(data_type, name)](
+                    pred=pred,
+                    true=true,
+                    sequence=batch.get("sequence", index=idx),
+                    reference=batch.get("reference", index=idx),
+                    length=batch.get("length", index=idx),
                 )
-                self.valid_examples[dataloader_idx]["score"].append(
-                    r2_score(labels[0], predictions[0])
-                )
-
-            else:
-                self.valid_examples[dataloader_idx]["pred"].append(
-                    predictions[0].cpu()[:len_seq, :len_seq]
-                )
-                self.valid_examples[dataloader_idx]["true"].append(
-                    labels[0].cpu()[:len_seq, :len_seq].bool()
-                )
-                self.valid_examples[dataloader_idx]["score"].append(
-                    compute_f1(labels[0], predictions[0])
-                )
+                self.logger.valid_plot(data_type, name, plot)
+        #### END PLOT ####
 
     def on_validation_end(self, trainer, pl_module, dataloader_idx=0):
         # Save best model
-        if rank_zero_only.rank == 0:
-            if self.data_type.lower() == "dms":
-                score = trainer.logged_metrics["valid/r2"].item()
-            else:
-                score = trainer.logged_metrics["valid/mFMI"].item()
+        loader = Loader()
+        for data_type, scores in self.batch_scores.items():
+            # if best metric, save metric as best
+            average_score = np.nanmean(scores[REFERENCE_METRIC[data_type]])
+            # The definition of best depends on the metric
+            if (
+                average_score * REF_METRIC_SIGN[data_type]
+                > self.best_score[data_type] * REF_METRIC_SIGN[data_type]
+            ):
+                self.best_score[data_type] = average_score
+                self.logger.best_score(average_score, data_type)
+                # save model for the best r2
+                if (
+                    data_type == "dms" and rank_zero_only.rank == 0
+                ):  # only keep best model for dms
+                    loader.dump(self.model)
 
-            if score > self.best_score:
-                self.best_score = score
-                os.makedirs(self.model_path, exist_ok=True)
-                self.best_model_path = os.path.join(
-                    self.model_path, trainer.logger.experiment.name + ".pt"
-                )
-                torch.save(
-                    pl_module.state_dict(),
-                    self.best_model_path,
-                )
-                if self.data_type.lower() == "dms":
-                    wandb.log({"final/best_r2": score})
+        self.batch_scores = {d: {} for d in self.data_type}
 
-            # Log a random example from the validation set. X is the true data, Y is the prediction, r2 is the score
-            fig = plot_dms(
-                self.valid_examples[dataloader_idx]["true"][-1],
-                self.valid_examples[dataloader_idx]["pred"][-1],
-                r2=self.valid_examples[dataloader_idx]["score"][-1],
-                layout="scatter",
-            )
-            wandb.log(
-                {
-                    "valid/example": wandb.Image(fig),
-                }
-            )
+    def on_test_start(self, trainer, pl_module):
+        if not self.wandb_log or rank_zero_only.rank != 0:
+            return
 
-            # plot the embedding
-            wandb.log(
-                {
-                    "valid/padding": wandb.Image(
-                        plot_dms_padding(
-                            self.valid_examples[dataloader_idx]["true"][-1],
-                            self.valid_examples[dataloader_idx]["pred"][-1],
-                        )
-                    )
-                }
-            )
-
-    # def on_test_start(self, trainer, pl_module):
-    #     if not self.wandb_log or rank_zero_only.rank != 0:
-    #         return
-
-    #     # Load best model
-    #     pl_module.load_state_dict(
-    #         torch.load(
-    #             os.path.join(self.model_path, trainer.logger.experiment.name + ".pt")
-    #         )
-    #     )
+        # Load best model for testing
+        loader = Loader()
+        weights = loader.load_from_weights(safe_load=True)
+        if weights is not None:
+            pl_module.load_state_dict(weights)
 
     def on_test_batch_end(
-        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0
+        self, trainer, pl_module, outputs, batch:Batch, batch_idx, dataloader_idx=0
     ):
-        features, labels = batch
-        predictions = outputs
+        # compute scores
+        list_of_datapoints = batch.to_list_of_datapoints()
+        for dp in list_of_datapoints:
+            dp.compute_error_metrics_pack()
 
-        for i in range(predictions.shape[0]):
-            len_seq = torch.count_nonzero(features[i]).item()
+        # Logging metrics to Wandb
+        self.logger.error_metrics_pack("test/{}".format(TEST_SETS_NAMES[dataloader_idx]), list_of_datapoints)
 
-            self.test_examples[dataloader_idx]["seq"].append(
-                features[i].cpu()[:len_seq].numpy()
-            )
-
-            if self.data_type == "dms":
-                self.test_examples[dataloader_idx]["pred"].append(
-                    predictions[i].cpu()[:len_seq].numpy()
+        # stack best and worse predictions
+        for data_type in self.data_type:
+            # wait to have a full buffer to start stacking
+            if (
+                len(self.test_start_buffer[dataloader_idx][data_type])
+                < 2 * self.n_best_worst
+            ):
+                self.test_start_buffer[dataloader_idx][data_type].extend(
+                    dp for dp in list_of_datapoints if data_type in dp.metrics.keys()
                 )
-                self.test_examples[dataloader_idx]["true"].append(
-                    labels[i].cpu()[:len_seq].numpy()
-                )
-                self.test_examples[dataloader_idx]["score"].append(
-                    r2_score(labels[i], predictions[i])
-                )
-
             else:
-                self.test_examples[dataloader_idx]["pred"].append(
-                    predictions[i].cpu()[:len_seq, :len_seq].numpy()
-                )
-                self.test_examples[dataloader_idx]["true"].append(
-                    labels[i].cpu()[:len_seq, :len_seq].bool().numpy()
-                )
-                self.test_examples[dataloader_idx]["score"].append(
-                    compute_f1(predictions[i], labels[i])
-                )
+                # initialise the stacks here
+                if (
+                    self.test_stacks[dataloader_idx][data_type]["best"].is_empty()
+                    and self.test_stacks[dataloader_idx][data_type]["worse"].is_empty()
+                ):
+                    merged_buffer_and_current_lines = (
+                        list_of_datapoints.copy()
+                        + self.test_start_buffer[dataloader_idx][data_type]
+                    )
+                    merged_buffer_and_current_lines.sort(
+                        key=lambda dp: dp.read_reference_metric(data_type) if dp.read_reference_metric(data_type) is not None else -np.inf,
+                    )
+                    for idx in range(self.n_best_worst):
+                        self.test_stacks[dataloader_idx][data_type]["worse"].try_to_add(
+                            merged_buffer_and_current_lines[idx]
+                        )
+                        self.test_stacks[dataloader_idx][data_type]["best"].try_to_add(
+                            merged_buffer_and_current_lines[-idx - 1]
+                        )
+
+                # when initialisation is done, start stacking here
+                else:
+                    for line in list_of_datapoints:
+                        if not self.test_stacks[dataloader_idx][data_type][
+                            "best"
+                        ].try_to_add(line):
+                            self.test_stacks[dataloader_idx][data_type][
+                                "worse"
+                            ].try_to_add(line)
 
     def on_test_end(self, trainer, pl_module):
         if not self.wandb_log or rank_zero_only.rank != 0:
             return
 
-        for dataloader_idx in range(len(TEST_SETS_NAMES[self.data_type])):
-            test_examples = self.test_examples[dataloader_idx]
-            test_set_name = TEST_SETS_NAMES[self.data_type][dataloader_idx]
-
-            # self.log_valid_example()
-
-            ## Log best and worst predictions of test dataset ##
-
-            for key in test_examples.keys():
-                test_examples[key] = np.array(test_examples[key], dtype=object)
-
-            # Select best and worst predictions
-            idx_sorted = np.argsort(test_examples["score"])
-            best_worst_idx = np.concatenate(
-                (idx_sorted[: self.n_best_worst], idx_sorted[-self.n_best_worst :])
-            )
-
-            sequences = test_examples["seq"][best_worst_idx]
-            true_outputs = test_examples["true"][best_worst_idx]
-            pred_outputs = test_examples["pred"][best_worst_idx]
-            scores = test_examples["score"][best_worst_idx]
-
-            # Plot best and worst predictions
-            fig_list = []
-            for true_output, pred_output, score in zip(
-                true_outputs, pred_outputs, scores
-            ):
-                if self.data_type == "dms":
-                    fig_list.append(
-                        plot_dms(true_output, pred_output, score, layout="scatter")
+        for dataloader_idx in range(len(TEST_SETS_NAMES)):
+            for data_type in self.data_type:
+                
+                def extract(dp, data_type):
+                    return {
+                        "sequence": dp.get("sequence"),
+                        "reference": dp.get("reference"),
+                        "length": dp.get("length"),
+                        "true_{}".format(data_type): dp.get(data_type),
+                        "pred_{}".format(data_type): dp.get(data_type, pred=True, true=False),
+                        "score_{}".format(data_type): dp.read_reference_metric(data_type),
+                    }
+                
+                for rank in ['best', 'worse']:
+                    df_examples = pd.DataFrame(
+                        [extract(dp, data_type) for dp in self.test_stacks[dataloader_idx][data_type][rank].vals] 
                     )
-                else:
-                    fig_list.append(plot_structure(true_output, pred_output))
 
-            # Make list of figures into a wandb table
-            df = pd.DataFrame(
-                {
-                    "seq": [
-                        "".join([int2seq[char] for char in seq[seq != 0]])
-                        for seq in sequences
-                    ],
-                    "structures": fig_list,
-                    "score": scores,
-                }
-            )
+                    if len(df_examples) == 0:
+                        continue
+                    ## Log best and worst predictions of test dataset ##
+                    df_examples.sort_values(by=["score_{}".format(data_type)], inplace=True)
 
-            wandb.log({f"test/{test_set_name}/best_worst": wandb.Table(dataframe=df)})
+                    true_outputs = df_examples["true_{}".format(data_type)].values
+                    pred_outputs = df_examples["pred_{}".format(data_type)].values
+                    sequences = df_examples["sequence"].values
+                    references = df_examples["reference"].values
+                    lengths = df_examples["length"].values
 
-            ## Log scatter of F1 score and sequence lengths ##
-
-            fig = go.Figure(
-                data=go.Scatter(
-                    x=[len(seq[seq != 0]) for seq in test_examples["seq"]],
-                    y=test_examples["score"],
-                    mode="markers",
-                )
-            )
-            score_type = "R2 score" if self.data_type == "dms" else "F1 score"
-            fig.update_layout(
-                title=f'Sequence lenght vs {score_type}. Mean score: {test_examples["score"].mean():.2f} ± {test_examples["score"].std():.2f} (1 std)',
-                xaxis_title="Sequence length",
-                yaxis_title=score_type,
-            )
-
-            wandb.log({f"test/{test_set_name}/score_vs_lenght": fig})
-
-            ## Log scatter of F1 score vs pearson ##
-            if self.data_type == "dms":
-                fig = go.Figure(
-                    data=go.Scatter(
-                        # x=[len(seq[seq != 0]) for seq in test_examples["seq"]],
-                        x=[
-                            pearson_coefficient(
-                                torch.tensor(y_true.astype(float)),
-                                torch.tensor(y_pred.astype(float)),
+                    # Plot best and worst predictions
+                    for true, pred, sequence, reference, length in zip(
+                        true_outputs, pred_outputs, sequences, references, lengths
+                    ):
+                        for plot_data_type, plot_name in plot_factory.keys():
+                            if plot_data_type != data_type:
+                                continue
+                            plot = plot_factory[(plot_data_type, plot_name)](
+                                pred=pred,
+                                true=true,
+                                sequence=sequence,
+                                reference=reference,
+                                length=length,
+                            )  # add arguments here if you want
+                            self.logger.test_plot(
+                                dataloader=TEST_SETS_NAMES[dataloader_idx],
+                                data_type=data_type,
+                                name=plot_name+ '_' + rank,
+                                plot=plot,
                             )
-                            for y_true, y_pred in zip(
-                                test_examples["true"], test_examples["pred"]
-                            )
-                        ],
-                        y=test_examples["score"],
-                        mode="markers",
-                    )
-                )
-                fig.update_layout(
-                    title=f"Pearson vs R2 score",
-                    xaxis_title="Pearson",
-                    yaxis_title="R2 score",
-                )
 
-                wandb.log({f"test/{test_set_name}/r2_vs_pearson": fig})
 
-        # plot the whole validation set
-        # figs = []
-        # for true_output, pred_output in zip(self.valid_examples["true"], self.valid_examples["pred"]):
-        #     if self.data_type == "dms":
-        #         figs.append(plot_dms(true_output, pred_output))
-        #     else:
-        #         figs.append(plot_structure(true_output, pred_output))
-        # wandb.log({"valid/whole_set": wandb.Image(figs)})
 
-    # def log_valid_example(self):
-    #     fig_list = []
-    #     for true_output, pred_output in zip(
-    #         self.valid_examples["true"], self.valid_examples["pred"]
-    #     ):
-    #         if self.data_type == "dms":
-    #             fig_list.append(plot_dms(true_output, pred_output))
-    #         else:
-    #             fig_list.append(plot_structure(true_output, pred_output))
+class KaggleLogger(pl.Callback):
+    def __init__(self, dm:DataModule, push_to_kaggle=True) -> None:
+        # prediction
+        self.predictions = [None] * len(dm.predict_set)
+        self.predictions_idx = 0
+        self.dm = dm
+        self.push_to_kaggle = push_to_kaggle
 
-    #     df = pd.DataFrame(
-    #         {"score": self.valid_examples["score"], "structures": fig_list}
-    #     )
+    def on_predict_start(self, trainer, pl_module):
+        if not self.wandb_log or rank_zero_only.rank != 0:
+            return
 
-    #     wandb.log({"final/example": wandb.Table(dataframe=df)})
+        loader = Loader()
+        # Load best model for testing
+        weights = loader.load_from_weights(safe_load=True)
+        if weights is not None:
+            pl_module.load_state_dict(weights)      
+
+    def on_predict_batch_end(
+        self,
+        trainer: Trainer,
+        pl_module: LightningModule,
+        outputs: Any,
+        batch: Batch,
+        batch_idx: int,
+        dataloader_idx: int = 0,
+    ) -> None:
+        for dp in batch.to_list_of_datapoints():   
+            self.predictions[self.predictions_idx] = {'reference':dp.get('reference')}
+            for dt in self.dm.data_type:
+                self.predictions[self.predictions_idx][dt] = dp.get(dt, pred=True, true=False, to_numpy = True)
+            self.predictions_idx += 1
+
+    def on_predict_end(self, trainer, pl_module):
+        # load data
+        df = pd.DataFrame(self.predictions)
+
+        sequence_ids = pd.read_csv(
+            os.path.join(
+                os.path.dirname(__file__), "../resources/test_sequences_ids.csv"
+            )
+        )
+        df = pd.merge(sequence_ids, df, on="reference")
+
+        # save predictions as csv
+        dms = np.concatenate(df["dms"].values)
+        shape = np.concatenate(df["shape"].values)
+        dms, shape = np.clip(dms, 0, 1), np.clip(shape, 0, 1)
+        pd.DataFrame(
+            {"reactivity_DMS_MaP": dms, "reactivity_2A3_MaP": shape}
+        ).reset_index().rename(columns={"index": "id"}).to_csv(
+            "predictions.csv", index=False
+        )
+
+        # save predictions as pickle
+        pickle.dump(df, open("predictions.pkl", "wb"))
+
+        # upload to kaggle
+        if self.push_to_kaggle:
+            api = KaggleApi()
+            api.authenticate()
+            api.competition_submit(
+                file_name="predictions.csv",
+                message="from predict callback",
+                competition="stanford-ribonanza-rna-folding",
+            )
 
 
 class ModelChecker(pl.Callback):
     def __init__(self, model, log_every_nstep=1000):
         self.step_number = 0
         self.model = model
-
         self.log_every_nstep = log_every_nstep
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
@@ -317,3 +381,19 @@ class ModelChecker(pl.Callback):
                 wandb.log({"model_params": wandb.Histogram(params)})
 
         self.step_number += 1
+
+
+def compute_error_metrics_pack(batch:Batch):
+    pred, true = batch.get_pairs("dms")
+    return {
+        data_type: {
+            metric_name: metric_factory[metric_name](
+                pred=pred,
+                true=true,
+                batch=len(batch.get_index(data_type)) > 1,
+            )
+            for metric_name in POSSIBLE_METRICS[data_type]
+        }
+        for data_type in DATA_TYPES
+        if batch.contains(data_type)
+    }

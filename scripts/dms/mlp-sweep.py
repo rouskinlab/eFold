@@ -28,7 +28,10 @@ sweep_configuration = {
     "method": "bayes",
     "metric": {"goal": "maximize", "name": "final/best_r2"},
     "parameters": {
-        "batch_size": {"distribution": "categorical", "values": [4, 8, 16, 32, 64, 128]},
+        "batch_size": {
+            "distribution": "categorical",
+            "values": [4, 8, 16, 32, 64, 128],
+        },
         "embedding_dim": {"distribution": "int_uniform", "max": 256, "min": 64},
         "loss_fn": {"distribution": "categorical", "values": ["mse_loss", "l1_loss"]},
         "lr": {"distribution": "log_uniform", "max": 0.0005, "min": 0.000001},
@@ -86,10 +89,10 @@ def train(config=None):
         ).to(device)
 
         trainer = Trainer(
-            logger= WandbLogger(),
-            max_epochs=config['max_epochs'],
+            logger=WandbLogger(),
+            max_epochs=config["max_epochs"],
             callbacks=[
-                PredictionLogger(data='dms'),
+                PredictionLogger(data="dms"),
                 EarlyStopping(monitor="valid/loss"),
                 ModelChecker(model=model, log_every_nstep=5),
             ],
@@ -102,7 +105,5 @@ def train(config=None):
 
 
 if __name__ == "__main__":
-
     sweep_id = wandb.sweep(sweep=sweep_configuration, project="mlp_dms_sweep")
     wandb.agent(sweep_id=sweep_id, function=train, count=50)
-    

@@ -18,6 +18,10 @@ import numpy as np
 from typing import Union, List
 from .dataset import Dataset
 
+# set seed
+torch.manual_seed(0)
+np.random.seed(0)
+
 
 class DataModule(pl.LightningDataModule):
     def __init__(
@@ -33,6 +37,7 @@ class DataModule(pl.LightningDataModule):
         overfit_mode=False,
         shuffle_train=True,
         shuffle_valid=False,
+        tqdm=True,
         **kwargs,
     ):
         """DataModule for the Rouskin lab datasets.
@@ -70,6 +75,7 @@ class DataModule(pl.LightningDataModule):
             "train": shuffle_train,
             "valid": shuffle_valid,
         }
+        self.tqdm = tqdm
 
         # we need to know the max sequence length for padding
         self.overfit_mode = overfit_mode
@@ -87,33 +93,56 @@ class DataModule(pl.LightningDataModule):
         raise ValueError("name must be a string or a list of strings")
 
     def _dataset_merge(self, datasets):
+        # TODO #11
         merge = datasets[0]
         collate_fn = merge.collate_fn
         for dataset in datasets[1:]:
-            merge = merge + dataset
+            merge.list_of_datapoints = (
+                merge.list_of_datapoints + dataset.list_of_datapoints
+            )
         merge.collate_fn = collate_fn
+        for index, datapoint in enumerate(merge.list_of_datapoints):
+            datapoint.metadata.index = index
         return merge
 
+    def find_one_reference_per_data_type(self, dataset_name: str):
+        refs = {}
+        dataset = {
+            "train": self.train_set,
+            "valid": self.val_set,
+            "predict": self.predict_set,
+        }[dataset_name]
+        for data_type in self.data_type:
+            for data, metadata in dataset:
+                if data_type in data.keys():
+                    refs[data_type] = metadata["reference"]
+                    break
+        return refs
+
     def setup(self, stage: str = None):
-        all_datasets = self._dataset_merge(
-            [
-                Dataset(
-                    name=name,
-                    data_type=self.data_type,
-                    force_download=self.force_download,
-                )
-                for name in self.name
-            ]
-        )
-        self.collate_fn = all_datasets.collate_fn
+        if stage == None:
+            self.all_datasets = self._dataset_merge(
+                [
+                    Dataset(
+                        name=name,
+                        data_type=self.data_type,
+                        force_download=self.force_download,
+                        tqdm=self.tqdm,
+                    )
+                    for name in self.name
+                ]
+            )
+            self.collate_fn = self.all_datasets.collate_fn
 
         if stage == "fit" or stage is None:
             self.size_sets = _compute_size_sets(
-                len(all_datasets),
+                len(self.all_datasets),
                 train_split=self.splits["train"],
                 valid_split=self.splits["valid"],
             )
-            self.train_set, self.val_set, _ = random_split(all_datasets, self.size_sets)
+            self.train_set, self.val_set, _ = random_split(
+                self.all_datasets, self.size_sets
+            )
 
         if stage == "test" or stage is None:
             self.test_sets = self._select_test_dataset(
@@ -122,10 +151,10 @@ class DataModule(pl.LightningDataModule):
 
         if stage == "predict" or stage is None:
             self.predict_set = Subset(
-                all_datasets,
+                self.all_datasets,
                 range(
                     0,
-                    round(len(all_datasets) * self.splits["predict"])
+                    round(len(self.all_datasets) * self.splits["predict"])
                     if type(self.splits["predict"]) == float
                     else self.splits["predict"],
                 ),
@@ -135,8 +164,9 @@ class DataModule(pl.LightningDataModule):
         return [
             Dataset(
                 name=name,
-                data_type = self.data_type,
+                data_type=self.data_type,
                 force_download=force_download,
+                tqdm=self.tqdm,
             )
             for name in TEST_SETS_NAMES
         ]

@@ -7,7 +7,7 @@ from scipy.stats.stats import pearsonr
 
 import lightning.pytorch as pl
 
-from ..model import Model
+from ...core.model import Model
 import wandb
 
 import sys, os
@@ -134,10 +134,10 @@ class Transformer(Model):
 
         src = self.resnet(src.unsqueeze(dim=1)).squeeze(dim=1)
 
-        # TODO: #9 Could place the .squeeze(-1) here to have batch_size x seq_len
-        DMS = self.output_net_DMS(src)
-        SHAPE = self.output_net_SHAPE(src)
-        return {"dms": DMS, "shape": SHAPE}
+        return {
+            "dms": self.output_net_DMS(src).squeeze(axis=2),
+            "shape": self.output_net_SHAPE(src).squeeze(axis=2),
+        }
 
 
 class PositionalEncoding(nn.Module):

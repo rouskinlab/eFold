@@ -1,8 +1,9 @@
 from matplotlib import pyplot as plt
 import numpy as np
 import wandb
-from .metrics import r2_score
+from .metrics import r2_score, mae_score, pearson_coefficient
 from ..config import UKN
+from rouskinhf import int2seq
 
 matplotlib_colors = [
     "red",
@@ -35,46 +36,84 @@ def plot_r2_distribution(r2_scores):
     return img
 
 
-def plot_dms(true_dms, pred_dms, r2=None, layout="bar", interval=100):
+def plot_signal(
+    pred,
+    true,
+    data_type,
+    sequence,
+    length,
+    reference=None,
+    layout="scatter",
+    interval=100,
+    **kwargs,
+):
     fig, ax = plt.subplots()
 
+    # Compute metrics while you still have tensors
+    r2 = r2_score(pred=pred, true=true)
+    r = pearson_coefficient(pred=pred, true=true)
+    mae = mae_score(pred=pred, true=true)
+
     # Base position with no coverage or G/U base are removed
-    mask = true_dms != UKN
-    pred_dms = pred_dms[mask]
-    true_dms = true_dms[mask]
+    def chop_array(x):
+        return x[:length].squeeze()
+
+    def known_bases_to_list(x, mask):
+        return x[mask].cpu().numpy()
+
+    pred, true, sequence = chop_array(pred), chop_array(true), chop_array(sequence)
+    mask = true != UKN
+    true, pred, sequence = (
+        known_bases_to_list(true, mask),
+        known_bases_to_list(pred, mask),
+        known_bases_to_list(sequence, mask),
+    )
 
     if layout == "bar":
         # Create and convert plot
         ax.bar(
-            np.arange(len(true_dms)), true_dms, color="b", alpha=0.5, label="True DMS"
+            np.arange(len(true)),
+            true,
+            color="b",
+            alpha=0.5,
+            label="True {}".format(data_type),
         )
         ax.bar(
-            np.arange(len(pred_dms)),
-            pred_dms,
+            np.arange(len(pred)),
+            pred,
             color="r",
             alpha=0.5,
-            label="Predicted DMS",
+            label="Predicted {}".format(data_type),
         )
         ax.set_xlabel("Position")
-        ax.set_ylabel("DMS reactivity")
+        ax.set_ylabel("{} reactivity".format(data_type))
 
     if layout == "scatter":
-        for i in range(int(np.ceil(len(true_dms) / interval))):
-            segment_true_dms = true_dms[i * interval : (i + 1) * interval]
-            segment_pred_dms = pred_dms[i * interval : (i + 1) * interval]
+        for i in set(sequence):
+            color = {
+                "A": "red",
+                "C": "blue",
+                "G": "green",
+                "U": "yellow",
+                "T": "yellow",
+            }[int2seq[i]]
+            segment_true = true[sequence == i]
+            segment_pred = pred[sequence == i]
             ax.scatter(
-                segment_true_dms,
-                segment_pred_dms,
-                color=matplotlib_colors[i],
+                segment_true,
+                segment_pred,
+                color=color,
                 alpha=0.5,
-                label="{} - {}".format(i * interval, (i + 1) * interval),
+                label=int2seq[i],
             )
-        ax.set_xlabel("True DMS")
-        ax.set_ylabel("Predicted DMS")
+        ax.set_xlabel("True {}".format(data_type))
+        ax.set_ylabel("Predicted {}".format(data_type))
 
     ax.legend()
-    if r2 is not None:
-        ax.set_title("R2 score: {:.3f}".format(r2))
+    title = "R2 = {:.2f}, pearson = {:.2f}, MAE = {:.2f}".format(r2, r, mae)
+    if reference is not None:
+        title = "{}: ".format(reference) + title
+    ax.set_title(title)
 
     img = wandb.Image(fig)
     fig = plt.close(fig)
@@ -82,13 +121,14 @@ def plot_dms(true_dms, pred_dms, r2=None, layout="bar", interval=100):
     return img
 
 
-def plot_dms_padding(true_dms, pred_dms):
+def plot_dms_padding(pred, true, **kwargs):
     fig, ax = plt.subplots()
 
-    pred_dms = pred_dms[true_dms == UKN]
-    true_dms = true_dms[true_dms == UKN]
+    mask = true != UKN
+    pred = pred[mask].cpu().numpy()
+    true = true[mask].cpu().numpy()
 
-    ax.scatter(true_dms, pred_dms)
+    ax.scatter(true, pred)
     ax.set_xlabel("True DMS")
     ax.set_ylabel("Predicted DMS")
 
@@ -98,13 +138,12 @@ def plot_dms_padding(true_dms, pred_dms):
     return img
 
 
-def plot_structure(true_struct, pred_struct):
+def plot_structure(pred, true, **kwargs):
     fig, ax = plt.subplots()
-    im = ax.imshow(
-        pred_struct, cmap="YlOrRd", interpolation="none", alpha=0.8, vmin=0, vmax=1
-    )
+    pred, true = pred.cpu().numpy(), true.cpu().numpy()
+    im = ax.imshow(pred, cmap="YlOrRd", interpolation="none", alpha=0.8, vmin=0, vmax=1)
 
-    x, y = np.where(true_struct == 1)
+    x, y = np.where(true == 1)
 
     plt.scatter(x, y, marker="+", color="black", s=2)
 
@@ -116,3 +155,14 @@ def plot_structure(true_struct, pred_struct):
     fig = plt.close(fig)
 
     return img
+
+
+plot_factory = {
+    ("dms", "scatter"): lambda *args, **kwargs: plot_signal(
+        *args, **kwargs, data_type="DMS"
+    ),
+    ("shape", "scatter"): lambda *args, **kwargs: plot_signal(
+        *args, **kwargs, data_type="SHAPE"
+    ),
+    ("structure", "heatmap"): plot_structure,
+}  # TODO

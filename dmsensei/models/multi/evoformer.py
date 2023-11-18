@@ -10,7 +10,7 @@ from einops import rearrange
 import torch.nn.functional as F
 import numpy as np
 
-from ..model import Model
+from ...core.model import Model
 
 dir_name = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(dir_name, ".."))
@@ -56,16 +56,15 @@ class Evoformer(Model):
             no_recycles=no_recycles,
         )
 
-        # self.output = ResLayer(dim_in=c_z,   dim_out=1, n_blocks=3, kernel_size=3, dropout=dropout)
-        self.output_net_DMS = nn.Sequential(  # nn.Linear(d_model, d_model),
-            # activation_map[activation],
-            nn.Linear(d_model, 1)
-        )
+        self.output_net_DMS = nn.Sequential(nn.LayerNorm(d_model),
+                                                nn.Linear(d_model, d_model), 
+                                                nn.ReLU(),
+                                                nn.Linear(d_model, 1))
 
-        self.output_net_SHAPE = nn.Sequential(  # nn.Linear(d_model, d_model),
-            # activation_map[activation],
-            nn.Linear(d_model, 1)
-        )
+        self.output_net_SHAPE = nn.Sequential(nn.LayerNorm(d_model),
+                                                nn.Linear(d_model, d_model), 
+                                                nn.ReLU(),
+                                                nn.Linear(d_model, 1))
 
     def forward(self, src: Tensor) -> Tensor:
         # Encoding of RNA sequence
@@ -90,10 +89,10 @@ class Evoformer(Model):
         # output = self.output_adapter(s)
         # return output.squeeze(-1)
 
-        DMS = self.output_net_DMS(s)
-        SHAPE = self.output_net_SHAPE(s)
-        # TODO #8 : reformat into dictionary
-        return torch.concatenate((DMS, SHAPE), dim=-1)
+        return {
+            'dms': self.output_net_DMS(s),
+            'shape': self.output_net_SHAPE(s),
+        }
 
 
 class EvoBlock(nn.Module):
