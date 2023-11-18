@@ -2,7 +2,7 @@ from rouskinhf import import_dataset, seq2int, dot2int, int2dot, int2seq
 from torch.utils.data import Dataset as TorchDataset
 from torch import nn, tensor, float32, int64, stack
 from numpy import array, ndarray
-from ..config import DEFAULT_FORMAT, device, TEST_SETS_NAMES
+from ..config import DEFAULT_FORMAT, device, TEST_SETS
 from .embeddings import base_pairs_to_int_dot_bracket, sequence_to_int
 import torch
 from torch.utils.data import DataLoader, random_split, Subset
@@ -164,11 +164,11 @@ class DataModule(pl.LightningDataModule):
         return [
             Dataset(
                 name=name,
-                data_type=self.data_type,
+                data_type=[data_type],
                 force_download=force_download,
                 tqdm=self.tqdm,
             )
-            for name in TEST_SETS_NAMES
+            for data_type, datasets in TEST_SETS.items() for name in datasets
         ]
 
     def train_dataloader(self):

@@ -22,7 +22,7 @@ def set_prefix(data_type):
     elif data_type in ['sequence', 'dms', 'shape', 'structure']:
         prefix = "data"
     else: 
-        raise ValueError("data_type must be in {}".format(DATA_TYPES))
+        raise ValueError("data_type: {} must be in {}".format(data_type, ['sequence', 'dms', 'shape', 'structure']))
     return prefix
 
 class Metadata:

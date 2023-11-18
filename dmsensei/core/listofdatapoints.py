@@ -27,7 +27,8 @@ class ListOfDatapoints:
 
     def __add__(self, other):
         if isinstance(other, Datapoint):
-            return ListOfDatapoints(self.list_of_datapoints + [other])
+            self.list_of_datapoints.append(other)
+            return self
         elif isinstance(other, ListOfDatapoints):
             return ListOfDatapoints(self.list_of_datapoints + other.list_of_datapoints)
         elif isinstance(other, list):

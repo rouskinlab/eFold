@@ -15,13 +15,13 @@ device = (
     else "cpu"
 )
 
-TEST_SETS_NAMES = {
-    "structure": ["CT_files_pdbee"],
+TEST_SETS = {
+    "structure": [],#["CT_files_pdbee"], #TODO #16 add structure test sets
     "sequence": [],
-    "dms": ["utr", "sarah_supermodel", "SARS2", "pri-miRNA"],
+    "dms": [ "sarah_supermodel", "utr", "SARS2", "pri-miRNA"],
 }
 
-TEST_SETS_NAMES = [i for j in TEST_SETS_NAMES.values() for i in j]
+TEST_SETS_NAMES = [i for j in TEST_SETS.values() for i in j]
 
 DATA_TYPES = ["structure", "dms", "shape"]
 REFERENCE_METRIC = {"structure": "f1", "dms": "mae", "shape": "mae"}
