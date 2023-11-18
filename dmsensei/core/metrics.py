@@ -126,7 +126,7 @@ def mae_score(pred, true, batch=None):
 
     mask = true != UKN
     pred = pred[mask]
-    true = true[mask].to(pred.device)
+    true = true[mask]
 
     return torch.mean(torch.abs(true - pred)).item()
 

@@ -144,33 +144,27 @@ class Batch(pl.LightningDataModule):
     def count(self, data_type):
         return len(self.data[data_type]["index"])
 
-    @unzip
     def get(self, data_type, pred=False, true=True, index=None):
         prefix = set_prefix(data_type)
-        out = {}
         if pred and self.prediction is None and prefix == "data":
             raise ValueError("No prediction available")
-        if pred and prefix == "data":
-            out["pred"] = self.prediction[data_type][index]
+        
+        # return metadata
+        if prefix == "metadata":
+            if index != None:
+                return self.metadata[data_type][index]
+            return self.metadata[data_type]
+        
+        # now we know we are dealing with data
+        out = []
+        if pred:
+            out.append(self.prediction[data_type])
         if true:
-            if prefix == "data":
-                out["true"] = self.data[data_type]["values"]
-            else:
-                out["true"] = self.metadata[data_type]
-        if index != None:
-            if prefix == "data":
-                return [
-                    out[v][: self.get("length", index=index)].squeeze()
-                    for v in ["pred", "true"]
-                    if v in out.keys()
-                ]
-            else:
-                return out["true"][index]
-        if prefix == "data":
-            return [out[v] for v in ["pred", "true"] if v in out.keys()]
-        else:
-            return out["true"]
-
+            out.append(self.data[data_type]["values"])
+        if index is not None:
+            out = [v[index][:self.get('length', index=index)] for v in out]
+        return out[0] if len(out) == 1 else out
+    
     def get_index(self, data_type):
         return self.data[data_type]["index"]
 

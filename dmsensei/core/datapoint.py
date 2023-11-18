@@ -68,11 +68,11 @@ class Datapoint:
         for data_type in DATA_TYPES:
             if not (hasattr(self.data, data_type) and hasattr(self.prediction, data_type)):
                 continue
-            true = getattr(self.data, data_type)
-            pred = getattr(self.prediction, data_type)
+            pred = self.get(data_type, pred=True, true=False)
+            true = self.get(data_type, pred=False, true=True)
             if not (true is not None and pred is not None):
                 continue
-            true, pred = true.squeeze(), pred.squeeze()
+            # true, pred = true.squeeze(), pred.squeeze()
             self.metrics[data_type] = {}
             for metric_name in POSSIBLE_METRICS[data_type]:
                 self.metrics[data_type][metric_name] = metric_factory[
@@ -86,27 +86,29 @@ class Datapoint:
         return self.metrics[data_type][REFERENCE_METRIC[data_type]]
 
     def contains(self, data_type):
-        return hasattr(self.data, data_type) and hasattr(self.prediction, data_type)
+        if self.prediction is not None and not hasattr(self.prediction, data_type):
+            return False
+        return hasattr(self.data, data_type)
 
-    @unzip
     def get(self, data_type, pred=False, true=True, to_numpy=False):
         prefix = set_prefix(data_type)
-        out = {}
+
         if pred and self.prediction is None and prefix == "data":
             raise ValueError("No prediction available")
-        if pred and prefix == "data":
-            out["pred"] = getattr(self.prediction, data_type)
+        
+        # return metadata
+        if prefix == "metadata":
+            return getattr(self.metadata, data_type)
+        
+        # now we are in the data part
+        out = []
+        if pred:
+            out.append(getattr(self.prediction, data_type))
         if true:
-            if prefix == "data":
-                out["true"] = getattr(self.data, data_type)
-            else:
-                out["true"] = getattr(self.metadata, data_type)
-        if to_numpy and prefix == "data":
-            for k in out.keys():
-                if out[k] is not None and hasattr(out[k], "cpu"):
-                    out[k] = out[k].squeeze().cpu().numpy()
-        if prefix == "data":
-            return [out[v] for v in ["pred", "true"] if v in out.keys() and out[v] is not None]
-        else:
-            return out["true"]
+            out.append(getattr(self.data, data_type))
+        if to_numpy:
+            for idx, arr in enumerate(out):
+                if hasattr(arr, "cpu"):
+                    out[idx] = arr.squeeze().cpu().numpy()
+        return out[0] if len(out) == 1 else out
         
