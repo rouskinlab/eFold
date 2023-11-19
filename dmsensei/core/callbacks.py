@@ -93,12 +93,17 @@ class MyWandbLogger(pl.Callback):
         outputs,
         batch: Batch,
         batch_idx,
+        dataloader_idx=0,
     ):
         ### LOG ###
         # Log loss to Wandb
         loss = outputs
-        self.logger.valid_loss(torch.sqrt(loss).item())
+        self.logger.valid_loss(torch.sqrt(loss).item(), isLQ=dataloader_idx)
 
+        # don't log metrics for the validation LQ set
+        if dataloader_idx:
+            return
+        
         # Store scores for averaging by batch
         list_of_datapoints = batch.to_list_of_datapoints()
         # Compute metrics

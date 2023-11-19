@@ -68,7 +68,7 @@ class Model(pl.LightningModule):
         loss = self.loss_fn(batch)
         return loss
 
-    def validation_step(self, batch: Batch, batch_idx: int):
+    def validation_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
         predictions = self.forward(batch.get("sequence"))
         batch.integrate_prediction(predictions)
         loss = self.loss_fn(batch)

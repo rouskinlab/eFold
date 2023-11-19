@@ -18,6 +18,7 @@ class Logger:
             on_step=False,
             on_epoch=True,
             batch_size=self._batch_size,
+            add_dataloader_idx=False,
         )
 
     def best_score(self, average_score, data_type):
@@ -32,7 +33,9 @@ class Logger:
     def train_loss(self, loss):
         self.log("train", "loss", loss)
 
-    def valid_loss(self, loss):
+    def valid_loss(self, loss, isLQ=False):
+        if isLQ:
+            self.log("valid", "lossLQ", loss)
         self.log("valid", "loss", loss)
 
     def valid_plot(self, data_type, name, plot):

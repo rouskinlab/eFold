@@ -31,10 +31,12 @@ class DataModule(pl.LightningDataModule):
         num_workers: int = 1,
         train_split: float = 0,
         valid_split: float = 0,
+        validLQ_split: float = 0,
         predict_split: float = 0,
         overfit_mode=False,
         shuffle_train=True,
         shuffle_valid=False,
+        shuffle_validLQ=False,
         tqdm=True,
         **kwargs,
     ):
@@ -67,11 +69,13 @@ class DataModule(pl.LightningDataModule):
         self.splits = {
             "train": train_split,
             "valid": valid_split,
+            "validLQ": validLQ_split,
             "predict": predict_split,
         }
         self.shuffle = {
             "train": shuffle_train,
             "valid": shuffle_valid,
+            "validLQ": shuffle_validLQ,
         }
         self.tqdm = tqdm
 
@@ -178,12 +182,32 @@ class DataModule(pl.LightningDataModule):
         )
 
     def val_dataloader(self):
-        return DataLoader(
+        valid = DataLoader(
             self.val_set if not self.overfit_mode else self.train_set,
             shuffle=self.shuffle["valid"],
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
         )
+        if self.splits['validLQ'] > 0:
+            n_datapoints = round(len(self.all_datasets) * self.splits["validLQ"]) if type(self.splits["validLQ"]) == float else self.splits["validLQ"]
+            self.valLQ_set = Subset(
+                Dataset(
+                    name='ribonanza_LQ',
+                    data_type=self.data_type,
+                    force_download=self.force_download,
+                    tqdm=self.tqdm,
+                ),
+                np.random.choice(len(self.all_datasets), n_datapoints, replace=False)
+            )
+            validLQ = DataLoader(
+                self.valLQ_set,
+                shuffle=self.shuffle["validLQ"],
+                collate_fn=self.collate_fn,
+                batch_size=self.batch_size,
+            )
+            return [valid, validLQ]
+        else:
+            return valid
 
     def test_dataloader(self):
         return [
