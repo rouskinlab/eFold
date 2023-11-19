@@ -27,6 +27,13 @@ def _pad(arr, L, data_type):
         return F.pad(arr, (0, L - len(arr)), value=padding_values[data_type])
 
 
+class BatchData:
+    def __init__(self, data_type, index, values):
+        self.data_type = data_type
+        self.index = index
+        self.values = values
+
+
 class Batch(pl.LightningDataModule):
     """Batch class to handle padding and stacking of tensors"""
 
@@ -67,10 +74,11 @@ class Batch(pl.LightningDataModule):
                     index.append(idx)
                     values.append(_pad(signal, L, dt))
             if len(index):
-                data[dt] = {
-                    "index": tensor(index).to(device),
-                    "values": stack(values).to(device),
-                }
+                data[dt] = BatchData(
+                    data_type=dt,
+                    index=tensor(index),
+                    values=stack(values),
+                )
 
         metadata = {"length": lengths}
         for metadata_type in ["reference", "quality"]:
@@ -110,11 +118,11 @@ class Batch(pl.LightningDataModule):
             )
             for dt in self.data_type:
                 if dt in self.data and idx in self.get_index(dt):
-                    local_idx = torch.where(self.data[dt]["index"] == idx)[0].item()
+                    local_idx = torch.where(self.data[dt].index == idx)[0].item()
                     setattr(
                         data,
                         dt,
-                        self.data[dt]["values"][local_idx][
+                        self.data[dt].values[local_idx][
                             : metadata.length
                         ],  # trims the padded part!
                     )
@@ -131,44 +139,44 @@ class Batch(pl.LightningDataModule):
             self.data["sequence"]["index"]
         ), "outputs and batch must have the same length"
         self.prediction = prediction
-        
+
     def get_pairs(self, data_type):
         if not data_type in DATA_TYPES:
             raise ValueError("data_type must be either dms or shape")
         if not self.contains(data_type):
             return None
-        pred = self.prediction[data_type][self.data[data_type]["index"]]
-        true = self.data[data_type]["values"]
+        pred = self.prediction[data_type][self.data[data_type].index]
+        true = self.data[data_type].values
         return pred, true
-    
+
     def count(self, data_type):
-        return len(self.data[data_type]["index"])
+        return len(self.data[data_type].index)
 
     def get(self, data_type, pred=False, true=True, index=None):
         prefix = set_prefix(data_type)
         if pred and self.prediction is None and prefix == "data":
             raise ValueError("No prediction available")
-        
+
         # return metadata
         if prefix == "metadata":
             if index != None:
                 return self.metadata[data_type][index]
             return self.metadata[data_type]
-        
+
         # now we know we are dealing with data
         out = []
         if pred:
             out.append(self.prediction[data_type])
         if true:
-            out.append(self.data[data_type]["values"])
+            out.append(self.data[data_type].values)
         if index is not None:
-            out = [v[index][:self.get('length', index=index)] for v in out]
+            out = [v[index][: self.get("length", index=index)] for v in out]
         return out[0] if len(out) == 1 else out
-    
+
     def get_index(self, data_type):
-        return self.data[data_type]["index"]
+        return self.data[data_type].index
 
     def contains(self, data_type):
         if self.prediction is not None and not data_type in self.prediction.keys():
             return False
-        return data_type in self.data.keys() and len(self.data[data_type]["index"]) > 0
+        return data_type in self.data.keys() and len(self.data[data_type].index) > 0
