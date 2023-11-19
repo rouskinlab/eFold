@@ -267,6 +267,9 @@ class KaggleLogger(pl.Callback):
         self.push_to_kaggle = push_to_kaggle
 
     def on_predict_start(self, trainer, pl_module):
+        if wandb.run is None:
+            return
+        
         loader = Loader()
         # Load best model for testing
         weights = loader.load_from_weights(safe_load=True)
