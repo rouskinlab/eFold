@@ -19,6 +19,7 @@ import wandb
 import numpy as np
 from lightning.pytorch.strategies import DDPStrategy
 import torch
+from torch import nn
 
 sys.path.append(os.path.abspath("."))
 
@@ -28,48 +29,19 @@ if __name__ == '__main__':
     USE_WANDB = True
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        wandb_logger = WandbLogger(project="dms-alby_test")
+        wandb_logger = WandbLogger(project="Evoformer-dms")
 
     model = 'evoformer'
     data = 'dms'
 
-    # if len(wandb.config._as_dict())>1:
-    #     print(wandb.config)
-    #     batch_train_size = 128# wandb.config.batch_train_size
-    #     d_model = wandb.config.d_model
-    #     n_heads = wandb.config.n_heads
-    #     d_hid = wandb.config.d_hid
-    #     num_encoder_layers = wandb.config.num_encoder_layers
-    #     num_decoder_layers = wandb.config.num_decoder_layers
-    #     dropout = 0# wandb.config.dropout
-    #     lr = wandb.config.lr
-    #     max_lr = wandb.config.max_lr
-    #     gamma = wandb.config.gamma
-    #     past_window = wandb.config.past_window
-    #     max_gradient = wandb.config.max_gradient
-    #     activation = wandb.config.activation
-    # else:
-    #     batch_train_size = 128
-    #     d_model = 64
-    #     n_heads = 16
-    #     d_hid = 64
-    #     num_encoder_layers = 6
-    #     num_decoder_layers = 6
-    #     dropout = 0
-    #     lr = 1e-3
-    #     max_lr = 3e-3
-    #     gamma = 0.9
-    #     # max_gradient = 0.5
-    #     activation = 'gelu'
-
     dm = DataModule(
-        name=["ribonanza", "ribonanza_shape"],
+        name=["ribonanza_dms", "ribonanza_shape_like_json"],
         data=data,
         force_download=False,
-        batch_size=16,
+        batch_size=32,
         num_workers=1,
-        train_split=42000,
-        valid_split=2531,
+        train_split=59000,
+        valid_split=3521,
         overfit_mode=False
     )
     
@@ -79,11 +51,12 @@ if __name__ == '__main__':
         ntoken=5,
         d_model=64, 
         c_z = 8,
-        num_blocks = 8,
+        num_blocks = 12,
         no_recycles = 0, 
-        dropout=0,
+        dropout=0.2,
         lr=3e-3,
         weight_decay=0,
+        gamma=0.997,
         wandb=USE_WANDB,
     )
 
@@ -99,13 +72,10 @@ if __name__ == '__main__':
                 log_every_n_steps=1,
                 accumulate_grad_batches=1,
                 logger=wandb_logger if USE_WANDB else None,
-                # precision="16-mixed",
-                # gradient_clip_val=max_gradient,
-                # gradient_clip_algorithm="value",
                 callbacks=[  
-                            # LearningRateMonitor(logging_interval='epoch'),
+                            LearningRateMonitor(logging_interval='epoch'),
                             PredictionLogger(data="dms"),
-                            ModelChecker(log_every_nstep=1000, model=model),
+                            ModelChecker(log_every_nstep=10000, model=model),
                             ] if USE_WANDB else [],
                 enable_checkpointing=False, 
                 )

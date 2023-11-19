@@ -11,13 +11,14 @@ from rouskinhf import seq2int
 import wandb
 
 class Model(pl.LightningModule):
-    def __init__(self, lr: float, loss_fn, optimizer_fn, **kwargs):
+    def __init__(self, lr: float, loss_fn, optimizer_fn, gamma, **kwargs):
         super().__init__()
 
         # Set attributes
         for k, v in kwargs.items():
             setattr(self, k, v)
         self.lr = lr
+        self.gamma = gamma
         self.loss_fn = loss_fn
         self.optimizer_fn = optimizer_fn
         self.automatic_optimization = True
@@ -30,11 +31,12 @@ class Model(pl.LightningModule):
             lr=self.lr,
             weight_decay=self.weight_decay if hasattr(self, "weight_decay") else 0,
         )
-        if not hasattr(self, "scheduler") or self.scheduler is None:
-            return optimizer
+        # if not hasattr(self, "scheduler") or self.scheduler is None:
+        #     return optimizer
 
-        scheduler = {"scheduler": self.scheduler(optimizer, patience=5, factor=0.5, verbose=True), "interval": "epoch", "monitor": "valid/loss"}
-        # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=self.gamma)
+        # scheduler = {"scheduler": self.scheduler(optimizer, patience=5, factor=0.5, verbose=True), "interval": "epoch", "monitor": "valid/loss"}
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=self.gamma)
+        # scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=1e-3, max_lr=5e-3)
         return [optimizer], [scheduler]
         
     def predict(self, inputs):

@@ -30,7 +30,7 @@ class Evoformer(DMSModel):
                     optimizer_fn=torch.optim.Adam,
                     **kwargs):
         self.save_hyperparameters()
-        super(Evoformer, self).__init__(lr=lr, loss_fn=loss_fn, optimizer_fn=optimizer_fn, **kwargs)
+        super(Evoformer, self).__init__(lr=lr, loss_fn=loss_fn, optimizer_fn=optimizer_fn, gamma=gamma, **kwargs)
 
         self.model_type = 'Evoformer'
         self.lr = lr
@@ -52,14 +52,15 @@ class Evoformer(DMSModel):
             no_recycles=no_recycles,
         )
 
-        # self.output = ResLayer(dim_in=c_z,   dim_out=1, n_blocks=3, kernel_size=3, dropout=dropout)
-        self.output_net_DMS = nn.Sequential(#nn.Linear(d_model, d_model), 
-                                             #activation_map[activation],
-                                             nn.Linear(d_model, 1))
-        
-        self.output_net_SHAPE = nn.Sequential(#nn.Linear(d_model, d_model), 
-                                             #activation_map[activation],
-                                             nn.Linear(d_model, 1))
+        self.output_net_DMS = nn.Sequential(nn.LayerNorm(d_model),
+                                                nn.Linear(d_model, d_model), 
+                                                nn.ReLU(),
+                                                nn.Linear(d_model, 1))
+
+        self.output_net_SHAPE = nn.Sequential(nn.LayerNorm(d_model),
+                                                nn.Linear(d_model, d_model), 
+                                                nn.ReLU(),
+                                                nn.Linear(d_model, 1))
 
 
     def forward(self, src: Tensor) -> Tensor:
