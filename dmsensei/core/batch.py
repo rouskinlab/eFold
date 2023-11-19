@@ -34,7 +34,7 @@ class BatchData:
         self.values = values
 
 
-class Batch(pl.LightningDataModule):
+class Batch:
     """Batch class to handle padding and stacking of tensors"""
 
     def __init__(self, data, metadata, data_type, L, batch_size):
