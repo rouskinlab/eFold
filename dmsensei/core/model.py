@@ -39,17 +39,11 @@ class Model(pl.LightningModule):
             lr=self.lr,
             weight_decay=self.weight_decay if hasattr(self, "weight_decay") else 0,
         )
-        if not hasattr(self, "scheduler") or self.scheduler is None:
+        
+        if not hasattr(self, "gamma") or self.gamma is None:
             return optimizer
-
-        scheduler = {
-            "scheduler": self.scheduler(
-                optimizer, patience=5, factor=0.5, verbose=True
-            ),
-            "interval": "epoch",
-            "monitor": "valid/loss",
-        }
-        # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=self.gamma)
+        
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=self.gamma)
         return [optimizer], [scheduler]
 
     def loss_fn(self, batch: Batch):
