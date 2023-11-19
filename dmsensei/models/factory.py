@@ -2,8 +2,6 @@ from .dms import MultiLayerPerceptron as dms_mlp
 from .multi import Transformer as multi_transformer
 from .multi import Evoformer as multi_evoformer
 
-import wandb as wandb_module
-
 
 class ModelFactory:
     def __init__(self):
@@ -35,10 +33,5 @@ class ModelFactory:
         raise NotImplementedError(f"Model {model} for data {data} not implemented.")
 
 
-def create_model(data: str, model: str, wandb: bool = True, **kwargs):
-    # log hyperparameters into wandb
-    if wandb:
-        wandb_module.init()
-        wandb_module.log({"model": model})
-
+def create_model(data: str, model: str, **kwargs):
     return ModelFactory()(data, model, **kwargs)

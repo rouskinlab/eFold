@@ -10,8 +10,6 @@ from typing import Tuple
 import lightning.pytorch as pl
 import torch.nn.functional as F
 from functools import partial
-import wandb
-from lightning.pytorch.loggers import WandbLogger
 from ..config import UKN
 import copy
 import numpy as np
