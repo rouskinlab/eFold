@@ -28,7 +28,7 @@ def _pad(arr, L, data_type):
 
 
 class BatchData:
-    def __init__(self, data_type, index, values):
+    def __init__(self, data_type:str, index:tensor, values:tensor):
         self.data_type = data_type
         self.index = index
         self.values = values
@@ -76,8 +76,8 @@ class Batch(pl.LightningDataModule):
             if len(index):
                 data[dt] = BatchData(
                     data_type=dt,
-                    index=tensor(index),
-                    values=stack(values),
+                    index=tensor(index).to(device),
+                    values=stack(values).to(device),
                 )
 
         metadata = {"length": lengths}
@@ -136,7 +136,7 @@ class Batch(pl.LightningDataModule):
 
     def integrate_prediction(self, prediction):
         assert len(prediction[list(prediction.keys())[0]]) == len(
-            self.data["sequence"]["index"]
+            self.get("sequence")
         ), "outputs and batch must have the same length"
         self.prediction = prediction
 
