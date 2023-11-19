@@ -90,8 +90,8 @@ class Evoformer(Model):
         # return output.squeeze(-1)
 
         return {
-            'dms': self.output_net_DMS(s),
-            'shape': self.output_net_SHAPE(s),
+            'dms': self.output_net_DMS(s).squeeze(axis=2),
+            'shape': self.output_net_SHAPE(s).squeeze(axis=2)
         }
 
 
