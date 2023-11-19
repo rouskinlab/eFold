@@ -262,9 +262,6 @@ class KaggleLogger(pl.Callback):
         self.push_to_kaggle = push_to_kaggle
 
     def on_predict_start(self, trainer, pl_module):
-        if not self.wandb_log or rank_zero_only.rank != 0:
-            return
-
         loader = Loader()
         # Load best model for testing
         weights = loader.load_from_weights(safe_load=True)
@@ -318,7 +315,7 @@ class KaggleLogger(pl.Callback):
             api.authenticate()
             api.competition_submit(
                 file_name="predictions.csv",
-                message="from predict callback",
+                message="from predict callback" if not hasattr(pl_module, 'kaggle_message') else pl_module.kaggle_message,
                 competition="stanford-ribonanza-rna-folding",
             )
 
