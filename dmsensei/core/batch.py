@@ -33,9 +33,15 @@ class BatchData:
         self.index = index
         self.values = values
 
+class BatchMetadata:
+    def __init__(self, reference:list, length:list, quality:list):
+        self.reference = reference
+        self.length = length
+        self.quality = quality
 
 class Batch:
-    """Batch class to handle padding and stacking of tensors"""
+    """Batch class to handle padding and stacking of tensors
+    """
 
     def __init__(self, data, metadata, data_type, L, batch_size):
         """Batch class to handle padding and stacking of tensors
@@ -80,11 +86,11 @@ class Batch:
                     values=stack(values).to(device),
                 )
 
-        metadata = {"length": lengths}
-        for metadata_type in ["reference", "quality"]:
-            metadata[metadata_type] = [
-                dp.get(metadata_type) for dp in list_of_datapoints
-            ]
+        metadata = Metadata(
+            length=lengths,
+            reference=[dp.get("reference") for dp in list_of_datapoints],
+            quality=[dp.get("quality") for dp in list_of_datapoints],
+        )
 
         return cls(
             data=data,
@@ -96,7 +102,7 @@ class Batch:
 
     def to_list_of_datapoints(self) -> ListOfDatapoints:
         list_of_datapoints = []
-        for idx in range(len(self.metadata["reference"])):
+        for idx in range(len(self.metadata.reference)):
             data = Data(sequence=self.get("sequence", index=idx))
             metadata = Metadata(
                 reference=self.get("reference", index=idx),
@@ -128,7 +134,7 @@ class Batch:
                     )
             #############################################
             for metadata_type in Metadata.__annotations__.keys():
-                setattr(metadata, metadata_type, self.metadata[metadata_type][idx])
+                setattr(metadata, metadata_type, getattr(self.metadata, metadata_type)[idx])
             list_of_datapoints.append(
                 Datapoint(data=data, metadata=metadata, prediction=prediction)
             )
@@ -160,8 +166,8 @@ class Batch:
         # return metadata
         if prefix == "metadata":
             if index != None:
-                return self.metadata[data_type][index]
-            return self.metadata[data_type]
+                return getattr(self.metadata, data_type)[index]
+            return getattr(self.metadata, data_type)
 
         # now we know we are dealing with data
         out = []
@@ -180,3 +186,29 @@ class Batch:
         if self.prediction is not None and not data_type in self.prediction.keys():
             return False
         return data_type in self.data.keys() and len(self.data[data_type].index) > 0
+    
+    def __len__(self):
+        return self.count("sequence")
+    
+    def __iter__(self):
+        for idx in range(len(self)):
+            yield Datapoint(
+                data=Data(
+                    sequence=self.get("sequence", index=idx),
+                    **{
+                        dt: self.get(dt, pred=True, true=False, index=idx)
+                        for dt in self.data.keys()
+                    },
+                ),
+                prediction=Data(
+                    sequence=self.get("sequence", index=idx),
+                    **{
+                        dt: self.get(dt, pred=True, true=False, index=idx)
+                        for dt in self.prediction.keys()
+                    },
+                ),
+                metadata=Metadata(
+                    reference=self.get("reference", index=idx),
+                    length=self.get("length", index=idx),
+                ),
+            )
