@@ -84,7 +84,8 @@ class DataModule(pl.LightningDataModule):
         self.setup()
 
         # Log hyperparameters
-        train_split, valid_split, _ = self.size_sets
+        if hasattr(self, 'size_sets'):
+            train_split, valid_split, _ = self.size_sets
         self.save_hyperparameters(ignore=["force_download"])
 
     def _use_multiple_datasets(self, name):
@@ -136,7 +137,7 @@ class DataModule(pl.LightningDataModule):
             )
             self.collate_fn = self.all_datasets.collate_fn
 
-        if stage == "fit" or stage is None:
+        if stage == "fit":
             self.size_sets = _compute_size_sets(
                 len(self.all_datasets),
                 train_split=self.splits["train"],
@@ -146,12 +147,12 @@ class DataModule(pl.LightningDataModule):
                 self.all_datasets, self.size_sets
             )
 
-        if stage == "test" or stage is None:
+        if stage == "test":
             self.test_sets = self._select_test_dataset(
                 force_download=self.force_download
             )
 
-        if stage == "predict" or stage is None:
+        if stage == "predict":
             self.predict_set = Subset(
                 self.all_datasets,
                 range(
