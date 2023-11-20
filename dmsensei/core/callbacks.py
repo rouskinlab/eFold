@@ -7,11 +7,12 @@ from torch import Tensor, tensor
 import wandb
 from .metrics import f1, r2_score
 from .visualisation import plot_factory
-from lightning.pytorch.utilities import rank_zero_only
+# from lightning.pytorch.utilities import _zero_only
 import os
 import pandas as pd
 from rouskinhf import int2seq
 import plotly.graph_objects as go
+from lightning.pytorch.utilities import rank_zero_only
 
 from ..config import (
     TEST_SETS_NAMES,
@@ -26,7 +27,7 @@ from ..core.datamodule import DataModule
 from . import metrics
 from .loader import Loader
 from os.path import join
-from . import logger
+from .logger import Logger
 from ..util.stack import Stack
 import pandas as pd
 from lightning.pytorch import Trainer
@@ -51,7 +52,7 @@ class MyWandbLogger(pl.Callback):
         self.dm = dm
         self.data_type = dm.data_type
         self.model = model
-        self.logger = logger.Logger(model, batch_size)
+        self.batch_size = batch_size
 
         # validation
         # TODO: #12 the validation examples aren't in the validation set
@@ -81,11 +82,12 @@ class MyWandbLogger(pl.Callback):
         batch_idx: int,
     ) -> None:
         loss = outputs["loss"]
-        self.logger.train_loss(torch.sqrt(loss).item())
+        logger = Logger(pl_module, self.batch_size)
+        logger.train_loss(torch.sqrt(loss).item())
 
     def on_train_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
         pass
-
+    
     def on_validation_batch_end(
         self,
         trainer,
@@ -95,35 +97,22 @@ class MyWandbLogger(pl.Callback):
         batch_idx,
         dataloader_idx=0,
     ):
+        logger = Logger(pl_module, self.batch_size)
+        
         ### LOG ###
         # Log loss to Wandb
         loss = outputs
-        self.logger.valid_loss(torch.sqrt(loss).item(), isLQ=dataloader_idx)
-
-        # don't log metrics for the validation LQ set
-        if dataloader_idx:
-            return
+        logger.valid_loss(torch.sqrt(loss).item(), isLQ=dataloader_idx)
         
-        # Store scores for averaging by batch
-        list_of_datapoints = batch.to_list_of_datapoints()
-        # Compute metrics
-        for dp in list_of_datapoints:
-            dp.compute_error_metrics_pack()
-            # save scores for averaging by epoch
-            for data_type in dp.metrics.keys():
-                metric = REFERENCE_METRIC[data_type]
-                if metric not in self.batch_scores[data_type]:
-                    self.batch_scores[data_type][metric] = []
-                self.batch_scores[data_type][metric].append(
-                    dp.read_reference_metric(data_type)
-                )
-        # Log metrics to Wandb
-        self.logger.error_metrics_pack(
-            stage="valid", list_of_datapoints=list_of_datapoints
-        )
-        ### END LOG ###
+        if not dataloader_idx:
+            logger.error_metrics_pack('valid', batch)
+                        
+        if not rank_zero_only.rank == 0 or dataloader_idx !=0:
+            return
 
-        #### PLOT ####
+        # ### END LOG ###
+
+        # #### PLOT ####
         # plot one example per epoch and per data_type
         # initialisation: choose one reference per data_type
         for data_type in self.data_type:
@@ -150,31 +139,50 @@ class MyWandbLogger(pl.Callback):
                     reference=batch.get("reference", index=idx),
                     length=batch.get("length", index=idx),
                 )
-                self.logger.valid_plot(data_type, name, plot)
+                logger.valid_plot(data_type, name, plot)
         #### END PLOT ####
 
-    def on_validation_end(self, trainer, pl_module, dataloader_idx=0):
-        # Save best model
-        loader = Loader()
-        for data_type, scores in self.batch_scores.items():
-            # if best metric, save metric as best
-            average_score = np.nanmean(scores[REFERENCE_METRIC[data_type]])
-            # The definition of best depends on the metric
-            if (
-                average_score * REF_METRIC_SIGN[data_type]
-                > self.best_score[data_type] * REF_METRIC_SIGN[data_type]
-            ):
-                self.best_score[data_type] = average_score
-                self.logger.best_score(average_score, data_type)
-                # save model for the best r2
-                if (
-                    data_type == "dms" and rank_zero_only.rank == 0
-                ):  # only keep best model for dms
-                    loader.dump(self.model)
+    def on_validation_end(self, trainer:Trainer, pl_module, dataloader_idx=0):
+        
+        # logger = Logger(pl_module, self.batch_size)
+        
+        # to_log = {}
+        # for data_type, data in self.batch_scores.items():
+        #     for metric, scores in data.items():
+        #         trainer.logger.log(
+        #             stage="valid",
+        #             metric=metric,
+        #             value=np.nanmean(scores),
+        #             data_type=data_type,
+        #         )
+        
+        if not rank_zero_only.rank == 0:
+            return
+        
+        # logger = Logger(pl_module, self.batch_size)
+        # # Save best model
+        # loader = Loader()
+        # for data_type, scores in self.batch_scores.items():
+        #     # if best metric, save metric as best
+        #     average_score = np.nanmean(scores[REFERENCE_METRIC[data_type]])
+        #     # The definition of best depends on the metric
+        #     if (
+        #         average_score * REF_METRIC_SIGN[data_type]
+        #         > self.best_score[data_type] * REF_METRIC_SIGN[data_type]
+        #     ):
+        #         self.best_score[data_type] = average_score
+        #         logger.best_score(average_score, data_type)
+        #         # save model for the best r2
+        #         if (
+        #             data_type == "dms" and rank_zero_only.rank == 0
+        #         ):  # only keep best model for dms
+        #             loader.dump(self.model)
 
-        self.batch_scores = {d: {} for d in self.data_type}
+        # self.batch_scores = {d: {} for d in self.data_type}
 
     def on_test_start(self, trainer, pl_module):
+        # init loggers 
+        
         if not self.wandb_log or rank_zero_only.rank != 0:
             return
 
@@ -187,6 +195,8 @@ class MyWandbLogger(pl.Callback):
     def on_test_batch_end(
         self, trainer, pl_module, outputs, batch: Batch, batch_idx, dataloader_idx=0
     ):
+        logger = Logger(pl_module, batch_size=self.batch_size)
+
         # compute scores
         list_of_datapoints = batch.to_list_of_datapoints()
         for dp in list_of_datapoints:
@@ -198,11 +208,12 @@ class MyWandbLogger(pl.Callback):
                 )
 
         # Logging metrics to Wandb
-        self.logger.error_metrics_pack(
+        logger.error_metrics_pack(
             "test/{}".format(TEST_SETS_NAMES[dataloader_idx]), list_of_datapoints
         )
 
     def on_test_end(self, trainer, pl_module):
+        logger = Logger(pl_module, batch_size=self.batch_size)
         
         if not self.wandb_log or rank_zero_only.rank != 0:
             return
@@ -250,7 +261,7 @@ class MyWandbLogger(pl.Callback):
                         )  # add arguments here if you want
                         
                         # log plot
-                        self.logger.test_plot(
+                        logger.test_plot(
                             dataloader=TEST_SETS_NAMES[dataloader_idx],
                             data_type=data_type,
                             name=plot_name + "_" + ('best' if df.loc[dp.get('reference'), 'score'] > mid_score else 'worst'),

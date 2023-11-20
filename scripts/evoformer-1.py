@@ -23,16 +23,18 @@ sys.path.append(os.path.abspath("."))
 
 # Train loop
 if __name__ == "__main__":
-    USE_WANDB = 0
+    USE_WANDB = 1
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        wandb_logger = WandbLogger(project="Evoformer-dms")
+        project = "Evoformer-dms-2"
+        # wandb.init(project=project)
+        wandb_logger = WandbLogger(project=project)
 
     batch_size = 32
     dm = DataModule(
         name=["ribonanza"],
         data_type=["dms",'shape'],
-        force_download=True,
+        force_download=False,
         batch_size=batch_size,
         num_workers=1,
         train_split=47000,
@@ -66,8 +68,8 @@ if __name__ == "__main__":
 
     trainer = Trainer(
         accelerator=device,
-        devices=1,
-        # strategy=DDPStrategy(find_unused_parameters=True),
+        devices=8,
+        strategy=DDPStrategy(find_unused_parameters=True),
         max_epochs=1000,
         log_every_n_steps=1,
         accumulate_grad_batches=1,
@@ -77,14 +79,15 @@ if __name__ == "__main__":
             # PredictionLogger(data="dms"),
             # ModelChecker(log_every_nstep=10000, model=model),
             MyWandbLogger(dm=dm, model=model, batch_size=batch_size),
-            KaggleLogger(dm=dm, push_to_kaggle=False),
+            # KaggleLogger(dm=dm, push_to_kaggle=False),
         ]
         if USE_WANDB
         else [],
         enable_checkpointing=False,
     )
     trainer.fit(model, datamodule=dm)
-    # trainer.test(model, datamodule=dm)
+    trainer.test(model, datamodule=dm)
+    trainer.predict(model, datamodule=dm)
 
     if USE_WANDB:
         wandb.finish()
