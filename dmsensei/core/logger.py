@@ -2,7 +2,9 @@ import wandb
 from ..config import *
 import numpy as np
 import lightning.pytorch as pl
-from .listofdatapoints import ListOfDatapoints
+from .batch import Batch
+from .metrics import metric_factory
+from ..config import POSSIBLE_METRICS
 
 
 class Logger:
@@ -15,8 +17,8 @@ class Logger:
             name="/".join([k for k in [stage, data_type, metric] if k is not None]),
             value=float(value),
             sync_dist=True,
-            on_step=False,
-            on_epoch=True,
+            # on_step=True,
+            # on_epoch=True,
             batch_size=self._batch_size,
             add_dataloader_idx=False,
         )
@@ -36,7 +38,8 @@ class Logger:
     def valid_loss(self, loss, isLQ=False):
         if isLQ:
             self.log("valid", "lossLQ", loss)
-        self.log("valid", "loss", loss)
+        else:
+            self.log("valid", "loss", loss)
 
     def valid_plot(self, data_type, name, plot):
         wandb.log(
@@ -48,8 +51,13 @@ class Logger:
             {"/".join(["test", dataloader, data_type, name]): plot},
         )
 
-    def error_metrics_pack(self, stage: str, list_of_datapoints: ListOfDatapoints):
-        for datapoint in list_of_datapoints:
-            for data_type, data in datapoint.metrics.items():
-                for name_metric, metric in data.items():
-                    self.log(stage, name_metric, metric, data_type)
+    def error_metrics_pack(self, stage: str, batch: Batch):
+        metrics = batch.compute_metrics()
+        for data_type, data in metrics.items():
+            for metric, value in data.items():
+                self.log(
+                    stage=stage,
+                    metric=metric,
+                    value=value,
+                    data_type=data_type,
+                )

@@ -81,8 +81,7 @@ class DataModule(pl.LightningDataModule):
 
         # we need to know the max sequence length for padding
         self.overfit_mode = overfit_mode
-        self.setup()
-
+        
         # Log hyperparameters
         if hasattr(self, 'size_sets'):
             train_split, valid_split, _ = self.size_sets
@@ -123,7 +122,7 @@ class DataModule(pl.LightningDataModule):
         return refs
 
     def setup(self, stage: str = None):
-        if stage == None:
+        if stage == None or (stage in ['fit', 'predict'] and not hasattr(self, 'all_datasets')):
             self.all_datasets = self._dataset_merge(
                 [
                     Dataset(

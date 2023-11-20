@@ -11,9 +11,10 @@ from .datapoint import Datapoint, Data, Metadata, set_prefix
 from .embeddings import base_pairs_to_pairing_matrix
 from .listofdatapoints import ListOfDatapoints
 import lightning.pytorch as pl
-from ..config import device
+from ..config import device, POSSIBLE_METRICS
+from .metrics import metric_factory
 from ..util import unzip
-
+from typing import Dict, List, Union, Tuple, Optional
 
 def _pad(arr, L, data_type):
     padding_values = {
@@ -28,20 +29,21 @@ def _pad(arr, L, data_type):
 
 
 class BatchData:
-    def __init__(self, data_type:str, index:tensor, values:tensor):
+    def __init__(self, data_type: str, index: tensor, values: tensor):
         self.data_type = data_type
         self.index = index
         self.values = values
 
+
 class BatchMetadata:
-    def __init__(self, reference:list, length:list, quality:list):
+    def __init__(self, reference: list, length: list, quality: list):
         self.reference = reference
         self.length = length
         self.quality = quality
 
+
 class Batch:
-    """Batch class to handle padding and stacking of tensors
-    """
+    """Batch class to handle padding and stacking of tensors"""
 
     def __init__(self, data, metadata, data_type, L, batch_size):
         """Batch class to handle padding and stacking of tensors
@@ -134,7 +136,9 @@ class Batch:
                     )
             #############################################
             for metadata_type in Metadata.__annotations__.keys():
-                setattr(metadata, metadata_type, getattr(self.metadata, metadata_type)[idx])
+                setattr(
+                    metadata, metadata_type, getattr(self.metadata, metadata_type)[idx]
+                )
             list_of_datapoints.append(
                 Datapoint(data=data, metadata=metadata, prediction=prediction)
             )
@@ -186,29 +190,19 @@ class Batch:
         if self.prediction is not None and not data_type in self.prediction.keys():
             return False
         return data_type in self.data.keys() and len(self.data[data_type].index) > 0
-    
+
     def __len__(self):
         return self.count("sequence")
-    
-    def __iter__(self):
-        for idx in range(len(self)):
-            yield Datapoint(
-                data=Data(
-                    sequence=self.get("sequence", index=idx),
-                    **{
-                        dt: self.get(dt, pred=True, true=False, index=idx)
-                        for dt in self.data.keys()
-                    },
-                ),
-                prediction=Data(
-                    sequence=self.get("sequence", index=idx),
-                    **{
-                        dt: self.get(dt, pred=True, true=False, index=idx)
-                        for dt in self.prediction.keys()
-                    },
-                ),
-                metadata=Metadata(
-                    reference=self.get("reference", index=idx),
-                    length=self.get("length", index=idx),
-                ),
-            )
+
+    def compute_metrics(self)->Dict[str, Dict[str, float]]:
+        out = {}
+        for data_type in self.data_type:
+            if not self.count(data_type) or data_type == "sequence":
+                continue
+            out[data_type] = {}
+            pred, true = self.get_pairs(data_type)
+            for metric in POSSIBLE_METRICS[data_type]:
+                out[data_type][metric] = metric_factory[metric](
+                    pred=pred, true=true, batch=self.count(data_type) > 1
+                )
+        return out
