@@ -60,7 +60,7 @@ class MyWandbLogger(pl.Callback):
         #     dataset_name="valid"
         # )
         self.val_losses = []
-        self.batch_scores = {d: {} for d in self.data_type}
+        self.batch_scores = {}
         self.best_score = {d: -torch.inf * REF_METRIC_SIGN[d] for d in self.data_type}
         self.validation_examples_references = {
             data_type: None for data_type in self.data_type
@@ -104,8 +104,24 @@ class MyWandbLogger(pl.Callback):
         loss = outputs
         logger.valid_loss(torch.sqrt(loss).item(), isLQ=dataloader_idx)
         
-        if not dataloader_idx:
-            logger.error_metrics_pack('valid', batch)
+        metrics = compute_error_metrics_pack(batch)
+        for data_type, data in metrics.items():
+            for metric, score in data.items():
+                if metric == REFERENCE_METRIC[data_type]:
+                    if data_type not in self.batch_scores:
+                        self.batch_scores[data_type] = []
+                    self.batch_scores[data_type].append(score)
+                
+                if not dataloader_idx:
+                    logger.log(
+                        stage="valid",
+                        metric=metric,
+                        value=score,
+                        data_type=data_type,
+                    )
+            
+        # if not dataloader_idx:
+        #     logger.error_metrics_pack('valid', batch)
                         
         if not rank_zero_only.rank == 0 or dataloader_idx !=0:
             return
@@ -159,26 +175,25 @@ class MyWandbLogger(pl.Callback):
         if not rank_zero_only.rank == 0:
             return
         
-        # logger = Logger(pl_module, self.batch_size)
-        # # Save best model
-        # loader = Loader()
-        # for data_type, scores in self.batch_scores.items():
-        #     # if best metric, save metric as best
-        #     average_score = np.nanmean(scores[REFERENCE_METRIC[data_type]])
-        #     # The definition of best depends on the metric
-        #     if (
-        #         average_score * REF_METRIC_SIGN[data_type]
-        #         > self.best_score[data_type] * REF_METRIC_SIGN[data_type]
-        #     ):
-        #         self.best_score[data_type] = average_score
-        #         logger.best_score(average_score, data_type)
-        #         # save model for the best r2
-        #         if (
-        #             data_type == "dms" and rank_zero_only.rank == 0
-        #         ):  # only keep best model for dms
-        #             loader.dump(self.model)
+        # Save best model
+        loader = Loader()
+        for data_type, scores in self.batch_scores.items():
+            # if best metric, save metric as best
+            average_score = np.nanmean(scores)
+            # The definition of best depends on the metric
+            if (
+                average_score * REF_METRIC_SIGN[data_type]
+                > self.best_score[data_type] * REF_METRIC_SIGN[data_type]
+            ):
+                self.best_score[data_type] = average_score
 
-        # self.batch_scores = {d: {} for d in self.data_type}
+                # save model for the best r2
+                if (
+                    data_type == "dms" and rank_zero_only.rank == 0
+                ):  # only keep best model for dms
+                    loader.dump(self.model)
+
+        self.batch_scores = {}
 
     def on_test_start(self, trainer, pl_module):
         # init loggers 
