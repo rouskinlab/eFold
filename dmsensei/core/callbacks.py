@@ -342,13 +342,16 @@ class KaggleLogger(pl.Callback):
 
         # save predictions as pickle
         pickle.dump(df, open("predictions.pkl", "wb"))
+        
+        # compress predictions
+        os.system("zip predictions.csv.zip predictions.csv")
 
         # upload to kaggle
         if self.push_to_kaggle:
             api = KaggleApi()
             api.authenticate()
             api.competition_submit(
-                file_name="predictions.csv",
+                file_name="predictions.csv.zip",
                 message="from predict callback" if not hasattr(pl_module, 'kaggle_message') else pl_module.kaggle_message,
                 competition="stanford-ribonanza-rna-folding",
             )
