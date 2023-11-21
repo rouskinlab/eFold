@@ -104,7 +104,7 @@ class MyWandbLogger(pl.Callback):
         loss = outputs
         logger.valid_loss(torch.sqrt(loss).item(), isLQ=dataloader_idx)
         
-        metrics = compute_error_metrics_pack(batch)
+        metrics = batch.compute_metrics()
         for data_type, data in metrics.items():
             for metric, score in data.items():
                 if metric == REFERENCE_METRIC[data_type]:
@@ -377,18 +377,3 @@ class ModelChecker(pl.Callback):
 
         self.step_number += 1
 
-
-def compute_error_metrics_pack(batch: Batch):
-    pred, true = batch.get_pairs("dms")
-    return {
-        data_type: {
-            metric_name: metric_factory[metric_name](
-                pred=pred,
-                true=true,
-                batch=len(batch.get_index(data_type)) > 1,
-            )
-            for metric_name in POSSIBLE_METRICS[data_type]
-        }
-        for data_type in DATA_TYPES
-        if batch.contains(data_type)
-    }
