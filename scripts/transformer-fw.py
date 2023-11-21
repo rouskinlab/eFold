@@ -25,8 +25,8 @@ if __name__ == "__main__":
     print("Running on device: {}".format(device))
     if USE_WANDB:
         wandb.login()
-        project = 'test_ribonanza_LQ'
-        wandb.init(project=project, name='ribonanza_LQ')
+        project = 'test ribonanza valid LQ + HQ'
+        wandb.init(project=project, name='transformer')
         wandb_logger = WandbLogger(project=project)
 
     d_model = 64
@@ -44,6 +44,7 @@ if __name__ == "__main__":
         train_split=500,
         valid_split=400,
         validLQ_split=300,
+        validHQ_split=300,
         predict_split=0,
         overfit_mode=False,
         shuffle_valid=False,

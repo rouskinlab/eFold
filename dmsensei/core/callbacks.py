@@ -102,7 +102,7 @@ class MyWandbLogger(pl.Callback):
         ### LOG ###
         # Log loss to Wandb
         loss = outputs
-        logger.valid_loss(torch.sqrt(loss).item(), isLQ=dataloader_idx)
+        logger.valid_loss(torch.sqrt(loss).item(), dataloader_idx)
         
         metrics = batch.compute_metrics()
         for data_type, data in metrics.items():
@@ -235,7 +235,6 @@ class MyWandbLogger(pl.Callback):
 
         for dataloader_idx in range(len(TEST_SETS_NAMES)):
             for data_type in self.data_type:
-                
                 # stack the scores together and sort them
                 df = pd.DataFrame(self.test_stacks[dataloader_idx][data_type], columns=["reference", "score"])
                 if not len(df):
@@ -287,8 +286,7 @@ class MyWandbLogger(pl.Callback):
 class KaggleLogger(pl.Callback):
     def __init__(self, dm: DataModule, push_to_kaggle=True) -> None:
         # prediction
-        self.predictions = [None] * len(dm.predict_set)
-        self.predictions_idx = 0
+        self.predictions = []
         self.dm = dm
         self.push_to_kaggle = push_to_kaggle
 
@@ -312,9 +310,9 @@ class KaggleLogger(pl.Callback):
         dataloader_idx: int = 0,
     ) -> None:
         for dp in batch.to_list_of_datapoints():
-            self.predictions[self.predictions_idx] = {"reference": dp.get("reference")}
+            self.predictions.append({"reference": dp.get("reference")})
             for dt in self.dm.data_type:
-                self.predictions[self.predictions_idx][dt] = dp.get(
+                self.predictions[-1][dt] = dp.get(
                     dt, pred=True, true=False, to_numpy=True
                 )
             self.predictions_idx += 1

@@ -35,11 +35,13 @@ class Logger:
     def train_loss(self, loss):
         self.log("train", "loss", loss)
 
-    def valid_loss(self, loss, isLQ=False):
-        if isLQ:
-            self.log("valid", "lossLQ", loss)
-        else:
+    def valid_loss(self, loss, dataloader_idx):
+        if dataloader_idx == 0:
             self.log("valid", "loss", loss)
+        if dataloader_idx == 1:
+            self.log("valid", "lossLQ", loss)
+        if dataloader_idx == 2:
+            self.log("valid", "lossHQ", loss)
 
     def valid_plot(self, data_type, name, plot):
         wandb.log(

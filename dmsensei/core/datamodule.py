@@ -32,11 +32,13 @@ class DataModule(pl.LightningDataModule):
         train_split: float = 0,
         valid_split: float = 0,
         validLQ_split: float = 0,
+        validHQ_split: float = 0,
         predict_split: float = 0,
         overfit_mode=False,
         shuffle_train=True,
         shuffle_valid=False,
         shuffle_validLQ=False,
+        shuffle_validHQ=False,
         tqdm=True,
         **kwargs,
     ):
@@ -70,12 +72,15 @@ class DataModule(pl.LightningDataModule):
             "train": train_split,
             "valid": valid_split,
             "validLQ": validLQ_split,
+            "validHQ": validHQ_split,
             "predict": predict_split,
         }
+        assert not (not self.splits['validHQ'] and self.splits['validLQ']), "You can't have a validHQ split without a validLQ split"
         self.shuffle = {
             "train": shuffle_train,
             "valid": shuffle_valid,
             "validLQ": shuffle_validLQ,
+            "validHQ": shuffle_validLQ,
         }
         self.tqdm = tqdm
 
@@ -106,20 +111,6 @@ class DataModule(pl.LightningDataModule):
         for index, datapoint in enumerate(merge.list_of_datapoints):
             datapoint.metadata.index = index
         return merge
-
-    def find_one_reference_per_data_type(self, dataset_name: str):
-        refs = {}
-        dataset = {
-            "train": self.train_set,
-            "valid": self.val_set,
-            "predict": self.predict_set,
-        }[dataset_name]
-        for data_type in self.data_type:
-            for data, metadata in dataset:
-                if data_type in data.keys():
-                    refs[data_type] = metadata["reference"]
-                    break
-        return refs
 
     def setup(self, stage: str = None):
         if stage == None or (stage in ['fit', 'predict'] and not hasattr(self, 'all_datasets')):
@@ -188,26 +179,36 @@ class DataModule(pl.LightningDataModule):
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
         )
+        val_dls = [valid]
         if self.splits['validLQ'] > 0:
-            n_datapoints = round(len(self.all_datasets) * self.splits["validLQ"]) if type(self.splits["validLQ"]) == float else self.splits["validLQ"]
-            self.valLQ_set = Subset(
-                Dataset(
-                    name='ribonanza_LQ',
+            self.valLQ_set = Dataset(
+                    name='ribo-LQ',
                     data_type=self.data_type,
                     force_download=self.force_download,
                     tqdm=self.tqdm,
-                ),
-                np.random.choice(len(self.all_datasets), n_datapoints, replace=False)
-            )
+                )
             validLQ = DataLoader(
-                self.valLQ_set,
+                Subset(self.valLQ_set, np.random.choice(len(self.all_datasets), round(len(self.all_datasets) * self.splits["validLQ"]) if type(self.splits["validLQ"]) == float else self.splits["validLQ"], replace=False)),
                 shuffle=self.shuffle["validLQ"],
                 collate_fn=self.collate_fn,
                 batch_size=self.batch_size,
             )
-            return [valid, validLQ]
-        else:
-            return valid
+            val_dls.append(validLQ)
+        if self.splits['validHQ'] > 0:
+            self.valHQ_set = Dataset(
+                    name='ribo-HQ',
+                    data_type=self.data_type,
+                    force_download=self.force_download,
+                    tqdm=self.tqdm,
+                )
+            validHQ = DataLoader(
+                Subset(self.valHQ_set, np.random.choice(len(self.all_datasets), round(len(self.all_datasets) * self.splits["validHQ"]) if type(self.splits["validHQ"]) == float else self.splits["validHQ"], replace=False)),
+                shuffle=self.shuffle["validHQ"],
+                collate_fn=self.collate_fn,
+                batch_size=self.batch_size,
+            )
+            val_dls.append(validHQ)
+        return val_dls
 
     def test_dataloader(self):
         return [
@@ -229,6 +230,20 @@ class DataModule(pl.LightningDataModule):
     def teardown(self, stage: str):
         # Used to clean-up when the run is finished
         pass
+    
+    def find_one_reference_per_data_type(self, dataset_name: str):
+        refs = {}
+        dataset = {
+            "train": self.train_set,
+            "valid": self.val_set,
+            "predict": self.predict_set,
+        }[dataset_name]
+        for data_type in self.data_type:
+            for data, metadata in dataset:
+                if data_type in data.keys():
+                    refs[data_type] = metadata["reference"]
+                    break
+        return refs
 
 
 def _compute_size_sets(len_data, train_split, valid_split):
