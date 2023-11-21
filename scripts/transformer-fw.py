@@ -49,6 +49,7 @@ if __name__ == "__main__":
         overfit_mode=False,
         shuffle_valid=False,
         shuffle_validLQ=False,
+        shuffle_validHQ=False,
     )
 
     model = create_model(

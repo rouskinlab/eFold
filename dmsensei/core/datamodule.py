@@ -80,7 +80,7 @@ class DataModule(pl.LightningDataModule):
             "train": shuffle_train,
             "valid": shuffle_valid,
             "validLQ": shuffle_validLQ,
-            "validHQ": shuffle_validLQ,
+            "validHQ": shuffle_validHQ,
         }
         self.tqdm = tqdm
 
