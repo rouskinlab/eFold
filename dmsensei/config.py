@@ -1,6 +1,5 @@
-from torch import nn, tensor, float32, cuda, backends
+from torch import float32, cuda, backends
 import torch
-import numpy as np
 
 
 DEFAULT_FORMAT = float32

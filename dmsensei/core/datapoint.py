@@ -1,17 +1,7 @@
 from typing import Any
-import torch
-from torch import tensor
-from tqdm import tqdm as tqdm_fun
 import numpy as np
-from ..config import UKN, DATA_TYPES, POSSIBLE_METRICS, REFERENCE_METRIC
-from torch import nn, tensor, float32, int64, stack, uint8
+from ..config import DATA_TYPES, POSSIBLE_METRICS, REFERENCE_METRIC
 import numpy as np
-from numpy import array, ndarray
-from .embeddings import (
-    base_pairs_to_int_dot_bracket,
-    sequence_to_int,
-    base_pairs_to_pairing_matrix,
-)
 import torch.nn.functional as F
 from .metrics import metric_factory
 from ..util import unzip

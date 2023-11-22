@@ -2,16 +2,8 @@ import torch
 from torch import nn, Tensor
 from torch.nn import TransformerEncoderLayer
 import numpy as np
-import os, sys, json
-from scipy.stats.stats import pearsonr
-
-import lightning.pytorch as pl
-
+import os, sys
 from ...core.model import Model
-import wandb
-
-import sys, os
-from ...config import UKN
 
 
 dir_name = os.path.dirname(os.path.abspath(__file__))

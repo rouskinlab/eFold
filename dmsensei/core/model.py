@@ -1,22 +1,9 @@
-from typing import Any
 import lightning.pytorch as pl
-from lightning.pytorch.utilities.types import STEP_OUTPUT
-from . import metrics
-from .embeddings import (
-    NUM_BASES,
-    sequence_to_one_hot,
-    int_dot_bracket_to_one_hot,
-    pairing_matrix_to_base_pairs,
-    int_to_sequence,
-)
 import torch.nn as nn
-from torch import Tensor, tensor, zeros_like, mean
 import torch
 import numpy as np
-from ..config import TEST_SETS_NAMES, UKN, VAL_GU
-from scipy.stats.stats import pearsonr
+from ..config import VAL_GU
 from rouskinhf import seq2int
-import wandb
 import torch.nn.functional as F
 from .batch import Batch
 

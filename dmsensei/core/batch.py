@@ -1,7 +1,6 @@
 from typing import Any
 import torch
 from torch import tensor
-from tqdm import tqdm as tqdm_fun
 import numpy as np
 from ..config import UKN, DATA_TYPES
 from torch import nn, tensor, float32, int64, stack, uint8
@@ -13,8 +12,7 @@ from .listofdatapoints import ListOfDatapoints
 import lightning.pytorch as pl
 from ..config import device, POSSIBLE_METRICS
 from .metrics import metric_factory
-from ..util import unzip
-from typing import Dict, List, Union, Tuple, Optional
+from typing import Dict
 
 def _pad(arr, L, data_type):
     padding_values = {

@@ -1,5 +1,4 @@
 import torch
-from rouskinhf import seq2int
 from ..config import UKN
 
 

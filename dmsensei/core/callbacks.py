@@ -1,18 +1,13 @@
 from typing import Any
 import lightning.pytorch as pl
-from lightning.pytorch.utilities.types import STEP_OUTPUT
 import torch
 import numpy as np
-from torch import Tensor, tensor
 import wandb
-from .metrics import f1, r2_score
 from .visualisation import plot_factory
 
 # from lightning.pytorch.utilities import _zero_only
 import os
 import pandas as pd
-from rouskinhf import int2seq
-import plotly.graph_objects as go
 from lightning.pytorch.utilities import rank_zero_only
 
 from ..config import (
@@ -25,18 +20,14 @@ from ..config import (
 from .metrics import metric_factory
 
 from ..core.datamodule import DataModule
-from . import metrics
 from .loader import Loader
-from os.path import join
 from .logger import Logger
 import pandas as pd
 from lightning.pytorch import Trainer
 from lightning.pytorch import LightningModule
 from kaggle.api.kaggle_api_extended import KaggleApi
-import pickle
 from .batch import Batch
 from .listofdatapoints import ListOfDatapoints
-from typing import Union
 
 
 class LoadBestModel(pl.Callback):

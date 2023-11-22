@@ -1,8 +1,8 @@
-import numpy as np
+
 from torch import nn
 import torch
 from ..config import DEFAULT_FORMAT
-from rouskinhf.util import seq2int, dot2int, int2dot, int2seq
+from rouskinhf.util import seq2int, dot2int, int2seq
 
 NUM_BASES = len(set(seq2int.values()))
 

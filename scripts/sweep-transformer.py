@@ -2,7 +2,7 @@ import sys, os
 
 sys.path.append(os.path.abspath("."))
 # os.system('source /Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/RNA_data/env')
-from dmsensei import DataModule, create_model, metrics
+from dmsensei import DataModule, create_model
 from dmsensei.config import device
 from dmsensei.util import str2fun
 from dmsensei.core.callbacks import PredictionLogger, ModelChecker

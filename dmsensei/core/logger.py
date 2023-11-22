@@ -1,10 +1,6 @@
 import wandb
 from ..config import *
-import numpy as np
 import lightning.pytorch as pl
-from .batch import Batch
-from .metrics import metric_factory
-from ..config import POSSIBLE_METRICS
 
 
 class Logger:

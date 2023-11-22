@@ -1,9 +1,9 @@
 import sys, os
 
 sys.path.append(os.path.abspath("."))
-from dmsensei import DataModule, create_model, metrics
+from dmsensei import DataModule, create_model
 from dmsensei.config import device
-from dmsensei.core.callbacks import ModelChecker, WandbFitLogger, KaggleLogger, WandbTestLogger
+from dmsensei.core.callbacks import WandbFitLogger, KaggleLogger, WandbTestLogger
 from lightning.pytorch.callbacks import LearningRateMonitor
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
@@ -14,10 +14,7 @@ import sys
 import os
 from lightning.pytorch.loggers import WandbLogger
 import wandb
-import numpy as np
 from lightning.pytorch.strategies import DDPStrategy
-import torch
-from torch import nn
 
 sys.path.append(os.path.abspath("."))
 
