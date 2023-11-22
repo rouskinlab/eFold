@@ -45,6 +45,7 @@ if __name__ == "__main__":
     model = create_model(
         model="evoformer",
         data="multi",
+        quality=True,
         ntoken=5,
         d_model=64,
         c_z=8,
@@ -72,8 +73,8 @@ if __name__ == "__main__":
             LearningRateMonitor(logging_interval='epoch'),
             # PredictionLogger(data="dms"),
             # ModelChecker(log_every_nstep=10000, model=model),
-            WandbFitLogger(dm=dm, batch_size=batch_size, load_model='/Users/yvesmartin/src/DMSensei/models/polar-moon-19.pt'),
-            WandbTestLogger(dm=dm, n_best_worst=10, load_model='best'),
+            WandbFitLogger(dm=dm, batch_size=batch_size, load_model=None),
+            WandbTestLogger(dm=dm, n_best_worst=10, load_model='best'), # 'best', None or path to model
         ]
         if USE_WANDB
         else [],
