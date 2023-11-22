@@ -7,7 +7,7 @@ py-modules = ['dmsensei']
 
 [project]
 name =  "dmsensei"
-version = "0.0.0"
+version = "0.1.0"
 authors = [
     {name = "Yves Martin", email = "yves@martin.yt"},
     {name = "Alberic de Lajarte", email = "albericlajarte@gmail.com"},
