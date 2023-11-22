@@ -5,3 +5,4 @@ dmsensei/models/trained_models
 lightning_logs
 models
 trash_project_for_testing
+.DS_Store

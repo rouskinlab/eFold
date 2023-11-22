@@ -17,7 +17,7 @@ class Loader:
     @classmethod
     def find_best_model(cls, prefix):
         models = [model for model in listdir('models') if model.startswith(prefix)]
-        models.sort(key=lambda x: int(x.split('_MAE')[-1].split('.')[0].replace('-','.')))
+        models.sort(key=lambda x: int(x.split('_loss')[-1].split('.')[0].replace('-','.')))
         if len(models) == 0:
             return None
         return cls(path='models/'+models[0])
@@ -28,9 +28,9 @@ class Loader:
     def get_name(self):
         return self.path.split('/')[-1].split('.')[0]
     
-    def write_in_log(self, name, mae): 
-        with open('models/mae_log.txt', 'a') as f:
-            f.write(f'{self.get_name()}_MAE{np.ceil(mae)}\t{mae}\n')
+    def write_in_log(self, name, loss): 
+        with open('models/loss_log.txt', 'a') as f:
+            f.write(f'{self.get_name()}_loss{np.ceil(100*loss)}\t{loss}\n')
         return self
 
     def load_from_weights(self, safe_load=True):

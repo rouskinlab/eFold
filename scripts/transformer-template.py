@@ -43,7 +43,7 @@ if __name__ == "__main__":
         num_workers=0,
         train_split=256,
         valid_split=256,
-        predict_split=200,
+        predict_split=0,
         overfit_mode=False,
         shuffle_valid=False,
     )
@@ -79,7 +79,7 @@ if __name__ == "__main__":
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[  # EarlyStopping(monitor="valid/loss", mode='min', patience=5),
     #         # LearningRateMonitor(logging_interval="epoch"),
-            WandbFitLogger(dm=dm, batch_size=batch_size),
+            WandbFitLogger(dm=dm, batch_size=batch_size, load_model='/Users/yvesmartin/src/DMSensei/models/polar-moon-19.pt'),
             WandbTestLogger(dm=dm, n_best_worst=10, load_model='/Users/yvesmartin/src/DMSensei/models/polar-moon-19.pt'),
     #         # ModelChecker(log_every_nstep=1000, model=model),
         ]

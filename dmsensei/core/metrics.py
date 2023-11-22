@@ -89,8 +89,6 @@ def r2_score(pred, true, batch=None):
 
 @batch_mean
 def pearson_coefficient(pred, true, batch=None):
-    # TODO # 7
-
     """
     Compute the Pearson correlation coefficient of the predictions.
 

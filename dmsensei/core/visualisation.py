@@ -23,19 +23,6 @@ matplotlib_colors = [
     "navy",
 ]
 
-
-def plot_r2_distribution(r2_scores):
-    fig, ax = plt.subplots()
-    ax.hist(r2_scores, bins=20)
-    ax.set_xlabel("R2 score")
-    ax.set_ylabel("Count")
-    ax.set_title("R2 score distribution")
-    img = wandb.Image(fig)
-    fig = plt.close(fig)
-
-    return img
-
-
 def plot_signal(
     pred,
     true,
@@ -121,23 +108,6 @@ def plot_signal(
     return img
 
 
-def plot_dms_padding(pred, true, **kwargs):
-    fig, ax = plt.subplots()
-
-    mask = true != UKN
-    pred = pred[mask].cpu().numpy()
-    true = true[mask].cpu().numpy()
-
-    ax.scatter(true, pred)
-    ax.set_xlabel("True DMS")
-    ax.set_ylabel("Predicted DMS")
-
-    img = wandb.Image(fig)
-    fig = plt.close(fig)
-
-    return img
-
-
 def plot_structure(pred, true, **kwargs):
     fig, ax = plt.subplots()
     pred, true = pred.cpu().numpy(), true.cpu().numpy()
@@ -165,4 +135,4 @@ plot_factory = {
         *args, **kwargs, data_type="SHAPE"
     ),
     ("structure", "heatmap"): plot_structure,
-}  # TODO
+} 

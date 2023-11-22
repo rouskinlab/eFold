@@ -91,7 +91,6 @@ class DataModule(pl.LightningDataModule):
         raise ValueError("name must be a string or a list of strings")
 
     def _dataset_merge(self, datasets):
-        # TODO #11
         merge = datasets[0]
         collate_fn = merge.collate_fn
         for dataset in datasets[1:]:
