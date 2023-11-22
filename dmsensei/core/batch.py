@@ -215,8 +215,9 @@ class Batch:
                 )
         return out
     
-    def get_weighted_data(self, data_type: str):
-        pred, true = self.get_pairs(data_type)
-        mask = true != UKN
-        weights = self.get("quality_" + data_type)[self.get_index(data_type)].unsqueeze(-1)        
-        return (weights*pred)[mask], (weights*true)[mask]
+    def get_weights_as_matrix(self, data_type, L):
+        """Returns the weights as a matrix of shape (batch_size*, L)
+        where batch_size* is the number of datapoints of this data_type in the batch
+        and L is the length of the longest sequence in the batch
+        """
+        return self.get('quality_{}'.format(data_type))[self.get_index(data_type)].unsqueeze(-1).repeat(1, L)

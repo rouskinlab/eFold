@@ -33,18 +33,29 @@ class Model(pl.LightningModule):
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=self.gamma)
         return [optimizer], [scheduler]
 
+    def _loss_signal(self, batch: Batch, data_type:str):
+        assert data_type in ['dms', 'shape'], "This function only works for dms and shape data"
+        pred, true = batch.get_pairs(data_type)
+        mask = true != -1000.
+        weights = batch.get_weights_as_matrix(data_type, true.shape[1])
+        loss = torch.sqrt(((pred[mask] - true[mask]) ** 2) @ weights[mask] / len(mask))
+        return loss
+    
+    def _loss_structure(self, batch: Batch):
+        # Unsure if this is the correct loss function
+        pred, true = batch.get("structure")
+        weights = batch.get("quality_structure")[batch.get_index("structure")].unsqueeze(-1)
+        return F.binary_cross_entropy(input=pred, target=true, reduction="none") @ weights / len(weights)
+        
     def loss_fn(self, batch: Batch):
         loss = torch.tensor(0.0, device=self.device)
         count = {dt: batch.count(dt) for dt in batch.data_type if batch.contains(dt)}
         if batch.contains("dms"):
-            pred, true = batch.get_weighted_data("dms")
-            loss += count["dms"] * F.mse_loss(input=pred, target=true)
+            loss += count["dms"] * self._loss_signal(batch, 'dms')
         if batch.contains("shape"):
-            pred, true = batch.get_weighted_data("shape")
-            loss += count["shape"] * F.mse_loss(input=pred, target=true)
+            loss += count["shape"] * self._loss_signal(batch, 'shape')
         if batch.contains("structure"):
-            pred, true = batch.get_weighted_data("structure")
-            loss += count["structure"] * F.binary_cross_entropy(input=pred, target=true)
+            loss += count["structure"] * self._loss_structure(batch)
         return loss / np.sum(list(count.values()))
 
     def training_step(self, batch: Batch, batch_idx: int):
