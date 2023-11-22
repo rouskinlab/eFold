@@ -218,6 +218,5 @@ class Batch:
     def get_weighted_data(self, data_type: str):
         pred, true = self.get_pairs(data_type)
         mask = true != UKN
-        weights = self.get("quality_" + data_type)[self.get_index(data_type)]
-        pred, true = torch.einsum("i,ij->ij", weights, pred), torch.einsum("i,ij->ij", weights, true)
-        return pred[mask], true[mask]
+        weights = self.get("quality_" + data_type)[self.get_index(data_type)].unsqueeze(-1)        
+        return (weights*pred)[mask], (weights*true)[mask]
