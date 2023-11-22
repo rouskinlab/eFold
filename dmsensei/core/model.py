@@ -9,7 +9,7 @@ from .batch import Batch
 
 
 class Model(pl.LightningModule):
-    def __init__(self, lr: float, optimizer_fn, **kwargs):
+    def __init__(self, lr: float, optimizer_fn, quality=True, **kwargs):
         super().__init__()
 
         # Set attributes
@@ -18,6 +18,7 @@ class Model(pl.LightningModule):
         self.lr = lr
         self.optimizer_fn = optimizer_fn
         self.automatic_optimization = True
+        self.use_quality = quality
         self.save_hyperparameters()
 
     def configure_optimizers(self):
@@ -37,15 +38,19 @@ class Model(pl.LightningModule):
         assert data_type in ['dms', 'shape'], "This function only works for dms and shape data"
         pred, true = batch.get_pairs(data_type)
         mask = true != -1000.
-        weights = batch.get_weights_as_matrix(data_type, true.shape[1])
-        loss = torch.sqrt(((pred[mask] - true[mask]) ** 2) @ weights[mask] / len(mask))
-        return loss
-    
+        if self.use_quality:
+            weights = batch.get_weights_as_matrix(data_type, true.shape[1])
+            loss = F.mse_loss(pred[mask], true[mask], reduction="none") @ weights[mask] / len(weights[mask])
+            return loss
+        return F.mse_loss(pred[mask], true[mask], reduction="mean")
+        
     def _loss_structure(self, batch: Batch):
         # Unsure if this is the correct loss function
         pred, true = batch.get("structure")
-        weights = batch.get("quality_structure")[batch.get_index("structure")].unsqueeze(-1)
-        return F.binary_cross_entropy(input=pred, target=true, reduction="none") @ weights / len(weights)
+        if self.use_quality:
+            weights = batch.get("quality_structure")[batch.get_index("structure")].unsqueeze(-1)
+            return F.binary_cross_entropy(input=pred, target=true, reduction="none") @ weights / len(weights)
+        return F.binary_cross_entropy(input=pred, target=true, reduction="mean")
         
     def loss_fn(self, batch: Batch):
         loss = torch.tensor(0.0, device=self.device)
