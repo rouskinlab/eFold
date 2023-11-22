@@ -232,7 +232,7 @@ class WandbTestLogger(LoadBestModel):
             if not len(df):
                 continue
             df.sort_values(
-                by="score", inplace=True, ascending=REF_METRIC_SIGN[data_type] < 0
+                by="score", inplace=True, ascending=REF_METRIC_SIGN[data_type] > 0
             )
             refs = set(df["reference"].values[: self.n_best_worst]).union(
                 set(df["reference"].values[-self.n_best_worst :])
