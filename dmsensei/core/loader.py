@@ -17,7 +17,7 @@ class Loader:
     @classmethod
     def find_best_model(cls, prefix):
         models = [model for model in listdir('models') if model.startswith(prefix)]
-        models.sort(key=lambda x: int(x.split('_loss')[-1].split('.')[0].replace('-','.')))
+        models.sort(key=lambda x: float(x.split('_loss')[-1].split('.')[0].replace('-','.')))
         if len(models) == 0:
             return None
         return cls(path='models/'+models[0])
