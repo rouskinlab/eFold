@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 from torch import nn, Tensor
-import lightning.pytorch as pl
 import os, sys
 from contextlib import ExitStack
 

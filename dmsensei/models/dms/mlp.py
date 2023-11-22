@@ -1,13 +1,10 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from ...config import DEFAULT_FORMAT, device
-from torch import optim, nn, utils, Tensor, tensor
-import lightning.pytorch as pl
-from ...core import metrics
+from ...config import DEFAULT_FORMAT
+from torch import nn, Tensor
 from ...core.model import Model
 from ...core.embeddings import NUM_BASES
-from torcheval.metrics import R2Score
 
 
 torch.seed()

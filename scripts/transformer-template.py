@@ -1,22 +1,16 @@
 import sys, os
 
 sys.path.append(os.path.abspath("."))
-from dmsensei import DataModule, create_model, metrics
+from dmsensei import DataModule, create_model
 from dmsensei.config import device
-from dmsensei.core.callbacks import ModelChecker, WandbFitLogger, KaggleLogger, WandbTestLogger
-from lightning.pytorch.callbacks import LearningRateMonitor
+from dmsensei.core.callbacks import WandbFitLogger, KaggleLogger, WandbTestLogger
 from lightning.pytorch import Trainer
-from lightning.pytorch.callbacks.early_stopping import EarlyStopping
-import pandas as pd
 from lightning.pytorch import Trainer
 from dmsensei.config import device
 import sys
 import os
 from lightning.pytorch.loggers import WandbLogger
 import wandb
-import numpy as np
-import torch
-import pickle
 
 sys.path.append(os.path.abspath("."))
 
@@ -51,8 +45,8 @@ if __name__ == "__main__":
     model = create_model(
         model="transformer",
         data="multi",
+        quality=True,
         ntoken=5,
-        n_struct=2,
         d_model=d_model,
         nhead=16,
         d_hid=d_model,
@@ -74,13 +68,13 @@ if __name__ == "__main__":
         # strategy="ddp",
         # precision="16-mixed",
         # accumulate_grad_batches=2,
-        max_epochs=3,
+        max_epochs=5,
         # log_every_n_steps=10,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[  # EarlyStopping(monitor="valid/loss", mode='min', patience=5),
     #         # LearningRateMonitor(logging_interval="epoch"),
-            WandbFitLogger(dm=dm, batch_size=batch_size, load_model='/Users/yvesmartin/src/DMSensei/models/polar-moon-19.pt'),
-            WandbTestLogger(dm=dm, n_best_worst=10, load_model='/Users/yvesmartin/src/DMSensei/models/polar-moon-19.pt'),
+            WandbFitLogger(dm=dm, batch_size=batch_size, load_model=None),
+            WandbTestLogger(dm=dm, n_best_worst=10, load_model='best'), # 'best', None or path to model
     #         # ModelChecker(log_every_nstep=1000, model=model),
         ]
         if USE_WANDB

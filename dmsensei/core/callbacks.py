@@ -1,18 +1,13 @@
 from typing import Any
 import lightning.pytorch as pl
-from lightning.pytorch.utilities.types import STEP_OUTPUT
 import torch
 import numpy as np
-from torch import Tensor, tensor
 import wandb
-from .metrics import f1, r2_score
 from .visualisation import plot_factory
 
 # from lightning.pytorch.utilities import _zero_only
 import os
 import pandas as pd
-from rouskinhf import int2seq
-import plotly.graph_objects as go
 from lightning.pytorch.utilities import rank_zero_only
 
 from ..config import (
@@ -25,18 +20,14 @@ from ..config import (
 from .metrics import metric_factory
 
 from ..core.datamodule import DataModule
-from . import metrics
 from .loader import Loader
-from os.path import join
 from .logger import Logger
 import pandas as pd
 from lightning.pytorch import Trainer
 from lightning.pytorch import LightningModule
 from kaggle.api.kaggle_api_extended import KaggleApi
-import pickle
 from .batch import Batch
 from .listofdatapoints import ListOfDatapoints
-from typing import Union
 
 
 class LoadBestModel(pl.Callback):
@@ -180,10 +171,10 @@ class WandbFitLogger(LoadBestModel):
         if this_epoch_loss < self.best_loss:
             # save the best model per integer MAE
             self.best_loss = this_epoch_loss
-            name = "{}_loss{}.pt".format(wandb.run.name, str(np.ceil(100*this_epoch_loss)).replace(".", "-"))
+            name = "{}_loss{}.pt".format(wandb.run.name, str(np.ceil(100*np.sqrt(this_epoch_loss))).replace(".", "-"))
             loader = Loader(path='models/'+name)
             # logs what MAE it corresponds to
-            loader.dump(pl_module).write_in_log(name, np.round(100*this_epoch_loss, 3))
+            loader.dump(pl_module).write_in_log(trainer.current_epoch, np.round(100*np.sqrt(this_epoch_loss), 3))
             
         self.val_losses = []
         
@@ -241,7 +232,7 @@ class WandbTestLogger(LoadBestModel):
             if not len(df):
                 continue
             df.sort_values(
-                by="score", inplace=True, ascending=REF_METRIC_SIGN[data_type] < 0
+                by="score", inplace=True, ascending=REF_METRIC_SIGN[data_type] > 0
             )
             refs = set(df["reference"].values[: self.n_best_worst]).union(
                 set(df["reference"].values[-self.n_best_worst :])

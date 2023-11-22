@@ -1,7 +1,6 @@
 from typing import Any
 import torch
 from torch import tensor
-from tqdm import tqdm as tqdm_fun
 import numpy as np
 from ..config import UKN, DATA_TYPES
 from torch import nn, tensor, float32, int64, stack, uint8
@@ -13,8 +12,7 @@ from .listofdatapoints import ListOfDatapoints
 import lightning.pytorch as pl
 from ..config import device, POSSIBLE_METRICS
 from .metrics import metric_factory
-from ..util import unzip
-from typing import Dict, List, Union, Tuple, Optional
+from typing import Dict
 
 def _pad(arr, L, data_type):
     padding_values = {
@@ -36,10 +34,12 @@ class BatchData:
 
 
 class BatchMetadata:
-    def __init__(self, reference: list, length: list, quality: list):
+    def __init__(self, reference: list, length: list, quality_dms: list, quality_shape: list, quality_structure: list):
         self.reference = reference
         self.length = length
-        self.quality = quality
+        self.quality_dms = quality_dms
+        self.quality_shape = quality_shape
+        self.quality_structure = quality_structure
 
 
 class Batch:
@@ -72,7 +72,7 @@ class Batch:
     @classmethod
     def from_list_of_datapoints(cls, list_of_datapoints, data_type):
         data, metadata = {}, {}
-        lengths = [dp.get("length") for dp in list_of_datapoints]
+        lengths = np.array([dp.get("length") for dp in list_of_datapoints])
         L = max(lengths)
         for dt in data_type:
             index, values = [], []
@@ -87,11 +87,16 @@ class Batch:
                     index=tensor(index).to(device),
                     values=stack(values).to(device),
                 )
+                
+        def parse_data(data_type, dtype=tensor):
+            return dtype([dp.get(data_type) for dp in list_of_datapoints])
 
-        metadata = Metadata(
+        metadata = BatchMetadata(
             length=lengths,
-            reference=[dp.get("reference") for dp in list_of_datapoints],
-            quality=[dp.get("quality") for dp in list_of_datapoints],
+            reference=parse_data("reference", dtype=list),
+            quality_dms=parse_data("quality_dms").to(device),
+            quality_shape=parse_data("quality_shape").to(device),
+            quality_structure=parse_data("quality_structure").to(device),
         )
 
         return cls(
@@ -109,6 +114,9 @@ class Batch:
             metadata = Metadata(
                 reference=self.get("reference", index=idx),
                 length=self.get("length", index=idx),
+                quality_dms=self.get("quality_dms", index=idx),
+                quality_shape=self.get("quality_shape", index=idx),
+                quality_structure=self.get("quality_structure", index=idx),
             )
             ######## This part is the tricky one ########
             prediction = (
@@ -206,3 +214,10 @@ class Batch:
                     pred=pred, true=true, batch= self.count(data_type) > 1
                 )
         return out
+    
+    def get_weights_as_matrix(self, data_type, L):
+        """Returns the weights as a matrix of shape (batch_size*, L)
+        where batch_size* is the number of datapoints of this data_type in the batch
+        and L is the length of the longest sequence in the batch
+        """
+        return self.get('quality_{}'.format(data_type))[self.get_index(data_type)].unsqueeze(-1).repeat(1, L)

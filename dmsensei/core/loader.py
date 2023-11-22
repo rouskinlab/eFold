@@ -1,10 +1,7 @@
-from os.path import dirname, join
+from os.path import dirname
 from os import makedirs, listdir
-import pickle
 import torch
-import wandb
 import os
-import numpy as np
 
 class Loader:
     def __init__(
@@ -28,9 +25,9 @@ class Loader:
     def get_name(self):
         return self.path.split('/')[-1].split('.')[0]
     
-    def write_in_log(self, name, loss): 
+    def write_in_log(self, epoch, loss): 
         with open('models/loss_log.txt', 'a') as f:
-            f.write(f'{self.get_name()}_loss{np.ceil(100*loss)}\t{loss}\n')
+            f.write(f'{epoch} {self.get_name()}\t{loss}\n')
         return self
 
     def load_from_weights(self, safe_load=True):
