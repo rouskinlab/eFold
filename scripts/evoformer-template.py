@@ -3,7 +3,7 @@ import sys, os
 sys.path.append(os.path.abspath("."))
 from dmsensei import DataModule, create_model, metrics
 from dmsensei.config import device
-from dmsensei.core.callbacks import ModelChecker, MyWandbLogger, KaggleLogger
+from dmsensei.core.callbacks import ModelChecker, WandbFitLogger, KaggleLogger, WandbTestLogger
 from lightning.pytorch.callbacks import LearningRateMonitor
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
@@ -26,23 +26,23 @@ if __name__ == "__main__":
     USE_WANDB = 1
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        project = "Evoformer-dms-2"
-        # wandb.init(project=project)
+        project = 'CHANGE_ME'
+        wandb.init(project=project)
         wandb_logger = WandbLogger(project=project)
 
+    # fit loop
     batch_size = 32
     dm = DataModule(
-        name=["ribonanza"],
+        name=["ribo-HQ", "ribo-LQ"],
         data_type=["dms",'shape'],
         force_download=False,
         batch_size=batch_size,
         num_workers=1,
-        train_split=47000,
-        valid_split=2001,
-        validLQ_split=3000,
+        train_split=None, # all but valid_split
+        valid_split=2048,
+        predict_split=0,
         overfit_mode=False,
         shuffle_valid=False,
-        shuffle_validLQ=False,
     )
 
     model = create_model(
@@ -59,10 +59,7 @@ if __name__ == "__main__":
         gamma=0.997,
         wandb=USE_WANDB,
     )
-
-    # model.load_state_dict(torch.load('/root/DMSensei/dmsensei/models/trained_models/desert-puddle-114.pt',
-    #                                  map_location=torch.device(device)))
-
+    
     if USE_WANDB:
         wandb_logger.watch(model, log="all")
 
@@ -78,15 +75,41 @@ if __name__ == "__main__":
             LearningRateMonitor(logging_interval='epoch'),
             # PredictionLogger(data="dms"),
             # ModelChecker(log_every_nstep=10000, model=model),
-            MyWandbLogger(dm=dm, model=model, batch_size=batch_size),
-            # KaggleLogger(dm=dm, push_to_kaggle=False),
+            WandbFitLogger(dm=dm, batch_size=batch_size, load_model='/Users/yvesmartin/src/DMSensei/models/polar-moon-19.pt'),
+            WandbTestLogger(dm=dm, n_best_worst=10, load_model='best'),
         ]
         if USE_WANDB
         else [],
         enable_checkpointing=False,
     )
+    
+    
     trainer.fit(model, datamodule=dm)
     trainer.test(model, datamodule=dm)
+    
+    
+    # Predict loop
+    dm = DataModule(
+        name=["ribo-test"],
+        data_type=["dms", "shape"],
+        force_download=False,
+        batch_size=128,
+        num_workers=0,
+        train_split=0,
+        valid_split=0,
+        predict_split=1.,
+        overfit_mode=False,
+        shuffle_valid=False,
+    )
+    
+    trainer = Trainer(
+        accelerator=device,
+        callbacks=[KaggleLogger(
+            push_to_kaggle=True, 
+            load_model='best' # 'best', None or path to model
+            )]
+    )
+    
     trainer.predict(model, datamodule=dm)
 
     if USE_WANDB:
