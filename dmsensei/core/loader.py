@@ -30,7 +30,7 @@ class Loader:
     
     def write_in_log(self, name, loss): 
         with open('models/loss_log.txt', 'a') as f:
-            f.write(f'{self.get_name()}_loss{np.ceil(100*loss)}\t{loss}\n')
+            f.write(f'{self.get_name()}\t{loss}\n')
         return self
 
     def load_from_weights(self, safe_load=True):

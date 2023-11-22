@@ -17,7 +17,7 @@ from .metrics import metric_factory
 from ..util import unzip
 
 def set_prefix(data_type):
-    if data_type in ["length", "reference", "quality"]:
+    if data_type in ["length", "reference", "quality_dms", "quality_shape", "quality_structure"]:
         prefix = "metadata"
     elif data_type in ['sequence', 'dms', 'shape', 'structure']:
         prefix = "data"
@@ -26,11 +26,13 @@ def set_prefix(data_type):
     return prefix
 
 class Metadata:
-    def __init__(self, reference, length, index=None, quality=1.0):
+    def __init__(self, reference, length, index=None, quality_dms=1., quality_shape=1., quality_structure=1.):
         self.reference = reference
         self.length = length
         self.index = index
-        self.quality = quality
+        self.quality_dms = quality_dms
+        self.quality_shape = quality_shape
+        self.quality_structure = quality_structure
 
 
 class Data:
@@ -56,11 +58,13 @@ class Datapoint:
         shape=None,
         structure=None,
         index=None,
-        quality=1.0,
+        quality_dms=1.,
+        quality_shape=1.,
+        quality_structure=1.,
     ):
         return cls(
             data=Data(sequence, dms, shape, structure),
-            metadata=Metadata(reference, index, quality),
+            metadata=Metadata(reference, index, quality_dms, quality_shape, quality_structure),
         )
 
     def compute_error_metrics_pack(self):

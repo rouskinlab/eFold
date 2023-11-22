@@ -50,15 +50,13 @@ class Model(pl.LightningModule):
         loss = torch.tensor(0.0, device=self.device)
         count = {dt: batch.count(dt) for dt in batch.data_type if batch.contains(dt)}
         if batch.contains("dms"):
-            pred, true = batch.get_pairs("dms")
-            mask = true != UKN
-            loss += count["dms"] * F.mse_loss(input=pred[mask], target=true[mask])
+            pred, true = batch.get_weighted_data("dms")
+            loss += count["dms"] * F.mse_loss(input=pred, target=true)
         if batch.contains("shape"):
-            pred, true = batch.get_pairs("shape")
-            mask = true != UKN
-            loss += count["shape"] * F.mse_loss(input=pred[mask], target=true[mask])
+            pred, true = batch.get_weighted_data("shape")
+            loss += count["shape"] * F.mse_loss(input=pred, target=true)
         if batch.contains("structure"):
-            pred, true = batch.get_pairs("structure")
+            pred, true = batch.get_weighted_data("structure")
             loss += count["structure"] * F.binary_cross_entropy(input=pred, target=true)
         return loss / np.sum(list(count.values()))
 

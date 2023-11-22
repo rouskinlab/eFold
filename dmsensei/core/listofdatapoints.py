@@ -11,13 +11,13 @@ from .datapoint import Datapoint, Data, Metadata
 import copy
 
 
-def get_array(data, attr, index, astype=None):
+def get_array(data, attr, index, astype=None, default=None):
     if not attr in data:
-        return None
+        return default
     d = tensor(data[attr][index].astype(astype))
     if not torch.isnan(d).all() and not (d == UKN).all():
         return d
-
+    return default
 
 class ListOfDatapoints:
     def __init__(self, list_of_datapoints=None) -> None:
@@ -68,7 +68,6 @@ class ListOfDatapoints:
     def from_rouskinhf(cls, data, data_type, name=None, tqdm=True):
         self = cls()
         self.data_type = data_type
-        # TODO #14 add  quality score per dataset or datapoint
 
         for index in tqdm_fun(
             range(len(data["references"])),
@@ -87,7 +86,9 @@ class ListOfDatapoints:
                 reference=data["references"][index],
                 length=len(d.sequence),
                 index=index,
-                quality=1.0,
+                quality_dms = get_array(data, "quality_dms", index, astype=np.float32, default=1.),
+                quality_shape = get_array(data, "quality_shape", index, astype=np.float32, default=1.),
+                quality_structure = get_array(data, "quality_structure", index, astype=np.float32, default=1.),
             )
             self.list_of_datapoints.append(
                 Datapoint(

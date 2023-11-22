@@ -36,10 +36,12 @@ class BatchData:
 
 
 class BatchMetadata:
-    def __init__(self, reference: list, length: list, quality: list):
+    def __init__(self, reference: list, length: list, quality_dms: list, quality_shape: list, quality_structure: list):
         self.reference = reference
         self.length = length
-        self.quality = quality
+        self.quality_dms = quality_dms
+        self.quality_shape = quality_shape
+        self.quality_structure = quality_structure
 
 
 class Batch:
@@ -72,7 +74,7 @@ class Batch:
     @classmethod
     def from_list_of_datapoints(cls, list_of_datapoints, data_type):
         data, metadata = {}, {}
-        lengths = [dp.get("length") for dp in list_of_datapoints]
+        lengths = np.array([dp.get("length") for dp in list_of_datapoints])
         L = max(lengths)
         for dt in data_type:
             index, values = [], []
@@ -87,11 +89,16 @@ class Batch:
                     index=tensor(index).to(device),
                     values=stack(values).to(device),
                 )
+                
+        def parse_data(data_type, dtype=tensor):
+            return dtype([dp.get(data_type) for dp in list_of_datapoints])
 
-        metadata = Metadata(
+        metadata = BatchMetadata(
             length=lengths,
-            reference=[dp.get("reference") for dp in list_of_datapoints],
-            quality=[dp.get("quality") for dp in list_of_datapoints],
+            reference=parse_data("reference", dtype=list),
+            quality_dms=parse_data("quality_dms").to(device),
+            quality_shape=parse_data("quality_shape").to(device),
+            quality_structure=parse_data("quality_structure").to(device),
         )
 
         return cls(
@@ -109,6 +116,9 @@ class Batch:
             metadata = Metadata(
                 reference=self.get("reference", index=idx),
                 length=self.get("length", index=idx),
+                quality_dms=self.get("quality_dms", index=idx),
+                quality_shape=self.get("quality_shape", index=idx),
+                quality_structure=self.get("quality_structure", index=idx),
             )
             ######## This part is the tricky one ########
             prediction = (
@@ -206,3 +216,10 @@ class Batch:
                     pred=pred, true=true, batch= self.count(data_type) > 1
                 )
         return out
+    
+    def get_weighted_data(self, data_type: str):
+        pred, true = self.get_pairs(data_type)
+        mask = true != UKN
+        weights = self.get("quality_" + data_type)[self.get_index(data_type)]
+        pred, true = torch.einsum("i,ij->ij", weights, pred), torch.einsum("i,ij->ij", weights, true)
+        return pred[mask], true[mask]
