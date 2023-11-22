@@ -203,6 +203,6 @@ class Batch:
             pred, true = self.get_pairs(data_type)
             for metric in POSSIBLE_METRICS[data_type]:
                 out[data_type][metric] = metric_factory[metric](
-                    pred=pred, true=true, batch=self.count(data_type) > 1
+                    pred=pred, true=true, batch= self.count(data_type) > 1
                 )
         return out

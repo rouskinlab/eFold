@@ -2,9 +2,6 @@ import torch
 from rouskinhf import seq2int
 from ..config import UKN
 
-from scipy import stats
-import sklearn
-
 
 # make a decorator to run the metrics on the batch
 def batch_mean(fn):
@@ -87,9 +84,7 @@ def r2_score(pred, true, batch=None):
     pred = pred[mask]
     true = true[mask]
 
-    return sklearn.metrics.r2_score(
-        true.detach().cpu().numpy(), pred.detach().cpu().numpy()
-    )
+    return (1 - torch.sum((true - pred) ** 2) / torch.sum((true - torch.mean(true)) ** 2)).item()
 
 
 @batch_mean
@@ -106,12 +101,10 @@ def pearson_coefficient(pred, true, batch=None):
     mask = true != UKN
     pred = pred[mask]
     true = true[mask]
-
-    res = stats.pearsonr(
-        true.detach().cpu().numpy().flatten(), pred.detach().cpu().numpy().flatten()
-    )
-
-    return res[0]
+    return torch.mean(
+        (pred - torch.mean(pred)) * (true - torch.mean(true))
+        / (torch.std(pred) * torch.std(true))
+    ).item()
 
 
 @batch_mean

@@ -1,44 +1,46 @@
 from os.path import dirname, join
-from os import makedirs
+from os import makedirs, listdir
 import pickle
 import torch
 import wandb
 import os
-
+import numpy as np
 
 class Loader:
     def __init__(
         self,
-        path=None,
+        path:str,
     ) -> None:
-        self.path = (
-            path + ".pkl" if path is not None and not path.endswith(".pkl") else path
-        )
+        self.path = path
         makedirs(dirname(self.get_path()), exist_ok=True)
+        
+    @classmethod
+    def find_best_model(cls, prefix):
+        models = [model for model in listdir('models') if model.startswith(prefix)]
+        models.sort(key=lambda x: int(x.split('_MAE')[-1].split('.')[0].replace('-','.')))
+        if len(models) == 0:
+            return None
+        return cls(path='models/'+models[0])
 
-    def get_path(self, extension=".pkl"):
-        return (
-            join(
-                "models",
-                wandb.run.name + extension
-                if wandb.run is not None
-                else "default_name" + extension,
-            )
-            if self.path is None
-            else self.path
-        )
-
-    def load_from_pickle(self):
-        return pickle.load(open(self.get_path(), "rb"))
+    def get_path(self):
+        return self.path
+    
+    def get_name(self):
+        return self.path.split('/')[-1].split('.')[0]
+    
+    def write_in_log(self, name, mae): 
+        with open('models/mae_log.txt', 'a') as f:
+            f.write(f'{self.get_name()}_MAE{np.ceil(mae)}\t{mae}\n')
+        return self
 
     def load_from_weights(self, safe_load=True):
         if (
             safe_load
-            and os.path.exists(self.get_path(extension=".pt"))
+            and os.path.exists(self.get_path())
             or not safe_load
         ):
-            return torch.load(self.get_path(extension=".pt"))
+            return torch.load(self.get_path())
 
     def dump(self, model):
-        torch.save(model.state_dict(), self.get_path(extension=".pt"))
-        # pickle.dump(model, open(self.get_path(), "wb"))
+        torch.save(model.state_dict(), self.get_path())
+        return self

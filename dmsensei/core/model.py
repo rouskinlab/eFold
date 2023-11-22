@@ -80,11 +80,16 @@ class Model(pl.LightningModule):
 
     def predict_step(self, batch: Batch, batch_idx: int):
         predictions = self.forward(batch.get("sequence"))
+        
         # Hardcoded values for DMS G/U bases
         if "dms" in predictions.keys():
             predictions["dms"][
                 (batch.get("sequence") == seq2int["G"])
                 | (batch.get("sequence") == seq2int["U"])
             ] = VAL_GU
+
+        # clip values to [0, 1]
+        for data_type in set(['dms', 'shape']).intersection(predictions.keys()):
+            predictions[data_type] = torch.clip(predictions[data_type], min=0, max=1)
 
         batch.integrate_prediction(predictions)

@@ -38,10 +38,6 @@ class Logger:
     def valid_loss(self, loss, dataloader_idx):
         if dataloader_idx == 0:
             self.log("valid", "loss", loss)
-        if dataloader_idx == 1:
-            self.log("valid", "lossLQ", loss)
-        if dataloader_idx == 2:
-            self.log("valid", "lossHQ", loss)
 
     def valid_plot(self, data_type, name, plot):
         wandb.log(
@@ -53,8 +49,7 @@ class Logger:
             {"/".join(["test", dataloader, data_type, name]): plot},
         )
 
-    def error_metrics_pack(self, stage: str, batch: Batch):
-        metrics = batch.compute_metrics()
+    def error_metrics_pack(self, stage: str, metrics: dict):
         for data_type, data in metrics.items():
             for metric, value in data.items():
                 self.log(

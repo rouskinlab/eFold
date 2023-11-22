@@ -3,7 +3,7 @@ import sys, os
 sys.path.append(os.path.abspath("."))
 from dmsensei import DataModule, create_model, metrics
 from dmsensei.config import device
-from dmsensei.core.callbacks import ModelChecker, MyWandbLogger, KaggleLogger
+from dmsensei.core.callbacks import ModelChecker, WandbFitLogger, KaggleLogger, WandbTestLogger
 from lightning.pytorch.callbacks import LearningRateMonitor
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
@@ -36,14 +36,14 @@ if __name__ == "__main__":
 
     # Create dataset
     dm = DataModule(
-        name=["ribonanza"],
+        name=["ribo-HQ", "ribo-LQ"],
         data_type=["dms", "shape"],
         force_download=False,
         batch_size=batch_size,
         num_workers=0,
-        train_split=None,
-        valid_split=2048,
-        predict_split=0,
+        train_split=256,
+        valid_split=256,
+        predict_split=200,
         overfit_mode=False,
         shuffle_valid=False,
     )
@@ -64,14 +64,6 @@ if __name__ == "__main__":
         gamma=gamma,
     )
 
-    # model.load_state_dict(
-    #     torch.load(
-    #         "/Users/yvesmartin/src/DMSensei/smooth-blaze-41.pt",
-    #         map_location=torch.device(device),
-    #     )
-    # )
-    # model.to(device)
-
     if USE_WANDB:
         wandb_logger.watch(model, log="all")
 
@@ -82,13 +74,13 @@ if __name__ == "__main__":
         # strategy="ddp",
         # precision="16-mixed",
         # accumulate_grad_batches=2,
-        max_epochs=500,
+        max_epochs=3,
         # log_every_n_steps=10,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[  # EarlyStopping(monitor="valid/loss", mode='min', patience=5),
     #         # LearningRateMonitor(logging_interval="epoch"),
-            MyWandbLogger(dm=dm, model=model, batch_size=batch_size),
-            KaggleLogger(dm=dm, push_to_kaggle=False),
+            WandbFitLogger(dm=dm, batch_size=batch_size),
+            WandbTestLogger(dm=dm, n_best_worst=10, load_model='/Users/yvesmartin/src/DMSensei/models/polar-moon-19.pt'),
     #         # ModelChecker(log_every_nstep=1000, model=model),
         ]
         if USE_WANDB
@@ -98,6 +90,28 @@ if __name__ == "__main__":
 
     trainer.fit(model, datamodule=dm)
     trainer.test(model, datamodule=dm)
+    
+    dm = DataModule(
+        name=["ribo-test"],
+        data_type=["dms", "shape"],
+        force_download=False,
+        batch_size=batch_size,
+        num_workers=0,
+        train_split=0,
+        valid_split=0,
+        predict_split=1.,
+        overfit_mode=False,
+        shuffle_valid=False,
+    )
+    
+    trainer = Trainer(
+        accelerator=device,
+        callbacks=[KaggleLogger(
+            push_to_kaggle=False, 
+            load_model='best' # 'best', None or path to model
+            )]
+    )
+
     trainer.predict(model, datamodule=dm)
 
     if USE_WANDB:

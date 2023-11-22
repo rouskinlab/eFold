@@ -66,7 +66,6 @@ class ListOfDatapoints:
 
     @classmethod
     def from_rouskinhf(cls, data, data_type, name=None, tqdm=True):
-        # TODO #5 group the sequences by length
         self = cls()
         self.data_type = data_type
         # TODO #14 add  quality score per dataset or datapoint
