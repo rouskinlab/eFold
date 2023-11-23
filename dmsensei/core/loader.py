@@ -37,6 +37,7 @@ class Loader:
             or not safe_load
         ):
             return torch.load(self.get_path())
+        raise FileNotFoundError(f'File {self.get_path()} not found')
 
     def dump(self, model):
         torch.save(model.state_dict(), self.get_path())

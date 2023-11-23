@@ -46,7 +46,7 @@ class LoadBestModel(pl.Callback):
             loader = Loader(path=model_file)
         
         # Load the model
-        weights = loader.load_from_weights(safe_load=True)
+        weights = loader.load_from_weights(safe_load=False)
         if weights is not None:
             pl_module.load_state_dict(weights)
             print(f"Loaded model on {self.stage}: {loader.get_name()}")
