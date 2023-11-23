@@ -1,38 +1,31 @@
-from rouskinhf import import_dataset, seq2int, dot2int, int2dot, int2seq
-from torch.utils.data import Dataset as TorchDataset
-from torch import nn, tensor, float32, int64, stack
-from numpy import array, ndarray
-from ..config import DEFAULT_FORMAT, device, TEST_SETS_NAMES
-from .embeddings import base_pairs_to_int_dot_bracket, sequence_to_int
+from ..config import TEST_SETS
 import torch
 from torch.utils.data import DataLoader, random_split, Subset
-from typing import Tuple
 import lightning.pytorch as pl
-import torch.nn.functional as F
-from functools import partial
-import wandb
-from lightning.pytorch.loggers import WandbLogger
-from ..config import UKN
-import copy
 import numpy as np
+from typing import Union, List
+from .dataset import Dataset
+
+# set seed
+torch.manual_seed(0)
+np.random.seed(0)
 
 
 class DataModule(pl.LightningDataModule):
     def __init__(
         self,
-        name: str,
-        data: str,
+        name: Union[str, list],
+        data_type: List[str] = ["dms", "shape", "structure"],
         force_download=False,
         batch_size: int = 32,
         num_workers: int = 1,
-        train_split: float = None,
-        valid_split: float = 4096,
+        train_split: float = 0,
+        valid_split: float = 0,
         predict_split: float = 0,
-        zero_padding_to=None,
         overfit_mode=False,
         shuffle_train=True,
         shuffle_valid=False,
-        shuffle_test=False,
+        tqdm=True,
         **kwargs,
     ):
         """DataModule for the Rouskin lab datasets.
@@ -52,24 +45,32 @@ class DataModule(pl.LightningDataModule):
         # Save arguments
         super().__init__(**kwargs)
 
-        self.name = name
-        self.data = data
+        if not self._use_multiple_datasets(name):
+            self.name = [name]
+        else:
+            self.name = name
+
         self.force_download = force_download
-        self.dataloader_args = {"batch_size": batch_size, "num_workers": num_workers}
-        self.splits = (train_split, valid_split, predict_split)
-        self.zero_padding_to = zero_padding_to
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.data_type = data_type
+        self.splits = {
+            "train": train_split,
+            "valid": valid_split,
+            "predict": predict_split,
+        }
         self.shuffle = {
             "train": shuffle_train,
             "valid": shuffle_valid,
-            "test": shuffle_test,
         }
+        self.tqdm = tqdm
 
         # we need to know the max sequence length for padding
         self.overfit_mode = overfit_mode
-        self.setup()
 
         # Log hyperparameters
-        train_split, valid_split, _ = self.size_sets
+        if hasattr(self, "size_sets"):
+            train_split, valid_split, _ = self.size_sets
         self.save_hyperparameters(ignore=["force_download"])
 
     def _use_multiple_datasets(self, name):
@@ -83,64 +84,98 @@ class DataModule(pl.LightningDataModule):
         merge = datasets[0]
         collate_fn = merge.collate_fn
         for dataset in datasets[1:]:
-            merge = merge + dataset
+            merge.list_of_datapoints = (
+                merge.list_of_datapoints + dataset.list_of_datapoints
+            )
         merge.collate_fn = collate_fn
+        for index, datapoint in enumerate(merge.list_of_datapoints):
+            datapoint.metadata.index = index
         return merge
 
     def setup(self, stage: str = None):
-        if stage in ["fit", None, "predict"]:
-            dataFull = self._dataset_merge(
+        if stage == None or (
+            stage in ["fit", "predict"] and not hasattr(self, "all_datasets")
+        ):
+            self.all_datasets = self._dataset_merge(
                 [
                     Dataset(
                         name=name,
-                        data=self.data,
+                        data_type=self.data_type,
                         force_download=self.force_download,
-                        zero_padding_to=self.zero_padding_to,
+                        tqdm=self.tqdm,
                     )
                     for name in self.name
                 ]
             )
-        if stage == "fit" or stage is None:
-            if not self._use_multiple_datasets(self.name):
-                self.name = [self.name]
+            self.collate_fn = self.all_datasets.collate_fn
 
-            self.size_sets = _compute_size_sets(len(dataFull), *self.splits[:2])
-            self.train_set, self.val_set, _ = random_split(dataFull, self.size_sets)
-
-        if stage == "test" or stage is None:
-            self.test_sets = self._select_test_dataset(
-                data=self.data, force_download=self.force_download
+        if stage == "fit":
+            self.size_sets = _compute_size_sets(
+                len(self.all_datasets),
+                train_split=self.splits["train"],
+                valid_split=self.splits["valid"],
+            )
+            self.train_set, self.val_set, _ = random_split(
+                self.all_datasets, self.size_sets
             )
 
-        if stage == "predict" or stage is None:
-            self.predict_set = Subset(dataFull, range(0, round(len(dataFull) * self.splits[2]) if type(self.splits[2]) == float else self.splits[2]))
+        if stage == "test":
+            self.test_sets = self._select_test_dataset(
+                force_download=self.force_download
+            )
 
-        if stage is None:
-            self.collate_fn = dataFull.collate_fn
+        if stage == "predict":
+            self.predict_set = Subset(
+                self.all_datasets,
+                range(
+                    0,
+                    round(len(self.all_datasets) * self.splits["predict"])
+                    if type(self.splits["predict"]) == float
+                    else self.splits["predict"],
+                ),
+            )
+
+    def _select_test_dataset(self, force_download=False):
+        return [
+            Dataset(
+                name=name,
+                data_type=[data_type],
+                force_download=force_download,
+                tqdm=self.tqdm,
+            )
+            for data_type, datasets in TEST_SETS.items()
+            for name in datasets
+        ]
 
     def train_dataloader(self):
         return DataLoader(
             self.train_set,
             shuffle=self.shuffle["train"],
             collate_fn=self.collate_fn,
-            **self.dataloader_args,
+            batch_size=self.batch_size,
         )
 
     def val_dataloader(self):
-        return DataLoader(
+        valid = DataLoader(
             self.val_set if not self.overfit_mode else self.train_set,
             shuffle=self.shuffle["valid"],
             collate_fn=self.collate_fn,
-            **self.dataloader_args,
+            batch_size=self.batch_size,
         )
+
+        ###################################
+        # Add validation set here if needed
+        ###################################
+
+        val_dls = [valid]
+        return val_dls
 
     def test_dataloader(self):
         return [
             DataLoader(
                 test_set,
-                shuffle=self.shuffle["test"],
-                collate_fn=self.collate_fn,
-                **self.dataloader_args,
+                collate_fn=test_set.collate_fn,
+                batch_size=self.batch_size,
             )
             for test_set in self.test_sets
         ]
@@ -148,228 +183,16 @@ class DataModule(pl.LightningDataModule):
     def predict_dataloader(self):
         return DataLoader(
             self.predict_set,
-            shuffle = False,
             collate_fn=self.collate_fn,
-            **self.dataloader_args,
+            batch_size=self.batch_size,
         )
 
     def teardown(self, stage: str):
         # Used to clean-up when the run is finished
         pass
 
-    def _select_test_dataset(self, data: str, force_download=False):
-        return [
-            Dataset(
-                name=name,
-                data=data,
-                force_download=force_download,
-                zero_padding_to=self.zero_padding_to,
-            )
-            for name in TEST_SETS_NAMES[data]
-        ]
 
-
-class Dataset:
-    def __new__(cls, name: str, data: str, force_download, zero_padding_to):
-        data = data.lower()
-        if data == "dms":
-            return DMSDataset(
-                name, force_download=force_download, zero_padding_to=zero_padding_to
-            )
-        elif data == "structure":
-            return StructureDataset(
-                name, force_download=force_download, zero_padding_to=zero_padding_to
-            )
-        elif data == "sequence":
-            return SequenceDataset(
-                name, force_download=force_download, zero_padding_to=zero_padding_to
-            )
-        else:
-            raise ValueError("Data must be either 'DMS' or 'structure'")
-
-
-class TemplateDataset(TorchDataset):
-    def __init__(self, name: str, data: str, force_download, zero_padding_to) -> None:
-        super().__init__()
-        self.name = name
-        self.zero_padding_to = zero_padding_to
-        data = import_dataset(name, data=data, force_download=force_download)
-
-        # save data
-        self.references = data["references"]
-        self.sequences = data["sequences"]
-
-        # save the maximum length of the sequences
-        self.max_sequence_length = max([len(sequence) for sequence in self.sequences])
-
-        return data
-
-    def __len__(self) -> int:
-        return len(self.sequences)
-
-    def collate_fn(self, batch):
-        raise NotImplementedError("This method must be implemented in the child class")
-
-
-class DMSDataset(TemplateDataset):
-    def __init__(self, name: str, force_download, zero_padding_to) -> None:
-        data = super().__init__(
-            name,
-            data="DMS",
-            force_download=force_download,
-            zero_padding_to=zero_padding_to,
-        )
-
-        # quality check
-        assert (
-            len(data["references"]) == len(data["sequences"]) == len(data["DMS"])
-        ), "Data is not consistent"
-
-        # Load DMS data
-        assert "DMS" in data.keys(), "DMS data not found"
-        self.dms = data["DMS"]
-
-    def __getitem__(self, index) -> tuple:
-        sequence = tensor(self.sequences[index], dtype=int64)
-        dms = tensor(self.dms[index], dtype=DEFAULT_FORMAT)
-        # sequence = tensor(self.sequences[index].astype(int), dtype=int64)
-        # dms = tensor(self.dms[index].astype(float), dtype=DEFAULT_FORMAT)
-
-        assert len(sequence) == len(dms), "Data is not consistent"
-
-        return sequence, dms
-
-    def __repr__(self) -> str:
-        return f"DMSDataset(name={self.name}, len={len(self.sequences)})"
-
-    def collate_fn(self, batch):
-        """Creates mini-batch tensors from the list of tuples (sequence, dms). Zero-pads sequences and dms. The sequences have variable length.
-
-        Args:
-            batch: list of tuple (sequence, dms).
-
-        Returns:
-            sequences: torch tensor of shape (batch_size, max_sequence_length)
-            dms: torch tensor of shape (batch_size, max_sequence_length)
-        """
-
-        sequences, dms = zip(*batch)
-
-        padding_length = 0
-        # Find longest sequence in batch
-        if self.zero_padding_to != None:
-            max_all_sequences_length = max([len(sequence) for sequence in sequences])
-            padding_length = self.zero_padding_to - max_all_sequences_length
-
-            if padding_length < 0:
-                raise ValueError(
-                    "The maximum sequence length of the dataset is greater than the zero padding length. Please increase the zero padding length."
-                )
-
-        # Merge sequences (from tuple of 1D tensor to 2D tensor).
-        sequences = F.pad(
-            nn.utils.rnn.pad_sequence(sequences, batch_first=True),
-            (0, padding_length),
-            value=0,
-        )
-
-        dms = F.pad(
-            nn.utils.rnn.pad_sequence(dms, batch_first=True, padding_value=UKN),
-            (0, padding_length),
-            value=UKN,
-        )
-
-        return sequences, dms
-
-
-
-class SequenceDataset(TemplateDataset):
-    def __init__(self, name: str, force_download, zero_padding_to) -> None:
-        data = super().__init__(
-            name,
-            data="sequence",
-            force_download=force_download,
-            zero_padding_to=zero_padding_to,
-        )
-
-        # quality check
-        assert (
-            len(data["references"]) == len(data["sequences"])
-        ), "Data is not consistent"
-
-
-    def __getitem__(self, index) -> tuple:
-
-        sequence = tensor(self.sequences[index], dtype=int64)
-
-        return sequence
-
-    def __repr__(self) -> str:
-        return f"SequenceDataset(name={self.name}, len={len(self.sequences)})"
-
-    def collate_fn(self, batch):
-        """Creates mini-batch tensors from the list of tuples (sequence, dms). Zero-pads sequences and dms. The sequences have variable length.
-
-        Args:
-            batch: list of tuple (sequence, dms).
-
-        Returns:
-            sequences: torch tensor of shape (batch_size, max_sequence_length)
-        """
-
-        sequences = batch
-        padding_length = 0
-        # Find longest sequence in batch
-        if self.zero_padding_to != None:
-            max_all_sequences_length = max([len(sequence) for sequence in sequences])
-            padding_length = self.zero_padding_to - max_all_sequences_length
-
-            if padding_length < 0:
-                raise ValueError(
-                    "The maximum sequence length of the dataset is greater than the zero padding length. Please increase the zero padding length."
-                )
-
-        # Merge sequences (from tuple of 1D tensor to 2D tensor).
-        sequences = F.pad(
-            nn.utils.rnn.pad_sequence(sequences, batch_first=True),
-            (0, padding_length),
-            value=0,
-        )
-
-        return sequences
-
-
-class StructureDataset(TemplateDataset):
-    def __init__(self, name: str, force_download, zero_padding_to) -> None:
-        data = super().__init__(
-            name,
-            data="structure",
-            force_download=force_download,
-            zero_padding_to=zero_padding_to,
-        )
-
-        # quality check
-        assert (
-            len(data["references"]) == len(data["sequences"]) == len(data["base_pairs"])
-        ), "Data is not consistent"
-
-        # Load structure data
-        assert "base_pairs" in data.keys(), "Structure data not found"
-        self.base_pairs = data["base_pairs"]
-
-    def __getitem__(self, index) -> tuple:
-        sequence = self.sequences[index]
-        structure = base_pairs_to_int_dot_bracket(
-            self.base_pairs[index], len(sequence), dtype=int64
-        )
-
-        return sequence, structure
-
-    def __repr__(self) -> str:
-        return f"StructureDataset(name={self.name}, len={len(self.sequences)})"
-
-
-def _compute_size_sets(len_data, train_split=None, valid_split=4000):
+def _compute_size_sets(len_data, train_split, valid_split):
     """Returns the size of the train and validation sets given the split percentages and the length of the dataset.
 
     Args:
