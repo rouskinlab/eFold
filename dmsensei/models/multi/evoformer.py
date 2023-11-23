@@ -31,11 +31,9 @@ class Evoformer(Model):
         **kwargs,
     ):
         self.save_hyperparameters()
-        super(Evoformer, self).__init__(
-            lr=lr, loss_fn=loss_fn, optimizer_fn=optimizer_fn, **kwargs
-        )
+        super(Evoformer, self).__init__(lr=lr, loss_fn=loss_fn, optimizer_fn=optimizer_fn, **kwargs)
 
-        self.model_type = "Evoformer"
+        self.model_type = 'Evoformer'
         self.lr = lr
         self.gamma = gamma
         self.train_losses = []
