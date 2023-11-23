@@ -298,7 +298,7 @@ class KaggleLogger(LoadBestModel):
 
     @rank_zero_only
     def on_predict_start(self, trainer, pl_module):
-        self.load_model(self.model_file)
+        self.message = self.load_model(self.model_file)
     
     @rank_zero_only
     def on_predict_batch_end(
@@ -311,8 +311,12 @@ class KaggleLogger(LoadBestModel):
         dataloader_idx: int = 0,
     ) -> None:
         
-        self.pred_dms.extend(batch.get("dms", pred=True, true=False).cpu().tolist())
-        self.pred_shape.extend(batch.get("shape", pred=True, true=False).cpu().tolist())
+        dms = batch.get("dms", pred=True, true=False).cpu().tolist()
+        shape = batch.get("shape", pred=True, true=False).cpu().tolist()
+        lengths = batch.get('length')
+        for l, s, d in zip(lengths, shape, dms):
+            self.pred_dms.append(d[:l])
+            self.pred_shape.append(s[:l])
         self.pred_ref.extend(batch.get("reference"))
 
     @rank_zero_only
@@ -333,11 +337,15 @@ class KaggleLogger(LoadBestModel):
         # save predictions as csv
         dms = np.concatenate(df["dms"].values)
         shape = np.concatenate(df["shape"].values)
-        pd.DataFrame(
+        pred = pd.DataFrame(
             {"reactivity_DMS_MaP": dms, "reactivity_2A3_MaP": shape}
-        ).reset_index().rename(columns={"index": "id"}).to_csv(
+        ).reset_index().rename(columns={"index": "id"})
+        
+        pred.to_csv(
             "predictions.csv", index=False
         )
+        
+        assert len(pred) == 269796671, "predictions.csv should have 269796671 rows and has {}".format(len(pred))
 
         # upload to kaggle
         if self.push_to_kaggle:
@@ -345,27 +353,7 @@ class KaggleLogger(LoadBestModel):
             api.authenticate()
             api.competition_submit(
                 file_name="predictions.csv",
-                message=self.message,
+                message=self.message if self.message is not None else "pushed from KaggleLogger",
                 competition="stanford-ribonanza-rna-folding",
             )
 
-
-class ModelChecker(pl.Callback):
-    def __init__(self, model, log_every_nstep=1000):
-        self.step_number = 0
-        self.model = model
-        self.log_every_nstep = log_every_nstep
-
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
-        if self.step_number % self.log_every_nstep == 0:
-            # Get all parameters
-            params = []
-            for param in pl_module.parameters():
-                params.append(param.view(-1))
-            params = torch.cat(params).cpu().detach().numpy()
-
-            # Compute histogram
-            if rank_zero_only.rank == 0 and self.model in ["mlp"]:
-                wandb.log({"model_params": wandb.Histogram(params)})
-
-        self.step_number += 1
