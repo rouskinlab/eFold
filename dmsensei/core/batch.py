@@ -168,6 +168,8 @@ class Batch:
         return pred, true
 
     def count(self, data_type):
+        if not data_type in self.data:
+            return 0
         return len(self.data[data_type].index)
 
     def get(self, data_type, pred=False, true=True, index=None):
