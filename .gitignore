@@ -8,3 +8,4 @@ trash_project_for_testing
 .DS_Store
 test_models
 predict*
+.env

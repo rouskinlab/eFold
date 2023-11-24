@@ -1,5 +1,6 @@
 from os.path import join
-from .env import env
+import os
+from .env import Env
 
 class Path:
     """Path to files and folders of a datafolder of name `name`. The path to the data folder is `DATA_FOLDER`, which is defined in `env`.
@@ -24,7 +25,7 @@ class Path:
     PathDatafolder(name='my_test_datafolder_pytest')
     """
 
-    def __init__(self, name, root = env.DATA_FOLDER) -> None:
+    def __init__(self, name, root = Env.get_data_folder()) -> None:
         assert type(name) == str, f'name {name} is not a string'
         assert type(root) == str, f'root {root} is not a string'
         self.root = root
