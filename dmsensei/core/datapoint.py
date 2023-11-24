@@ -16,6 +16,7 @@ def set_prefix(data_type):
     return prefix
 
 class Metadata:
+    attributes = ["quality_dms", "quality_shape", "quality_structure", "error_dms", "error_shape"]
     def __init__(self, reference, length, index=None, quality_dms=1., quality_shape=1., quality_structure=1.):
         self.reference = reference
         self.length = length
@@ -26,6 +27,7 @@ class Metadata:
 
 
 class Data:
+    attributes = ["sequence", "dms", "shape", "structure"]
     def __init__(self, sequence, dms=None, shape=None, structure=None):
         self.sequence = sequence
         self.dms = dms
