@@ -23,6 +23,7 @@ matplotlib_colors = [
     "navy",
 ]
 
+
 def plot_signal(
     pred,
     true,
@@ -135,4 +136,4 @@ plot_factory = {
         *args, **kwargs, data_type="SHAPE"
     ),
     ("structure", "heatmap"): plot_structure,
-} 
+}

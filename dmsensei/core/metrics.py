@@ -83,7 +83,9 @@ def r2_score(pred, true, batch=None):
     pred = pred[mask]
     true = true[mask]
 
-    return (1 - torch.sum((true - pred) ** 2) / torch.sum((true - torch.mean(true)) ** 2)).item()
+    return (
+        1 - torch.sum((true - pred) ** 2) / torch.sum((true - torch.mean(true)) ** 2)
+    ).item()
 
 
 @batch_mean
@@ -99,7 +101,8 @@ def pearson_coefficient(pred, true, batch=None):
     pred = pred[mask]
     true = true[mask]
     return torch.mean(
-        (pred - torch.mean(pred)) * (true - torch.mean(true))
+        (pred - torch.mean(pred))
+        * (true - torch.mean(true))
         / (torch.std(pred) * torch.std(true))
     ).item()
 

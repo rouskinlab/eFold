@@ -49,3 +49,7 @@ class Path:
     def get_data_pickle(self)->str:
         """Returns the path to the data.pickle file."""
         return join(self.get_main_folder(), 'data.pkl')
+    
+    def get_card(self)->str:
+        """Returns the path to the README.md file."""
+        return join(self.get_main_folder(), 'README.md')

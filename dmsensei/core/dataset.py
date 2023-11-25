@@ -1,8 +1,8 @@
-from rouskinhf import import_dataset
 from torch.utils.data import Dataset as TorchDataset
 from typing import List
 from .batch import Batch
-from .listofdatapoints import ListOfDatapoints
+from ..huggingface import get_dataset
+from ..config import device
 
 
 class Dataset(TorchDataset):
@@ -15,11 +15,14 @@ class Dataset(TorchDataset):
     ) -> None:
         super().__init__()
         self.name = name
-        data = import_dataset(name, force_download=force_download)
-        self.data_type = data_type + ["sequence"] if "sequence" not in data_type else data_type
-        self.list_of_datapoints = ListOfDatapoints.from_rouskinhf(
-            data, data_type, name=name, tqdm=tqdm
+        self.data_type = data_type
+        self.list_of_datapoints = get_dataset(
+            name=name,
+            force_download=force_download,
+            tqdm=tqdm,
         )
+        for dp in self.list_of_datapoints:
+            dp.to(device=device)
 
     def __len__(self) -> int:
         return len(self.list_of_datapoints)

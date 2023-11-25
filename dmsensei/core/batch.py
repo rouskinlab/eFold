@@ -6,13 +6,17 @@ from ..config import UKN, DATA_TYPES
 from torch import nn, tensor, float32, int64, stack, uint8
 import numpy as np
 import torch.nn.functional as F
-from .datapoint import Datapoint, Data, Metadata, set_prefix
+from .datapoint import Datapoint
 from .embeddings import base_pairs_to_pairing_matrix
-from .listofdatapoints import ListOfDatapoints
 import lightning.pytorch as pl
 from ..config import device, POSSIBLE_METRICS
 from .metrics import metric_factory
 from typing import Dict
+from .embeddings import sequence_to_int
+from .metrics import metric_factory
+from ..config import POSSIBLE_METRICS
+from .datapoint import Datapoint, data_type_factory, split_data_type
+
 
 def _pad(arr, L, data_type):
     padding_values = {
@@ -26,131 +30,121 @@ def _pad(arr, L, data_type):
         return F.pad(arr, (0, L - len(arr)), value=padding_values[data_type])
 
 
-class BatchData:
-    def __init__(self, data_type: str, index: tensor, values: tensor):
-        self.data_type = data_type
-        self.index = index
-        self.values = values
+from dmsensei.config import UKN, DATA_TYPES
+from dmsensei.core.embeddings import base_pairs_to_pairing_matrix
+import torch.nn.functional as F
+from torch import tensor
 
 
-class BatchMetadata:
-    def __init__(self, reference: list, length: list, quality_dms: list, quality_shape: list, quality_structure: list):
-        self.reference = reference
-        self.length = length
-        self.quality_dms = quality_dms
-        self.quality_shape = quality_shape
-        self.quality_structure = quality_structure
+def _pad(arr, L, data_type):
+    padding_values = {
+        "sequence": 0,
+        "dms": UKN,
+        "shape": UKN,
+    }
+    if data_type == "structure":
+        return base_pairs_to_pairing_matrix(arr, L)
+    else:
+        return F.pad(arr, (0, L - len(arr)), value=padding_values[data_type])
+
+
+def get_padded_vector(dp, data_type, data_part, L):
+    if getattr(dp, data_type) is None:
+        return None
+    if getattr(getattr(dp, data_type), data_part) is None:
+        return None
+    return _pad(getattr(getattr(dp, data_type), data_part), L, data_type)
 
 
 class Batch:
-    """Batch class to handle padding and stacking of tensors"""
-
-    def __init__(self, data, metadata, data_type, L, batch_size):
-        """Batch class to handle padding and stacking of tensors
-
-        Format of data and metadata:
-            data is a dict of tensors:
-            data = {
-                "sequence": {"index": tensor([0, 1, 2]), "values": tensor([[0, 1, 2], [3, 4, 5], [6, 7, 8]])},
-                "dms": {"index": tensor([0, 1, 2]), "values": tensor([[0, 1, 2], [3, 4, 5], [6, 7, 8]])},
-                "shape": {"index": tensor([0, 1, 2]), "values": tensor([[0, 1, 2], [3, 4, 5], [6, 7, 8]])},
-            }
-            metadata is a dict of tensors:
-            metadata = {
-                "length": tensor([3, 3, 3]),
-                "reference": tensor([0, 1, 2]),
-        }
-        """
-
-        self.data = data
-        self.metadata = metadata
-        self.data_type = data_type
-        self.prediction = None
+    def __init__(
+        self,
+        reference,
+        sequence,
+        L,
+        batch_size,
+        data_types,
+        dms=None,
+        shape=None,
+        structure=None,
+    ):
+        self.reference = reference
+        self.sequence = sequence
+        self.length = len(sequence)
+        self.dms = dms
+        self.shape = shape
+        self.structure = structure
         self.L = L
         self.batch_size = batch_size
+        self.data_types = data_types
+
+    def _stack_data_type(self, list_of_datapoints, data_type, L):
+        index, true, error, quality, pred = [], [], [], [], []
+        for idx, dp in enumerate(list_of_datapoints):
+            if getattr(dp, data_type) is not None:
+                index.append(idx)
+                true.append(get_padded_vector(dp, data_type, "true", L))
+                if (err := get_padded_vector(dp, data_type, "error", L)) is not None:
+                    error.append(err)
+                if (qual := get_padded_vector(dp, data_type, "quality", L)) is not None:
+                    quality.append(qual)
+                if (pr := get_padded_vector(dp, data_type, "pred", L)) is not None:
+                    pred.append(pr)
+
+        if len(index) == 0:
+            return None
+
+        def post_process(x):
+            if len(x) == 0:
+                return None
+            return torch.stack(x)
+
+        return {
+            "index": index,
+            "true": post_process(true),
+            "error": post_process(error),
+            "quality": post_process(quality),
+            "pred": post_process(pred),
+        }
 
     @classmethod
-    def from_list_of_datapoints(cls, list_of_datapoints, data_type):
-        data, metadata = {}, {}
-        lengths = np.array([dp.get("length") for dp in list_of_datapoints])
-        L = max(lengths)
-        for dt in data_type:
-            index, values = [], []
-            for idx, dp in enumerate(list_of_datapoints):
-                signal = dp.get(dt)
-                if signal is not None and len(signal) > 0:
-                    index.append(idx)
-                    values.append(_pad(signal, L, dt))
-            if len(index):
-                data[dt] = BatchData(
-                    data_type=dt,
-                    index=tensor(index).to(device),
-                    values=stack(values).to(device),
-                )
-                
-        def parse_data(data_type, dtype=tensor):
-            return dtype([dp.get(data_type) for dp in list_of_datapoints])
+    def from_list_of_datapoints(cls, datapoints: list, data_types: list):
+        reference = [dp.reference for dp in datapoints]
+        L = max([dp.length for dp in datapoints])
+        sequence = torch.stack([_pad(dp.sequence, L, "sequence") for dp in datapoints])
+        batch_size = len(datapoints)
 
-        metadata = BatchMetadata(
-            length=lengths,
-            reference=parse_data("reference", dtype=list),
-            quality_dms=parse_data("quality_dms").to(device),
-            quality_shape=parse_data("quality_shape").to(device),
-            quality_structure=parse_data("quality_structure").to(device),
-        )
+        data = {}
+        for data_type in DATA_TYPES:
+            vector = cls._stack_data_type(None, datapoints, data_type, L)
+            if vector is not None:
+                data[data_type] = data_type_factory[data_type](**vector)
 
         return cls(
-            data=data,
-            metadata=metadata,
-            data_type=data_type,
+            reference,
+            sequence,
             L=L,
-            batch_size=len(list_of_datapoints),
+            batch_size=batch_size,
+            data_types=data_types,
+            **data,
         )
 
-    def to_list_of_datapoints(self) -> ListOfDatapoints:
-        list_of_datapoints = []
-        for idx in range(len(self.metadata.reference)):
-            data = Data(sequence=self.get("sequence", index=idx))
-            metadata = Metadata(
-                reference=self.get("reference", index=idx),
-                length=self.get("length", index=idx),
-                quality_dms=self.get("quality_dms", index=idx),
-                quality_shape=self.get("quality_shape", index=idx),
-                quality_structure=self.get("quality_structure", index=idx),
-            )
-            ######## This part is the tricky one ########
-            prediction = (
-                Data(
-                    sequence=self.get("sequence", index=idx),
-                    **{
-                        dt: self.get(dt, pred=True, true=False, index=idx)[
-                            : metadata.length
-                        ]
-                        for dt in self.prediction.keys()
-                    },
-                )
-                if self.prediction is not None
-                else None
-            )
-            for dt in self.data_type:
-                if dt in self.data and idx in self.get_index(dt):
-                    local_idx = torch.where(self.data[dt].index == idx)[0].item()
-                    setattr(
-                        data,
-                        dt,
-                        self.data[dt].values[local_idx][
-                            : metadata.length
-                        ],  # trims the padded part!
-                    )
-            #############################################
-            for metadata_type in Metadata.__annotations__.keys():
-                setattr(
-                    metadata, metadata_type, getattr(self.metadata, metadata_type)[idx]
-                )
-            list_of_datapoints.append(
-                Datapoint(data=data, metadata=metadata, prediction=prediction)
-            )
-        return ListOfDatapoints(list_of_datapoints)
+    def get(self, data_type, to_numpy=False):
+        if data_type in ["reference", "sequence", "length"]:
+            return getattr(self, data_type)
+        data_part, data_type = split_data_type(data_type)
+
+        if not hasattr(self, data_type):
+            raise ValueError(f"This batch doesn't contain data type {data_type}.")
+        out = getattr(getattr(self, data_type), data_part)
+
+        if to_numpy:
+            if hasattr(out, "cpu"):
+                out = out.squeeze().cpu().numpy()
+        return out
+
+    def to_list_of_datapoints(self) -> list:
+        pass
 
     def integrate_prediction(self, prediction):
         assert len(prediction[list(prediction.keys())[0]]) == len(
@@ -168,58 +162,49 @@ class Batch:
         return pred, true
 
     def count(self, data_type):
-        if not data_type in self.data:
-            return 0
-        return len(self.data[data_type].index)
-
-    def get(self, data_type, pred=False, true=True, index=None):
-        prefix = set_prefix(data_type)
-        if pred and self.prediction is None and prefix == "data":
-            raise ValueError("No prediction available")
-
-        # return metadata
-        if prefix == "metadata":
-            if index != None:
-                return getattr(self.metadata, data_type)[index]
-            return getattr(self.metadata, data_type)
-
-        # now we know we are dealing with data
-        out = []
-        if pred:
-            out.append(self.prediction[data_type])
-        if true:
-            out.append(self.data[data_type].values)
-        if index is not None:
-            out = [v[index][: self.get("length", index=index)] for v in out]
-        return out[0] if len(out) == 1 else out
+        pass
 
     def get_index(self, data_type):
-        return self.data[data_type].index
+        pass
 
     def contains(self, data_type):
-        if self.prediction is not None and not data_type in self.prediction.keys():
+        data_part, data_type = split_data_type(data_type)
+        if (
+            not hasattr(self, data_type)
+            or getattr(self, data_type) is None
+            or not data_type in self.data_types
+        ):
             return False
-        return data_type in self.data.keys() and len(self.data[data_type].index) > 0
+        if (
+            not hasattr(getattr(self, data_type), data_part)
+            or getattr(getattr(self, data_type), data_part) is None
+        ):
+            return False
+        return True
 
     def __len__(self):
         return self.count("sequence")
 
-    def compute_metrics(self)->Dict[str, Dict[str, float]]:
+    def compute_metrics(self) -> Dict[str, Dict[str, float]]:
         out = {}
-        for data_type in self.data_type:
+        for data_type in self.data_types:
             if not self.count(data_type) or data_type == "sequence":
                 continue
             out[data_type] = {}
             pred, true = self.get_pairs(data_type)
             for metric in POSSIBLE_METRICS[data_type]:
                 out[data_type][metric] = metric_factory[metric](
-                    pred=pred, true=true, batch= self.count(data_type) > 1
+                    pred=pred, true=true, batch=self.count(data_type) > 1
                 )
         return out
-    
+
     def get_weights_as_matrix(self, data_type, L):
         """Returns the weights as a matrix of shape (batch_size*, L)
         where batch_size* is the number of datapoints of this data_type in the batch
         and L is the length of the longest sequence in the batch
         """
-        return self.get('quality_{}'.format(data_type))[self.get_index(data_type)].unsqueeze(-1).repeat(1, L)
+        return (
+            self.get("quality_{}".format(data_type))[self.get_index(data_type)]
+            .unsqueeze(-1)
+            .repeat(1, L)
+        )

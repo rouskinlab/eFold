@@ -4,10 +4,16 @@ import os
 import datetime
 import json
 from .env import Env
+from os.path import dirname
 
-def upload_dataset(datapath:dict, exist_ok= False, commit_message:str=None, add_card=True, **kwargs):
+def name_from_path(datapath:str):
+    if datapath.split('/')[-1] == 'data.json':
+        return datapath.split('/')[-2]
+    return datapath.split('/')[-1].split('.')[0]
+
+def upload_dataset(datapath:str, exist_ok= False, commit_message:str=None, add_card=True, **kwargs):
     api = HfApi()
-    name = datapath.split('/')[-2]
+    name = name_from_path(datapath)
 
     hf_token = Env.get_hf_token()
     
@@ -18,7 +24,7 @@ def upload_dataset(datapath:dict, exist_ok= False, commit_message:str=None, add_
         private=True,
         repo_type="dataset",
     )
-
+    
     api.upload_file(
         path_or_fileobj=datapath,
         path_in_repo='data.json',
@@ -28,6 +34,7 @@ def upload_dataset(datapath:dict, exist_ok= False, commit_message:str=None, add_
         commit_message=commit_message,
         **kwargs,
     )
+
     if add_card:
         card = write_card(datapath)
         api.upload_file(
@@ -37,14 +44,14 @@ def upload_dataset(datapath:dict, exist_ok= False, commit_message:str=None, add_
             repo_type="dataset",
             token=hf_token,
             commit_message=commit_message,
-            **card,
         )
     
     
 def write_card(datapath):
     source = os.path.basename(datapath)
     date = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    
+    name = name_from_path(datapath)
+
     out = """
 ---
 license: mit
@@ -72,9 +79,13 @@ date: {}
     
     for k, v in data_type_count.items():
         out += f"""
-## {k}
-- {v} datapoints
-"""
+- **{k}**: {v} datapoints"""
 
     #TODO add filtering report
-    return out
+    
+    
+    # dump
+    path = Path(name=name, root=dirname(dirname(datapath)))
+    with open(path.get_card(), 'w') as f:
+        f.write(out)
+    return path.get_card()

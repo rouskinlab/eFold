@@ -5,106 +5,151 @@ import numpy as np
 import torch.nn.functional as F
 from .metrics import metric_factory
 from ..util import unzip
+import torch
+from .embeddings import sequence_to_int
 
-def set_prefix(data_type):
-    if data_type in ["length", "reference", "quality_dms", "quality_shape", "quality_structure"]:
-        prefix = "metadata"
-    elif data_type in ['sequence', 'dms', 'shape', 'structure']:
-        prefix = "data"
-    else: 
-        raise ValueError("data_type: {} must be in {}".format(data_type, ['sequence', 'dms', 'shape', 'structure']))
-    return prefix
+from dmsensei.config import UKN, DATA_TYPES, DATA_TYPES_FORMAT
+from dmsensei.core.embeddings import sequence_to_int
+import torch
+from torch import tensor
 
-class Metadata:
-    attributes = ["quality_dms", "quality_shape", "quality_structure", "error_dms", "error_shape"]
-    def __init__(self, reference, length, index=None, quality_dms=1., quality_shape=1., quality_structure=1.):
-        self.reference = reference
-        self.length = length
+device = "mps"
+
+
+def split_data_type(data_type):
+    if not "_" in data_type:
+        data_part = "true"
+    else:
+        data_part, data_type = data_type.split("_")
+    return data_part, data_type
+
+
+class DataType:
+    attributes = ["true", "pred", "error", "quality", "index"]
+
+    def __init__(self, name, true, pred, error, quality, index):
+        self.name = name
+        self.true = true
+        self.pred = pred
+        self.error = error
+        self.quality = quality
         self.index = index
-        self.quality_dms = quality_dms
-        self.quality_shape = quality_shape
-        self.quality_structure = quality_structure
+
+    def to(self, device):
+        for attr in DataType.attributes:
+            if hasattr(getattr(self, attr), "to"):
+                setattr(self, attr, getattr(self, attr).to(device))
+        return self
 
 
-class Data:
-    attributes = ["sequence", "dms", "shape", "structure"]
-    def __init__(self, sequence, dms=None, shape=None, structure=None):
-        self.sequence = sequence
-        self.dms = dms
-        self.shape = shape
-        self.structure = structure
+class DMS(DataType):
+    def __init__(self, true, pred=None, error=None, quality=None, index=None):
+        super().__init__("dms", true, pred, error, quality, index)
+
+
+class SHAPE(DataType):
+    def __init__(self, true, pred=None, error=None, quality=None, index=None):
+        super().__init__("shape", true, pred, error, quality, index)
+
+
+class Structure(DataType):
+    def __init__(self, true, pred=None, error=None, quality=None, index=None):
+        super().__init__("structure", true, pred, error, quality, index)
+
+
+data_type_factory = {"dms": DMS, "shape": SHAPE, "structure": Structure}
 
 
 class Datapoint:
-    def __init__(self, data: Data, metadata: Metadata, prediction=None):
-        self.data = data
-        self.metadata = metadata
-        self.prediction = prediction
+    def __init__(
+        self,
+        reference: str,
+        sequence: str,
+        dms: DMS = None,
+        shape: SHAPE = None,
+        structure: Structure = None,
+    ):
+        self.reference = reference
+        self.sequence = (
+            sequence_to_int(sequence) if type(sequence) == str else sequence
+        )
+        self.length = len(sequence)
+        self.dms = dms
+        self.shape = shape
+        self.structure = structure
+        self.data_types = [
+            attr
+            for attr in ["dms", "shape", "structure"]
+            if getattr(self, attr) is not None
+        ]
+
+    def to(self, device):
+        self.sequence = self.sequence.to(device)
+        for attr in self.data_types:
+            if hasattr(getattr(self, attr), "to"):
+                getattr(self, attr).to(device)
+        return self
 
     @classmethod
-    def from_attributes(
-        cls,
-        sequence,
-        reference,
-        dms=None,
-        shape=None,
-        structure=None,
-        index=None,
-        quality_dms=1.,
-        quality_shape=1.,
-        quality_structure=1.,
-    ):
-        return cls(
-            data=Data(sequence, dms, shape, structure),
-            metadata=Metadata(reference, index, quality_dms, quality_shape, quality_structure),
-        )
+    def from_data_json_line(cls, line: dict):
+        ref, values = line
+        seq = values["sequence"]
+        data = {}
+        for data_type in DATA_TYPES:
+            if data_type in values:
+                data[data_type] = data_type_factory[data_type](
+                    true=tensor(values[data_type], dtype=DATA_TYPES_FORMAT[data_type]),
+                    error=tensor(
+                        values["error_" + data_type], dtype=DATA_TYPES_FORMAT[data_type]
+                    )
+                    if "error_" + data_type in values[data_type]
+                    else None,
+                    quality=tensor(
+                        values["quality_" + data_type],
+                        dtype=DATA_TYPES_FORMAT[data_type],
+                    )
+                    if "quality_" + data_type in values[data_type]
+                    else None,
+                )
+        return cls(ref, seq, **data).to(device)
+
+    def add_prediction(self, preds: dict):
+        for data_type, value in preds.items():
+            getattr(self, data_type).pred = value
+
+    def get(self, data_type, to_numpy=False):
+        if data_type in ["reference", "sequence", "length"]:
+            return getattr(self, data_type)
+        data_part, data_type = split_data_type(data_type)
+
+        if not data_type in self.data_types:
+            raise ValueError(f"This datapoints doesn't contain data type {data_type}.")
+        out = getattr(getattr(self, data_type), data_part)
+
+        if to_numpy:
+            if hasattr(out, "cpu"):
+                out = out.squeeze().cpu().numpy()
+        return out
+
+    def contains(self, data_type):
+        data_part, data_type = split_data_type(data_type)
+        if getattr(self, data_type) is None:
+            return False
+        return getattr(getattr(self, data_type), data_part) != None
 
     def compute_error_metrics_pack(self):
         self.metrics = {}
-        for data_type in DATA_TYPES:
-            if not (hasattr(self.data, data_type) and hasattr(self.prediction, data_type)):
+        for data_type in self.data_types:
+            if not (
+                self.contains(f"true_{data_type}")
+                and self.contains(f"pred_{data_type}")
+            ):
                 continue
-            pred = self.get(data_type, pred=True, true=False)
-            true = self.get(data_type, pred=False, true=True)
-            if not (true is not None and pred is not None):
-                continue
-            # true, pred = true.squeeze(), pred.squeeze()
+            pred = self.get(f"pred_{data_type}")
+            true = self.get(f"true_{data_type}")
             self.metrics[data_type] = {}
             for metric_name in POSSIBLE_METRICS[data_type]:
-                self.metrics[data_type][metric_name] = metric_factory[
-                    metric_name
-                ](true=true, pred=pred, batch=False)
+                self.metrics[data_type][metric_name] = metric_factory[metric_name](
+                    true=true, pred=pred, batch=False
+                )
         return self.metrics
-
-    def read_reference_metric(self, data_type):
-        if not data_type in self.metrics:
-            return np.nan
-        return self.metrics[data_type][REFERENCE_METRIC[data_type]]
-
-    def contains(self, data_type):
-        if self.prediction is not None and not hasattr(self.prediction, data_type):
-            return False
-        return hasattr(self.data, data_type)
-
-    def get(self, data_type, pred=False, true=True, to_numpy=False):
-        prefix = set_prefix(data_type)
-
-        if pred and self.prediction is None and prefix == "data":
-            raise ValueError("No prediction available")
-        
-        # return metadata
-        if prefix == "metadata":
-            return getattr(self.metadata, data_type)
-        
-        # now we are in the data part
-        out = []
-        if pred:
-            out.append(getattr(self.prediction, data_type))
-        if true:
-            out.append(getattr(self.data, data_type))
-        if to_numpy:
-            for idx, arr in enumerate(out):
-                if hasattr(arr, "cpu"):
-                    out[idx] = arr.squeeze().cpu().numpy()
-        return out[0] if len(out) == 1 else out
-        

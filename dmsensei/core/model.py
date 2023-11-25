@@ -27,38 +27,51 @@ class Model(pl.LightningModule):
             lr=self.lr,
             weight_decay=self.weight_decay if hasattr(self, "weight_decay") else 0,
         )
-        
+
         if not hasattr(self, "gamma") or self.gamma is None:
             return optimizer
-        
+
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=self.gamma)
         return [optimizer], [scheduler]
 
-    def _loss_signal(self, batch: Batch, data_type:str):
-        assert data_type in ['dms', 'shape'], "This function only works for dms and shape data"
+    def _loss_signal(self, batch: Batch, data_type: str):
+        assert data_type in [
+            "dms",
+            "shape",
+        ], "This function only works for dms and shape data"
         pred, true = batch.get_pairs(data_type)
-        mask = true != -1000.
+        mask = true != -1000.0
         if self.use_quality:
             weights = batch.get_weights_as_matrix(data_type, true.shape[1])
-            loss = F.mse_loss(pred[mask], true[mask], reduction="none") @ weights[mask] / len(weights[mask])
+            loss = (
+                F.mse_loss(pred[mask], true[mask], reduction="none")
+                @ weights[mask]
+                / len(weights[mask])
+            )
             return loss
         return F.mse_loss(pred[mask], true[mask], reduction="mean")
-        
+
     def _loss_structure(self, batch: Batch):
         # Unsure if this is the correct loss function
         pred, true = batch.get("structure")
         if self.use_quality:
-            weights = batch.get("quality_structure")[batch.get_index("structure")].unsqueeze(-1)
-            return F.binary_cross_entropy(input=pred, target=true, reduction="none") @ weights / len(weights)
+            weights = batch.get("quality_structure")[
+                batch.get_index("structure")
+            ].unsqueeze(-1)
+            return (
+                F.binary_cross_entropy(input=pred, target=true, reduction="none")
+                @ weights
+                / len(weights)
+            )
         return F.binary_cross_entropy(input=pred, target=true, reduction="mean")
-        
+
     def loss_fn(self, batch: Batch):
         loss = torch.tensor(0.0, device=self.device)
         count = {dt: batch.count(dt) for dt in batch.data_type if batch.contains(dt)}
         if batch.contains("dms"):
-            loss += count["dms"] * self._loss_signal(batch, 'dms')
+            loss += count["dms"] * self._loss_signal(batch, "dms")
         if batch.contains("shape"):
-            loss += count["shape"] * self._loss_signal(batch, 'shape')
+            loss += count["shape"] * self._loss_signal(batch, "shape")
         if batch.contains("structure"):
             loss += count["structure"] * self._loss_structure(batch)
         return loss / np.sum(list(count.values()))
@@ -81,7 +94,7 @@ class Model(pl.LightningModule):
 
     def predict_step(self, batch: Batch, batch_idx: int):
         predictions = self.forward(batch.get("sequence"))
-        
+
         # Hardcoded values for DMS G/U bases
         if "dms" in predictions.keys():
             predictions["dms"][
@@ -90,7 +103,7 @@ class Model(pl.LightningModule):
             ] = VAL_GU
 
         # clip values to [0, 1]
-        for data_type in set(['dms', 'shape']).intersection(predictions.keys()):
+        for data_type in set(["dms", "shape"]).intersection(predictions.keys()):
             predictions[data_type] = torch.clip(predictions[data_type], min=0, max=1)
 
         batch.integrate_prediction(predictions)

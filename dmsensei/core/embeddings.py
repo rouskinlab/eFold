@@ -1,4 +1,3 @@
-
 from torch import nn
 import torch
 from ..config import DEFAULT_FORMAT
