@@ -1,6 +1,6 @@
 from typing import Any
 import numpy as np
-from ..config import DATA_TYPES, POSSIBLE_METRICS, REFERENCE_METRIC
+from ..config import DATA_TYPES, POSSIBLE_METRICS, device
 import numpy as np
 import torch.nn.functional as F
 from .metrics import metric_factory

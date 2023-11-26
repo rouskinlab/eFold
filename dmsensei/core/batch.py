@@ -47,6 +47,7 @@ class Batch:
         self,
         reference,
         sequence,
+        length,
         L,
         batch_size,
         data_types,
@@ -56,7 +57,7 @@ class Batch:
     ):
         self.reference = reference
         self.sequence = sequence
-        self.length = [len(seq) for seq in sequence]
+        self.length = length
         self.dms = dms
         self.shape = shape
         self.structure = structure
@@ -100,7 +101,8 @@ class Batch:
     @classmethod
     def from_list_of_datapoints(cls, datapoints: list, data_types: list):
         reference = [dp.reference for dp in datapoints]
-        L = max([dp.length for dp in datapoints])
+        length = [dp.length for dp in datapoints]
+        L = max(length)
         sequence = torch.stack([_pad(dp.sequence, L, "sequence") for dp in datapoints])
         batch_size = len(datapoints)
 
@@ -113,6 +115,7 @@ class Batch:
         return cls(
             reference,
             sequence,
+            length=length,
             L=L,
             batch_size=batch_size,
             data_types=data_types,
