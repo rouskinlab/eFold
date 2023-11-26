@@ -104,7 +104,7 @@ class Datapoint:
         seq = values["sequence"]
         data = {}
         for data_type in DATA_TYPES:
-            if data_type in values:
+            if data_type in values and not (values[data_type] is None or (type(values[data_type]) == float and np.isnan(values[data_type]))):
                 data[data_type] = data_type_factory[data_type](
                     true=tensor(values[data_type], dtype=DATA_TYPES_FORMAT[data_type]),
                     error=tensor(
