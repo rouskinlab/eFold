@@ -13,8 +13,6 @@ from dmsensei.core.embeddings import sequence_to_int
 import torch
 from torch import tensor
 
-device = "mps"
-
 
 def split_data_type(data_type):
     if not "_" in data_type:
