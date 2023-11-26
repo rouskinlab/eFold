@@ -9,7 +9,7 @@ from .batch import Batch
 
 
 class Model(pl.LightningModule):
-    def __init__(self, lr: float, optimizer_fn, quality=True, **kwargs):
+    def __init__(self, lr: float, optimizer_fn, quality=False, **kwargs):
         super().__init__()
 
         # Set attributes
