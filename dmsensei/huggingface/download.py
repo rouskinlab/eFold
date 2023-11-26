@@ -39,6 +39,7 @@ def get_dataset(name:str, force_download=False, tqdm=True):
         # Load data.json into a list of datapoints
         parser = lambda x: tqdm_fn(x, desc=name, colour='red', total=len(data)) if tqdm else lambda x: x
         lod = [Datapoint.from_data_json_line(line) for line in parser(data.items())]
+        print("{}: Saving data.pkl...".format(name))
         pickle.dump(lod, open(path.get_data_pickle(), 'wb'))
         return lod
     

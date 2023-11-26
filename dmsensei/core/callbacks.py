@@ -67,12 +67,12 @@ class WandbFitLogger(LoadBestModel):
         self.data_type = dm.data_type
         self.batch_size = batch_size
         self.model_file = load_model
-        self.val_losses = []
         self.dm = dm
-        self.best_loss = np.inf
-        self.validation_examples_references = {d: None for d in self.data_type}
 
-    def on_start(self, trainer: Trainer, pl_module: LightningModule):
+    def on_fit_start(self, trainer: Trainer, pl_module: LightningModule):
+        self.best_loss = np.inf
+        self.val_losses = []
+        self.validation_examples_references = {d: None for d in self.data_type}
         self.load_model(pl_module, self.model_file)
 
     def on_train_batch_end(
@@ -149,7 +149,7 @@ class WandbFitLogger(LoadBestModel):
             idx = batch.get("reference").index(
                 self.validation_examples_references[data_type]
             )
-            pred, true = batch.get(data_type, pred=True, true=True, index=idx)
+            pred, true = batch.get(f"pred_{data_type}", index=idx), batch.get(data_type, index=idx)
             plot = plot_factory[(data_type, name)](
                 pred=pred,
                 true=true,
@@ -175,7 +175,7 @@ class WandbFitLogger(LoadBestModel):
             self.best_loss = this_epoch_loss
             name = "{}_loss{}.pt".format(
                 wandb.run.name,
-                str(np.ceil(100 * np.sqrt(this_epoch_loss))).replace(".", "-"),
+                str(np.floor(100 * np.sqrt(this_epoch_loss))).replace(".", "-"),
             )
             loader = Loader(path="models/" + name)
             # logs what MAE it corresponds to
@@ -200,11 +200,12 @@ class WandbTestLogger(LoadBestModel):
         self.batch_size = dm.batch_size
         self.stage = "test"
         self.n_best_worst = n_best_worst
-        self.test_stacks = [[] for _ in TEST_SETS_NAMES]
         self.model_file = load_model
-
+        
     @rank_zero_only
     def on_test_start(self, trainer, pl_module):
+        self.test_stacks = [[] for _ in TEST_SETS_NAMES]
+        self.refs = [[] for _ in TEST_SETS_NAMES]
         self.load_model(pl_module, self.model_file)
 
     @rank_zero_only
@@ -218,6 +219,9 @@ class WandbTestLogger(LoadBestModel):
         logger.error_metrics_pack(
             "test/{}".format(TEST_SETS_NAMES[dataloader_idx]), metrics
         )
+
+        # log the refs
+        self.refs[dataloader_idx].extend(batch.get("reference"))
 
         # Log the scores
         data_type = DATA_TYPES_TEST_SETS[dataloader_idx]
@@ -233,6 +237,8 @@ class WandbTestLogger(LoadBestModel):
         logger = Logger(pl_module, batch_size=self.batch_size)
 
         for dataloader_idx, data_type in enumerate(DATA_TYPES_TEST_SETS):
+            
+            assert len(self.refs[dataloader_idx]) == len(set(self.refs[dataloader_idx])), "There are duplicates in the test set. This is not allowed."
             # Find the best and worst examples
             df = pd.DataFrame(
                 self.test_stacks[dataloader_idx],
@@ -258,9 +264,7 @@ class WandbTestLogger(LoadBestModel):
             list_of_datapoints = []
             for dp in self.dm.test_sets[dataloader_idx]:
                 if dp.get("reference") in refs:
-                    list_of_datapoints = (
-                        list_of_datapoints + dp
-                    )  # lowkey flex on the __add__ method
+                    list_of_datapoints.append(dp)
 
             # compute predictions for the examples
             batch = Batch.from_list_of_datapoints(
@@ -277,8 +281,8 @@ class WandbTestLogger(LoadBestModel):
 
                     # generate plot
                     plot = plot_factory[(plot_data_type, plot_name)](
-                        pred=dp.get(plot_data_type, pred=True, true=False),
-                        true=dp.get(plot_data_type, pred=False, true=True),
+                        pred=dp.get(f"pred_{plot_data_type}"),
+                        true=dp.get(f"true_{plot_data_type}"),
                         sequence=dp.get("sequence"),
                         reference=dp.get("reference"),
                         length=dp.get("length"),
@@ -299,15 +303,15 @@ class KaggleLogger(LoadBestModel):
         load_model: path to the model to load. None if no model to load. 'best' to load the best model from wandb run.
         """
         self.stage = "predict"
-        self.pred_dms = []
-        self.pred_shape = []
-        self.pred_ref = []
         self.push_to_kaggle = push_to_kaggle
         self.model_file = load_model
 
     @rank_zero_only
     def on_predict_start(self, trainer, pl_module):
         self.message = self.load_model(self.model_file)
+        self.pred_dms = []
+        self.pred_shape = []
+        self.pred_ref = []
 
     @rank_zero_only
     def on_predict_batch_end(
@@ -319,8 +323,8 @@ class KaggleLogger(LoadBestModel):
         batch_idx: int,
         dataloader_idx: int = 0,
     ) -> None:
-        dms = batch.get("dms", pred=True, true=False).cpu().tolist()
-        shape = batch.get("shape", pred=True, true=False).cpu().tolist()
+        dms = batch.get("pred_dms", to_numpy=True).tolist()
+        shape = batch.get("pred_shape", to_numpy=True).tolist()
         lengths = batch.get("length")
         for l, s, d in zip(lengths, shape, dms):
             self.pred_dms.append(d[:l])
@@ -343,11 +347,11 @@ class KaggleLogger(LoadBestModel):
         df = pd.merge(sequence_ids, df, on="reference")
         assert len(df) == len(
             sequence_ids
-        ), "Not all sequences were predicted. Are you sure you are using ?"
+        ), "Not all sequences were predicted. Are you sure you are using all of ribo-test?"
 
         # save predictions as csv
-        dms = np.concatenate(df["dms"].values)
-        shape = np.concatenate(df["shape"].values)
+        dms = np.concatenate(df["dms"].values).round(4)
+        shape = np.concatenate(df["shape"].values).round(4)
         pred = (
             pd.DataFrame({"reactivity_DMS_MaP": dms, "reactivity_2A3_MaP": shape})
             .reset_index()
@@ -356,6 +360,10 @@ class KaggleLogger(LoadBestModel):
 
         pred.to_csv("predictions.csv", index=False)
 
+        # zip predictions, return 1 if successful
+        import subprocess
+        use_zip = not subprocess.call(["zip", "predictions.zip", "predictions.csv"])
+        
         assert (
             len(pred) == 269796671
         ), "predictions.csv should have 269796671 rows and has {}".format(len(pred))
@@ -365,9 +373,13 @@ class KaggleLogger(LoadBestModel):
             api = KaggleApi()
             api.authenticate()
             api.competition_submit(
-                file_name="predictions.csv",
+                file_name="predictions.zip" if use_zip else "predictions.csv",
                 message=self.message
                 if self.message is not None
                 else "pushed from KaggleLogger",
                 competition="stanford-ribonanza-rna-folding",
             )
+
+        # remove zip
+        if use_zip:
+            os.remove("predictions.zip")

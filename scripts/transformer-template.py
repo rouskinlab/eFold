@@ -1,5 +1,6 @@
 import sys, os
-
+import envbash
+envbash.load.load_envbash('.env')
 sys.path.append(os.path.abspath("."))
 from dmsensei import DataModule, create_model
 from dmsensei.config import device
@@ -15,7 +16,7 @@ import wandb
 sys.path.append(os.path.abspath("."))
 
 if __name__ == "__main__":
-    USE_WANDB = 1
+    USE_WANDB = 0
     print("Running on device: {}".format(device))
     if USE_WANDB:
         wandb.login()

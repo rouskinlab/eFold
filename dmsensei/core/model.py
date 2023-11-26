@@ -54,25 +54,16 @@ class Model(pl.LightningModule):
     def _loss_structure(self, batch: Batch):
         # Unsure if this is the correct loss function
         pred, true = batch.get("structure")
-        if self.use_quality:
-            weights = batch.get("quality_structure")[
-                batch.get_index("structure")
-            ].unsqueeze(-1)
-            return (
-                F.binary_cross_entropy(input=pred, target=true, reduction="none")
-                @ weights
-                / len(weights)
-            )
         return F.binary_cross_entropy(input=pred, target=true, reduction="mean")
 
     def loss_fn(self, batch: Batch):
         loss = torch.tensor(0.0, device=self.device)
-        count = {dt: batch.count(dt) for dt in batch.data_type if batch.contains(dt)}
-        if batch.contains("dms"):
+        count = {dt: batch.count(dt) for dt in batch.data_types if batch.contains(dt) and batch.contains(f"pred_{dt}")}
+        if 'dms' in count.keys():
             loss += count["dms"] * self._loss_signal(batch, "dms")
-        if batch.contains("shape"):
+        if 'shape' in count.keys():
             loss += count["shape"] * self._loss_signal(batch, "shape")
-        if batch.contains("structure"):
+        if 'structure' in count.keys():
             loss += count["structure"] * self._loss_structure(batch)
         return loss / np.sum(list(count.values()))
 

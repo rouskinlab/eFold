@@ -96,6 +96,12 @@ def plot_signal(
             )
         ax.set_xlabel("True {}".format(data_type))
         ax.set_ylabel("Predicted {}".format(data_type))
+        
+        # minimal window is 0, 1
+        xmin, xmax = ax.get_xlim()
+        ymin, ymax = ax.get_ylim()
+        ax.set_xlim(min(xmin, 0), max(xmax, 1))
+        ax.set_ylim(min(ymin, 0), max(ymax, 1))
 
     ax.legend()
     title = "R2 = {:.2f}, pearson = {:.2f}, MAE = {:.2f}".format(r2, r, mae)

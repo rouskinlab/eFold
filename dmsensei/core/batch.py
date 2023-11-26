@@ -16,20 +16,6 @@ from .embeddings import sequence_to_int
 from .metrics import metric_factory
 from ..config import POSSIBLE_METRICS
 from .datapoint import Datapoint, data_type_factory, split_data_type
-
-
-def _pad(arr, L, data_type):
-    padding_values = {
-        "sequence": 0,
-        "dms": UKN,
-        "shape": UKN,
-    }
-    if data_type == "structure":
-        return base_pairs_to_pairing_matrix(arr, L)
-    else:
-        return F.pad(arr, (0, L - len(arr)), value=padding_values[data_type])
-
-
 from dmsensei.config import UKN, DATA_TYPES
 from dmsensei.core.embeddings import base_pairs_to_pairing_matrix
 import torch.nn.functional as F
@@ -46,7 +32,7 @@ def _pad(arr, L, data_type):
         return base_pairs_to_pairing_matrix(arr, L)
     else:
         return F.pad(arr, (0, L - len(arr)), value=padding_values[data_type])
-
+    
 
 def get_padded_vector(dp, data_type, data_part, L):
     if getattr(dp, data_type) is None:
@@ -70,7 +56,7 @@ class Batch:
     ):
         self.reference = reference
         self.sequence = sequence
-        self.length = len(sequence)
+        self.length = [len(seq) for seq in sequence]
         self.dms = dms
         self.shape = shape
         self.structure = structure
@@ -86,7 +72,7 @@ class Batch:
                 true.append(get_padded_vector(dp, data_type, "true", L))
                 if (err := get_padded_vector(dp, data_type, "error", L)) is not None:
                     error.append(err)
-                if (qual := get_padded_vector(dp, data_type, "quality", L)) is not None:
+                if (qual := dp.get(f"quality_{data_type}")) is not None:
                     quality.append(qual)
                 if (pr := get_padded_vector(dp, data_type, "pred", L)) is not None:
                     pred.append(pr)
@@ -94,17 +80,21 @@ class Batch:
         if len(index) == 0:
             return None
 
-        def post_process(x):
+        def post_process(x, dtype, dim=1):
             if len(x) == 0:
                 return None
-            return torch.stack(x)
+            if dim == 1:
+                return torch.tensor(x, dtype=dtype).to(device)
+            if dim == 2:
+                return torch.stack(x).to(dtype=dtype)
+            raise ValueError(f"dim must be 1 or 2, got {dim}")
 
         return {
-            "index": index,
-            "true": post_process(true),
-            "error": post_process(error),
-            "quality": post_process(quality),
-            "pred": post_process(pred),
+            "index": post_process(index, torch.int32, dim=1),
+            "true": post_process(true, torch.float32, dim=2),
+            "error": post_process(error, torch.float32, dim=2),
+            "quality": post_process(quality, torch.float32, dim=1),
+            "pred": post_process(pred, torch.float32, dim=2),
         }
 
     @classmethod
@@ -129,14 +119,20 @@ class Batch:
             **data,
         )
 
-    def get(self, data_type, to_numpy=False):
+    def get(self, data_type, index=None, to_numpy=False):
         if data_type in ["reference", "sequence", "length"]:
-            return getattr(self, data_type)
-        data_part, data_type = split_data_type(data_type)
+            out = getattr(self, data_type)
 
-        if not hasattr(self, data_type):
-            raise ValueError(f"This batch doesn't contain data type {data_type}.")
-        out = getattr(getattr(self, data_type), data_part)
+        else:
+            data_part, data_type = split_data_type(data_type)
+            if not hasattr(self, data_type):
+                raise ValueError(f"This batch doesn't contain data type {data_type}.")
+            out = getattr(getattr(self, data_type), data_part)
+        
+        if index is not None:
+            out = out[index]
+            if hasattr(out, '__len__'):
+                out = out[:self.get("length")[index]]
 
         if to_numpy:
             if hasattr(out, "cpu"):
@@ -147,25 +143,24 @@ class Batch:
         pass
 
     def integrate_prediction(self, prediction):
-        assert len(prediction[list(prediction.keys())[0]]) == len(
-            self.get("sequence")
-        ), "outputs and batch must have the same length"
-        self.prediction = prediction
+        for data_type, value in prediction.items():
+            if getattr(self, data_type) is not None:
+                getattr(self, data_type).pred = value
 
-    def get_pairs(self, data_type):
-        if not data_type in DATA_TYPES:
-            raise ValueError("data_type must be either dms or shape")
-        if not self.contains(data_type):
-            return None
-        pred = self.prediction[data_type][self.data[data_type].index]
-        true = self.data[data_type].values
-        return pred, true
+    def get_pairs(self, data_type, to_numpy=False):
+        index = self.get_index(data_type)
+        return (
+            self.get('pred_{}'.format(data_type), to_numpy=to_numpy)[index],
+            self.get('true_{}'.format(data_type), to_numpy=to_numpy),
+        )
 
     def count(self, data_type):
-        pass
+        if getattr(self, data_type) is None:
+            return 0
+        return len(self.get_index(data_type))
 
     def get_index(self, data_type):
-        pass
+        return self.get('index_{}'.format(data_type))
 
     def contains(self, data_type):
         data_part, data_type = split_data_type(data_type)
@@ -204,7 +199,23 @@ class Batch:
         and L is the length of the longest sequence in the batch
         """
         return (
-            self.get("quality_{}".format(data_type))[self.get_index(data_type)]
+            self.get("quality_{}".format(data_type))
             .unsqueeze(-1)
             .repeat(1, L)
         )
+        
+    def to_list_of_datapoints(self) -> list:
+        out = []
+        for idx in range(self.batch_size):
+            L = self.get('length', index=idx)
+            out.append(Datapoint(
+                reference=self.get('reference', index=idx),
+                sequence=self.get('sequence', index=idx),
+                **{
+                    data_type: getattr(self, data_type).get(idx, L)
+                    for data_type in self.data_types
+                    if getattr(self, data_type) is not None
+                    and data_type != "sequence"
+                },
+            ))
+        return out

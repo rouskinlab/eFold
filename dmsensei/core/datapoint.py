@@ -41,6 +41,18 @@ class DataType:
                 setattr(self, attr, getattr(self, attr).to(device))
         return self
 
+    def get(self, idx, L):
+        if not hasattr(self.true, "__iter__"):
+            raise ValueError("This data type is not iterable.")
+        if not idx in self.index:
+            return None
+        return data_type_factory[self.name](
+            true=self.true[idx][:L],
+            pred=self.pred[idx][:L] if self.pred is not None else None,
+            error=self.error[idx][:L] if self.error is not None else None,
+            quality=self.quality[idx] if self.quality is not None else None,
+        )
+
 
 class DMS(DataType):
     def __init__(self, true, pred=None, error=None, quality=None, index=None):
@@ -70,9 +82,7 @@ class Datapoint:
         structure: Structure = None,
     ):
         self.reference = reference
-        self.sequence = (
-            sequence_to_int(sequence) if type(sequence) == str else sequence
-        )
+        self.sequence = sequence_to_int(sequence) if type(sequence) == str else sequence
         self.length = len(sequence)
         self.dms = dms
         self.shape = shape
@@ -102,13 +112,10 @@ class Datapoint:
                     error=tensor(
                         values["error_" + data_type], dtype=DATA_TYPES_FORMAT[data_type]
                     )
-                    if "error_" + data_type in values[data_type]
+                    if "error_" + data_type in values
                     else None,
-                    quality=tensor(
-                        values["quality_" + data_type],
-                        dtype=DATA_TYPES_FORMAT[data_type],
-                    )
-                    if "quality_" + data_type in values[data_type]
+                    quality=values["quality_" + data_type]
+                    if "quality_" + data_type in values
                     else None,
                 )
         return cls(ref, seq, **data).to(device)

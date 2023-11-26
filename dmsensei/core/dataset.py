@@ -3,7 +3,7 @@ from typing import List
 from .batch import Batch
 from ..huggingface import get_dataset
 from ..config import device
-
+from tqdm import tqdm as tqdm_fn
 
 class Dataset(TorchDataset):
     def __init__(
