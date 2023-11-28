@@ -130,6 +130,7 @@ class WandbFitLogger(LoadBestModel):
             if (
                 data_type in self.data_type
                 and self.validation_examples_references[data_type] is None
+                and batch.contains(f"pred_{data_type}")
             ):
                 if batch.contains(data_type):
                     idx = batch.get_index(data_type)[0]
@@ -225,7 +226,9 @@ class WandbTestLogger(LoadBestModel):
 
         # Log the scores
         data_type = DATA_TYPES_TEST_SETS[dataloader_idx]
-        preds, trues = batch.get_pairs(data_type)
+        if not batch.contains(f"pred_{data_type}"):
+            return
+        preds, trues = batch.get_pairs(data_type) 
         for pred, true, idx in zip(preds, trues, batch.get_index(data_type)):
             metric = metric_factory[REFERENCE_METRIC[data_type]](pred=pred, true=true)
             self.test_stacks[dataloader_idx].append(
@@ -247,7 +250,7 @@ class WandbTestLogger(LoadBestModel):
             if not len(df):
                 continue
             df.sort_values(
-                by="score", inplace=True, ascending=REF_METRIC_SIGN[data_type] > 0
+                by="score", inplace=True, ascending=REF_METRIC_SIGN[data_type] < 0
             )
             refs = set(df["reference"].values[: self.n_best_worst]).union(
                 set(df["reference"].values[-self.n_best_worst :])

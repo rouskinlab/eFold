@@ -9,7 +9,7 @@ from .batch import Batch
 
 
 class Model(pl.LightningModule):
-    def __init__(self, lr: float, optimizer_fn, quality=False, **kwargs):
+    def __init__(self, lr: float, optimizer_fn, weight_data=None, **kwargs):
         super().__init__()
 
         # Set attributes
@@ -18,7 +18,8 @@ class Model(pl.LightningModule):
         self.lr = lr
         self.optimizer_fn = optimizer_fn
         self.automatic_optimization = True
-        self.use_quality = quality
+        self.weight_data = weight_data
+        assert self.weight_data in [None, "error", "quality"], "Invalid weight_data: {}, should be one of [None, 'error', 'quality']".format(self.weight_data)
         self.save_hyperparameters()
 
     def configure_optimizers(self):
@@ -41,15 +42,24 @@ class Model(pl.LightningModule):
         ], "This function only works for dms and shape data"
         pred, true = batch.get_pairs(data_type)
         mask = true != -1000.0
-        if self.use_quality:
-            weights = batch.get_weights_as_matrix(data_type, true.shape[1])
-            loss = (
-                F.mse_loss(pred[mask], true[mask], reduction="none")
-                @ weights[mask]
-                / len(weights[mask])
-            )
-            return loss
-        return F.mse_loss(pred[mask], true[mask], reduction="mean")
+        
+        if self.weight_data is None:
+            return F.mse_loss(pred[mask], true[mask], reduction="mean")
+        
+        if self.weight_data == "quality":
+            weights = batch.get_quality_as_matrix(data_type, true.shape[1])
+        if self.weight_data == "error":
+            error = batch.get("error_{}".format(data_type))
+            #TODO: make this faster
+            def error_to_weight(error):
+                return 1 / (torch.sqrt(error) + 0.02)
+            weights = error_to_weight(error)
+        loss = (
+            F.mse_loss(pred[mask], true[mask], reduction="none")
+            @ weights[mask]
+            / len(weights[mask])
+        )
+        return loss
 
     def _loss_structure(self, batch: Batch):
         # Unsure if this is the correct loss function
