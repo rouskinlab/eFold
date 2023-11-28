@@ -76,26 +76,8 @@ class Model(pl.LightningModule):
         if 'structure' in count.keys():
             loss += count["structure"] * self._loss_structure(batch)
         return loss / np.sum(list(count.values()))
-
-    def training_step(self, batch: Batch, batch_idx: int):
-        predictions = self.forward(batch.get("sequence"))
-        batch.integrate_prediction(predictions)
-        loss = self.loss_fn(batch)
-        return loss
-
-    def validation_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
-        predictions = self.forward(batch.get("sequence"))
-        batch.integrate_prediction(predictions)
-        loss = self.loss_fn(batch)
-        return loss
-
-    def test_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
-        predictions = self.forward(batch.get("sequence"))
-        batch.integrate_prediction(predictions)
-
-    def predict_step(self, batch: Batch, batch_idx: int):
-        predictions = self.forward(batch.get("sequence"))
-
+    
+    def _clean_predictions(self, batch, predictions):
         # Hardcoded values for DMS G/U bases
         if "dms" in predictions.keys():
             predictions["dms"][
@@ -106,5 +88,29 @@ class Model(pl.LightningModule):
         # clip values to [0, 1]
         for data_type in set(["dms", "shape"]).intersection(predictions.keys()):
             predictions[data_type] = torch.clip(predictions[data_type], min=0, max=1)
+        
+        return predictions
 
+
+    def training_step(self, batch: Batch, batch_idx: int):
+        predictions = self.forward(batch.get("sequence"))
+        batch.integrate_prediction(predictions)
+        loss = self.loss_fn(batch)
+        return loss
+
+    def validation_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
+        predictions = self.forward(batch.get("sequence"))
+        predictions = self._clean_predictions(batch, predictions)
+        batch.integrate_prediction(predictions)
+        loss = self.loss_fn(batch)
+        return loss
+
+    def test_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
+        predictions = self.forward(batch.get("sequence"))
+        predictions = self._clean_predictions(batch, predictions)
+        batch.integrate_prediction(predictions)
+
+    def predict_step(self, batch: Batch, batch_idx: int):
+        predictions = self.forward(batch.get("sequence"))
+        predictions = self._clean_predictions(batch, predictions)
         batch.integrate_prediction(predictions)
