@@ -166,6 +166,8 @@ class Batch:
         return self.get('index_{}'.format(data_type))
 
     def contains(self, data_type):
+        if data_type in ["reference", "sequence", "length"]:
+            return True
         data_part, data_type = split_data_type(data_type)
         if (
             not hasattr(self, data_type)
