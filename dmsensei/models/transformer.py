@@ -70,35 +70,35 @@ class Transformer(Model):
         # self.decoder.bias.data.zero_()
         # self.decoder.weight.data.uniform_(0, initrange)
 
-        # self.resnet = nn.Sequential(
-        #     ResLayer(n_blocks=4, dim_in=1, dim_out=8, kernel_size=3, dropout=dropout),
-        #     # ResLayer(n_blocks=4, dim_in=4, dim_out=8, kernel_size=3, dropout=dropout),
-        #     # ResLayer(n_blocks=4, dim_in=8, dim_out=4, kernel_size=3, dropout=dropout),
-        #     ResLayer(n_blocks=4, dim_in=8, dim_out=1, kernel_size=3, dropout=dropout),
-        # )
+        self.resnet = nn.Sequential(
+            ResLayer(n_blocks=4, dim_in=1, dim_out=8, kernel_size=3, dropout=dropout),
+            # ResLayer(n_blocks=4, dim_in=4, dim_out=8, kernel_size=3, dropout=dropout),
+            # ResLayer(n_blocks=4, dim_in=8, dim_out=4, kernel_size=3, dropout=dropout),
+            ResLayer(n_blocks=4, dim_in=8, dim_out=1, kernel_size=3, dropout=dropout),
+        )
 
         # self.init_weights()
-        # self.output_net_DMS = nn.Sequential(
-        #     nn.Linear(d_model, d_model * 2),
-        #     nn.LayerNorm(d_model * 2),
-        #     nn.ReLU(inplace=True),
-        #     # nn.Flatten(start_dim=1, end_dim=-1),
-        #     nn.Linear(d_model * 2, d_model),
-        #     nn.LayerNorm(d_model),
-        #     nn.ReLU(inplace=True),
-        #     nn.Linear(d_model, 1),
-        # )
+        self.output_net_DMS = nn.Sequential(
+            nn.Linear(d_model, d_model * 2),
+            nn.LayerNorm(d_model * 2),
+            nn.ReLU(inplace=True),
+            # nn.Flatten(start_dim=1, end_dim=-1),
+            nn.Linear(d_model * 2, d_model),
+            nn.LayerNorm(d_model),
+            nn.ReLU(inplace=True),
+            nn.Linear(d_model, 1),
+        )
 
-        # self.output_net_SHAPE = nn.Sequential(
-        #     nn.Linear(d_model, d_model * 2),
-        #     nn.LayerNorm(d_model * 2),
-        #     nn.ReLU(inplace=True),
-        #     # nn.Flatten(start_dim=1, end_dim=-1),
-        #     nn.Linear(d_model * 2, d_model),
-        #     nn.LayerNorm(d_model),
-        #     nn.ReLU(inplace=True),
-        #     nn.Linear(d_model, 1),
-        # )
+        self.output_net_SHAPE = nn.Sequential(
+            nn.Linear(d_model, d_model * 2),
+            nn.LayerNorm(d_model * 2),
+            nn.ReLU(inplace=True),
+            # nn.Flatten(start_dim=1, end_dim=-1),
+            nn.Linear(d_model * 2, d_model),
+            nn.LayerNorm(d_model),
+            nn.ReLU(inplace=True),
+            nn.Linear(d_model, 1),
+        )
 
         self.output_net = nn.Linear(d_model, 2)
         self.drop = nn.Dropout(p=0)
@@ -108,8 +108,8 @@ class Transformer(Model):
                 torch.nn.init.xavier_uniform(m.weight * 0.001)
                 m.bias.data.fill_(0.0)
 
-        # self.output_net_DMS.apply(init_weights)
-        # self.output_net_SHAPE.apply(init_weights)
+        self.output_net_DMS.apply(init_weights)
+        self.output_net_SHAPE.apply(init_weights)
 
     def forward(self, src: Tensor) -> Tensor:
         """
@@ -125,13 +125,14 @@ class Transformer(Model):
         for i, l in enumerate(self.transformer_encoder):
             src = self.transformer_encoder[i](src)
 
-        # src = self.resnet(src.unsqueeze(dim=1)).squeeze(dim=1)
+        src = self.resnet(src.unsqueeze(dim=1)).squeeze(dim=1)
 
-        src = self.output_net(self.drop(src))
+        dms = self.output_net_DMS(src)
+        shape = self.output_net_SHAPE(src)
 
         return {
-            "dms": src[:,:,0],
-            "shape": src[:,:,1],
+            "dms": dms,
+            "shape": shape,
         }
 
 
