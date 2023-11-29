@@ -32,16 +32,4 @@ def get_dataset(name:str, force_download=False, tqdm=True):
         download_dataset(name)
         print("{}: Download complete. File saved at {}".format(name, path.get_data_json()))
     
-    if not exists(path.get_data_pickle()):
-        print("{}: Converting data.json to data.pkl...".format(name))
-        data = json.load(open(path.get_data_json()))    
-        
-        # Load data.json into a list of datapoints
-        parser = lambda x: tqdm_fn(x, desc=name, colour='red', total=len(data)) if tqdm else lambda x: x
-        lod = [Datapoint.from_data_json_line(line) for line in parser(data.items())]
-        print("{}: Saving data.pkl...".format(name))
-        pickle.dump(lod, open(path.get_data_pickle(), 'wb'))
-        return lod
-    
-    print("{}: Loading data.pkl...".format(name))
-    return pickle.load(open(path.get_data_pickle(), 'rb'))
+    return json.load(open(path.get_data_json(), 'r'))

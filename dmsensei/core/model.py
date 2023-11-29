@@ -65,7 +65,10 @@ class Model(pl.LightningModule):
             loss += count["shape"] * self._loss_signal(batch, "shape")
         if 'structure' in count.keys():
             loss += count["structure"] * self._loss_structure(batch)
-        return loss / np.sum(list(count.values()))
+        loss = loss / np.sum(list(count.values()))
+        if not self.weight_data:
+            loss = torch.sqrt(loss)
+        return loss
     
     def _clean_predictions(self, batch, predictions):
         # Hardcoded values for DMS G/U bases
@@ -89,7 +92,7 @@ class Model(pl.LightningModule):
 
     def validation_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
         predictions = self.forward(batch.get("sequence"))
-        predictions = self._clean_predictions(batch, predictions)
+        # predictions = self._clean_predictions(batch, predictions)
         batch.integrate_prediction(predictions)
         loss = self.loss_fn(batch)
         return loss

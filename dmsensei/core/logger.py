@@ -10,7 +10,7 @@ class Logger:
 
     def log(self, stage, metric, value, data_type=None):
         if value is None:
-            return  
+            return
         self._model.log(
             name="/".join([k for k in [stage, data_type, metric] if k is not None]),
             value=float(value),

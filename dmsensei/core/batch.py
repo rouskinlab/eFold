@@ -97,6 +97,53 @@ class Batch:
             "quality": post_process(quality, torch.float32, dim=1),
             "pred": post_process(pred, torch.float32, dim=2),
         }
+        
+    @classmethod
+    def from_dataset_items(cls, datapoints: list, data_type: str):
+        reference= [d['reference'] for d in datapoints]
+        length = [d['length'] for d in datapoints]
+        L = max(length)
+        sequence= torch.stack([d['sequence'][:L] for d in datapoints]).to(device)
+        batch_size = len(datapoints)
+        
+        data = {}
+        for dt in data_type:
+            true, error, index = [], [], []
+            for idx, dp in enumerate(datapoints):
+                if dt in dp and dp[dt] is not None:
+                    true.append(dp[dt]['true'])
+                    if dt != 'structure':
+                        error.append(dp[dt]['error']) 
+                    index.append(idx)
+            
+            if len(true) == 0:
+                continue
+            
+
+            if dt != 'structure':
+                data[dt] = data_type_factory['batch'][dt](
+                    true=torch.stack(true)[:, :L].to(device),
+                    pred=None,
+                    error=torch.stack(error)[:, :L].to(device),
+                    index=torch.tensor(index).to(device),
+                )
+            else:
+                data[dt] = data_type_factory['batch'][dt](
+                    true=torch.stack([_pad(t, L, 'structure') for t in true]).to(device),
+                    pred=None,
+                    index=torch.tensor(index).to(device),
+                )
+            
+        return cls(
+            reference=reference,
+            sequence=sequence,
+            length=length,
+            L=L,
+            batch_size=batch_size,
+            data_types=data_type,
+            **data,
+        )
+            
 
     @classmethod
     def from_list_of_datapoints(cls, datapoints: list, data_types: list):
@@ -188,7 +235,7 @@ class Batch:
     def compute_metrics(self) -> Dict[str, Dict[str, float]]:
         out = {}
         for data_type in self.data_types:
-            if not self.count(data_type) or data_type == "sequence":
+            if not self.count(data_type) or data_type == "sequence" or not self.contains(f"pred_{data_type}"):
                 continue
             out[data_type] = {}
             pred, true = self.get_pairs(data_type)

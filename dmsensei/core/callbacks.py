@@ -88,7 +88,7 @@ class WandbFitLogger(LoadBestModel):
         # Log the train loss
         loss = outputs["loss"]
         logger = Logger(pl_module, self.batch_size)
-        logger.train_loss(torch.sqrt(loss).item())
+        logger.train_loss(loss.item())
 
     def on_train_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
         pass
@@ -108,7 +108,7 @@ class WandbFitLogger(LoadBestModel):
         loss = outputs
         # Dataloader_idx is 0 for the validation set
         # The other dataloader_idx are for complementary validation sets
-        logger.valid_loss(torch.sqrt(loss).item(), dataloader_idx)
+        logger.valid_loss(loss.item(), dataloader_idx)
         # Save val_loss for evaluating if this model is the best model
         self.val_losses.append(loss)
 
@@ -178,12 +178,12 @@ class WandbFitLogger(LoadBestModel):
             self.best_loss = this_epoch_loss
             name = "{}_loss{}.pt".format(
                 wandb.run.name,
-                str(np.floor(100 * np.sqrt(this_epoch_loss))).replace(".", "-"),
+                str(np.floor(100 * this_epoch_loss)).replace(".", "-"),
             )
             loader = Loader(path="models/" + name)
             # logs what MAE it corresponds to
             loader.dump(pl_module).write_in_log(
-                trainer.current_epoch, np.round(100 * np.sqrt(this_epoch_loss), 3)
+                trainer.current_epoch, np.round(100 * this_epoch_loss, 3)
             )
 
         self.val_losses = []
@@ -228,7 +228,7 @@ class WandbTestLogger(LoadBestModel):
 
         # Log the scores
         data_type = DATA_TYPES_TEST_SETS[dataloader_idx]
-        if not batch.contains(f"pred_{data_type}"):
+        if not batch.contains(f"pred_{data_type}"): 
             return
         preds, trues = batch.get_pairs(data_type) 
         for pred, true, idx in zip(preds, trues, batch.get_index(data_type)):
