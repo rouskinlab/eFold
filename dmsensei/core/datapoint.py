@@ -7,6 +7,7 @@ from .metrics import metric_factory
 from ..util import unzip
 import torch
 from .embeddings import sequence_to_int
+from .datatype import *
 
 from dmsensei.config import UKN, DATA_TYPES, DATA_TYPES_FORMAT
 from dmsensei.core.embeddings import sequence_to_int
@@ -22,62 +23,14 @@ def split_data_type(data_type):
     return data_part, data_type
 
 
-class DataType:
-    attributes = ["true", "pred", "error", "quality", "index"]
-
-    def __init__(self, name, true, pred, error, quality, index):
-        self.name = name
-        self.true = true
-        self.pred = pred
-        self.error = error
-        self.quality = quality
-        self.index = index
-
-    def to(self, device):
-        for attr in DataType.attributes:
-            if hasattr(getattr(self, attr), "to"):
-                setattr(self, attr, getattr(self, attr).to(device))
-        return self
-
-    def get(self, idx, L):
-        if not hasattr(self.true, "__iter__"):
-            raise ValueError("This data type is not iterable.")
-        if not idx in self.index:
-            return None
-        return data_type_factory[self.name](
-            true=self.true[idx][:L],
-            pred=self.pred[idx][:L] if self.pred is not None else None,
-            error=self.error[idx][:L] if self.error is not None else None,
-            quality=self.quality[idx] if self.quality is not None else None,
-        )
-
-
-class DMS(DataType):
-    def __init__(self, true, pred=None, error=None, quality=None, index=None):
-        super().__init__("dms", true, pred, error, quality, index)
-
-
-class SHAPE(DataType):
-    def __init__(self, true, pred=None, error=None, quality=None, index=None):
-        super().__init__("shape", true, pred, error, quality, index)
-
-
-class Structure(DataType):
-    def __init__(self, true, pred=None, error=None, quality=None, index=None):
-        super().__init__("structure", true, pred, error, quality, index)
-
-
-data_type_factory = {"dms": DMS, "shape": SHAPE, "structure": Structure}
-
-
 class Datapoint:
     def __init__(
         self,
         reference: str,
         sequence: str,
-        dms: DMS = None,
-        shape: SHAPE = None,
-        structure: Structure = None,
+        dms: DMSDatapoint = None,
+        shape: SHAPEDatapoint = None,
+        structure: StructureDatapoint = None,
     ):
         self.reference = reference
         self.sequence = sequence_to_int(sequence) if type(sequence) == str else sequence
@@ -97,6 +50,7 @@ class Datapoint:
             if hasattr(getattr(self, attr), "to"):
                 getattr(self, attr).to(device)
         return self
+    
 
     @classmethod
     def from_data_json_line(cls, line: dict):
@@ -105,7 +59,7 @@ class Datapoint:
         data = {}
         for data_type in DATA_TYPES:
             if data_type in values and not (values[data_type] is None or (type(values[data_type]) == float and np.isnan(values[data_type]))):
-                data[data_type] = data_type_factory[data_type](
+                data[data_type] = data_type_factory['datapoint'][data_type](
                     true=tensor(values[data_type], dtype=DATA_TYPES_FORMAT[data_type]),
                     error=tensor(
                         values["error_" + data_type], dtype=DATA_TYPES_FORMAT[data_type]

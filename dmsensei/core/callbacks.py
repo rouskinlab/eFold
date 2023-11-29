@@ -88,7 +88,7 @@ class WandbFitLogger(LoadBestModel):
         # Log the train loss
         loss = outputs["loss"]
         logger = Logger(pl_module, self.batch_size)
-        logger.train_loss(torch.sqrt(loss).item())
+        logger.train_loss(loss.item())
 
     def on_train_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
         pass
@@ -228,7 +228,7 @@ class WandbTestLogger(LoadBestModel):
 
         # Log the scores
         data_type = DATA_TYPES_TEST_SETS[dataloader_idx]
-        if not batch.contains(f"pred_{data_type}"):
+        if not batch.contains(f"pred_{data_type}"): 
             return
         preds, trues = batch.get_pairs(data_type) 
         for pred, true, idx in zip(preds, trues, batch.get_index(data_type)):

@@ -65,7 +65,10 @@ class Model(pl.LightningModule):
             loss += count["shape"] * self._loss_signal(batch, "shape")
         if 'structure' in count.keys():
             loss += count["structure"] * self._loss_structure(batch)
-        return loss / np.sum(list(count.values()))
+        loss = loss / np.sum(list(count.values()))
+        if not self.weight_data:
+            loss = torch.sqrt(loss)
+        return loss
     
     def _clean_predictions(self, batch, predictions):
         # Hardcoded values for DMS G/U bases
