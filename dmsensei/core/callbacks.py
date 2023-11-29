@@ -178,12 +178,12 @@ class WandbFitLogger(LoadBestModel):
             self.best_loss = this_epoch_loss
             name = "{}_loss{}.pt".format(
                 wandb.run.name,
-                str(np.floor(100 * np.sqrt(this_epoch_loss))).replace(".", "-"),
+                str(np.floor(100 * this_epoch_loss)).replace(".", "-"),
             )
             loader = Loader(path="models/" + name)
             # logs what MAE it corresponds to
             loader.dump(pl_module).write_in_log(
-                trainer.current_epoch, np.round(100 * np.sqrt(this_epoch_loss), 3)
+                trainer.current_epoch, np.round(100 * this_epoch_loss, 3)
             )
 
         self.val_losses = []
