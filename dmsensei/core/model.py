@@ -9,7 +9,7 @@ from .batch import Batch
 
 
 class Model(pl.LightningModule):
-    def __init__(self, lr: float, optimizer_fn, weight_data=None, **kwargs):
+    def __init__(self, lr: float, optimizer_fn, weight_data:bool=False, **kwargs):
         super().__init__()
 
         # Set attributes
@@ -18,8 +18,13 @@ class Model(pl.LightningModule):
         self.lr = lr
         self.optimizer_fn = optimizer_fn
         self.automatic_optimization = True
+        
         self.weight_data = weight_data
-        assert self.weight_data in [None, "error", "quality"], "Invalid weight_data: {}, should be one of [None, 'error', 'quality']".format(self.weight_data)
+        if weight_data:
+            self.loss_signal_fn = torch.nn.GaussianNLLLoss(full=True, eps=5E-2, reduction='mean')
+        else:
+            self.loss_signal_fn = torch.nn.MSELoss(reduction='mean')
+        
         self.save_hyperparameters()
 
     def configure_optimizers(self):
@@ -42,24 +47,9 @@ class Model(pl.LightningModule):
         ], "This function only works for dms and shape data"
         pred, true = batch.get_pairs(data_type)
         mask = true != -1000.0
-        
-        if self.weight_data is None:
-            return F.mse_loss(pred[mask], true[mask], reduction="mean")
-        
-        if self.weight_data == "quality":
-            weights = batch.get_quality_as_matrix(data_type, true.shape[1])
-        if self.weight_data == "error":
-            error = batch.get("error_{}".format(data_type))
-            #TODO: make this faster
-            def error_to_weight(error):
-                return 1 / (torch.sqrt(error) + 0.02)
-            weights = error_to_weight(error)
-        loss = (
-            F.mse_loss(pred[mask], true[mask], reduction="none")
-            @ weights[mask]
-            / len(weights[mask])
-        )
-        return loss
+        if self.weight_data:
+            return self.loss_signal_fn(pred[mask], true[mask], batch.get("error_{}".format(data_type))[mask])
+        return self.loss_signal_fn(pred[mask], true[mask])
 
     def _loss_structure(self, batch: Batch):
         # Unsure if this is the correct loss function
@@ -90,7 +80,6 @@ class Model(pl.LightningModule):
             predictions[data_type] = torch.clip(predictions[data_type], min=0, max=1)
         
         return predictions
-
 
     def training_step(self, batch: Batch, batch_idx: int):
         predictions = self.forward(batch.get("sequence"))
