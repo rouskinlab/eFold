@@ -107,7 +107,7 @@ class Batch:
         batch_size = len(datapoints)
 
         data = {}
-        for data_type in DATA_TYPES:
+        for data_type in data_types:
             vector = cls._stack_data_type(None, datapoints, data_type, L)
             if vector is not None:
                 data[data_type] = data_type_factory[data_type](**vector)
