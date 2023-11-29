@@ -85,24 +85,24 @@ class Model(pl.LightningModule):
         return predictions
 
     def training_step(self, batch: Batch, batch_idx: int):
-        predictions = self.forward(batch.get("sequence"))
+        predictions = self.forward(batch)
         batch.integrate_prediction(predictions)
         loss = self.loss_fn(batch)
         return loss
 
     def validation_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
-        predictions = self.forward(batch.get("sequence"))
+        predictions = self.forward(batch)
         # predictions = self._clean_predictions(batch, predictions)
         batch.integrate_prediction(predictions)
         loss = self.loss_fn(batch)
         return loss
 
     def test_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
-        predictions = self.forward(batch.get("sequence"))
+        predictions = self.forward(batch)
         predictions = self._clean_predictions(batch, predictions)
         batch.integrate_prediction(predictions)
 
     def predict_step(self, batch: Batch, batch_idx: int):
-        predictions = self.forward(batch.get("sequence"))
+        predictions = self.forward(batch)
         predictions = self._clean_predictions(batch, predictions)
         batch.integrate_prediction(predictions)

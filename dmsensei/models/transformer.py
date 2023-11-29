@@ -4,7 +4,7 @@ from torch.nn import TransformerEncoderLayer
 import numpy as np
 import os, sys
 from ..core.model import Model
-
+from ..core.batch import Batch
 
 dir_name = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(dir_name, ".."))
@@ -111,7 +111,7 @@ class Transformer(Model):
         self.output_net_DMS.apply(init_weights)
         self.output_net_SHAPE.apply(init_weights)
 
-    def forward(self, src: Tensor) -> Tensor:
+    def forward(self, batch: Batch) -> Tensor:
         """
         Args:
             src: Tensor, shape [seq_len, batch_size]
@@ -119,7 +119,7 @@ class Transformer(Model):
         Returns:
             output Tensor of shape [seq_len, batch_size, ntoken]
         """
-
+        src = batch.get("sequence")
         src = self.encoder(src) * np.sqrt(self.d_model)
         src = self.pos_encoder(src)
         for i, l in enumerate(self.transformer_encoder):
