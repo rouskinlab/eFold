@@ -59,7 +59,7 @@ class WandbFitLogger(LoadBestModel):
         dm: DataModule,
         batch_size: int,
         load_model: str = None,
-        log_every_n_epoch: int = 1,
+        log_plots_every_n_epoch: int = 1,
     ):
         """
         load_model: path to the model to load. None if no model to load.
@@ -69,7 +69,7 @@ class WandbFitLogger(LoadBestModel):
         self.batch_size = batch_size
         self.model_file = load_model
         self.dm = dm
-        self.log_every_n_epoch = log_every_n_epoch
+        self.log_plots_every_n_epoch = log_plots_every_n_epoch
 
     def on_fit_start(self, trainer: Trainer, pl_module: LightningModule):
         self.best_loss = np.inf
@@ -123,7 +123,7 @@ class WandbFitLogger(LoadBestModel):
         # #### PLOT ####
 
         # For multi-gpu training. Only plot for the validation set
-        if (rank_zero_only.rank or dataloader_idx) and not trainer.current_epoch % self.log_every_n_epoch:
+        if (rank_zero_only.rank or dataloader_idx) and not trainer.current_epoch % self.log_plots_every_n_epoch:
             return
 
         # plot one example per epoch and per data_type
