@@ -19,16 +19,11 @@ if __name__ == "__main__":
     USE_WANDB = 1
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        # wandb.login()
-        project = 'Transformer-tuning'
-        # wandb.init(project=project)
-        wandb_logger = WandbLogger(project=project)
+        wandb_logger = WandbLogger(project='Transformer-tuning')
 
         
-
-    d_model = 192
     lr = 5e-4
-    # gamma = 0.998
+    gamma = 0.998
     batch_size = 128
 
     # Create dataset
@@ -50,15 +45,15 @@ if __name__ == "__main__":
         data="multi",
         quality=False,
         ntoken=5,
-        d_model=d_model,
-        nhead=6,
-        d_hid=d_model*4,
-        nlayers=12,
-        dropout=0.1,
+        d_model=128,
+        nhead=16,
+        d_hid=256,
+        nlayers=8,
+        dropout=0,
         lr=lr,
-        weight_decay=0.004,
+        weight_decay=0,
         wandb=USE_WANDB,
-        # gamma=gamma,
+        gamma=gamma,
     )
 
     # import torch
@@ -75,10 +70,9 @@ if __name__ == "__main__":
         strategy="ddp",
         # precision="16-mixed",
         # accumulate_grad_batches=2,
-        max_epochs=500,
-        # log_every_n_steps=10,
+        max_epochs=300,
         logger=wandb_logger if USE_WANDB else None,
-        callbacks=[  # EarlyStopping(monitor="valid/loss", mode='min', patience=5),
+        callbacks=[  
             LearningRateMonitor(logging_interval="epoch"),
             WandbFitLogger(dm=dm, batch_size=batch_size, load_model=None),
             WandbTestLogger(dm=dm, n_best_worst=10, load_model='best'), # 'best', None or path to model

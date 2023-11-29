@@ -11,6 +11,39 @@ sys.path.append(os.path.join(dir_name, ".."))
 
 # from util_torch import *
 
+class TransformerBlock(nn.Module):
+    def __init__(self, d_model, d_hid, n_head, dropout=0.1):
+
+        super(TransformerBlock, self).__init__()
+
+        self.att = nn.MultiheadAttention(d_model, n_head, dropout, batch_first=True)
+        self.ffn = nn.Sequential(
+                    nn.Linear(d_model, d_hid),
+                    nn.ReLU(inplace=True),
+                    nn.Linear(d_hid, d_model),
+                )
+
+        self.layernorm1 = nn.LayerNorm(d_model, eps=1e-6)
+        self.layernorm2 = nn.LayerNorm(d_model, eps=1e-6)
+
+        self.dropout1 = nn.Dropout(dropout)
+        self.dropout2 = nn.Dropout(dropout)
+
+    def forward(self, src):
+
+        # att_mask = tf.expand_dims(mask, axis=-1)
+        # att_mask = tf.repeat(att_mask, repeats=tf.shape(att_mask)[1], axis=-1)
+
+        attn_output = self.att(src, src, src, need_weights=False)[0]
+        attn_output = self.dropout1(attn_output)
+
+        out1 = self.layernorm1(src + attn_output)
+        ffn_output = self.ffn(out1)
+        ffn_output = self.dropout2(ffn_output)
+
+        return self.layernorm2(out1 + ffn_output)
+
+
 
 class Transformer(Model):
     def __init__(
@@ -31,24 +64,10 @@ class Transformer(Model):
         self.nhead = nhead
         self.nlayers = nlayers
         self.model_type = "Transformer"
+
         self.encoder = nn.Embedding(ntoken, d_model)
         self.pos_encoder = PositionalEncoding(d_model, dropout)
-        """
-        self.transformer_encoder = nn.ModuleList(
-            [
-                TransformerEncoderLayer(
-                    d_model,
-                    nhead,
-                    d_hid,
-                    dropout,
-                    batch_first=True,
-                    norm_first=True,
-                    activation="gelu",
-                )
-                for i in range(nlayers)
-            ]
-        )
-        """
+
         self.transformer_encoder = nn.Sequential(
             *[
                 TransformerEncoderLayer(
@@ -58,58 +77,39 @@ class Transformer(Model):
                     dropout,
                     batch_first=True,
                     norm_first=True,
-                    activation="gelu",
+                    activation="relu",
                 )
                 for i in range(nlayers)
             ]
         )
-        # self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
 
-        initrange = 1
-        self.encoder.weight.data.uniform_(0, initrange)
-        # self.decoder.bias.data.zero_()
-        # self.decoder.weight.data.uniform_(0, initrange)
+        self.resnet = nn.Sequential(
+            ResLayer(n_blocks=4, dim_in=1, dim_out=8, kernel_size=3, dropout=dropout),
+            # ResLayer(n_blocks=4, dim_in=4, dim_out=8, kernel_size=3, dropout=dropout),
+            # ResLayer(n_blocks=4, dim_in=8, dim_out=4, kernel_size=3, dropout=dropout),
+            ResLayer(n_blocks=4, dim_in=8, dim_out=1, kernel_size=3, dropout=dropout),
+        )
 
-        # self.resnet = nn.Sequential(
-        #     ResLayer(n_blocks=4, dim_in=1, dim_out=8, kernel_size=3, dropout=dropout),
-        #     # ResLayer(n_blocks=4, dim_in=4, dim_out=8, kernel_size=3, dropout=dropout),
-        #     # ResLayer(n_blocks=4, dim_in=8, dim_out=4, kernel_size=3, dropout=dropout),
-        #     ResLayer(n_blocks=4, dim_in=8, dim_out=1, kernel_size=3, dropout=dropout),
-        # )
+        self.output_net_DMS = nn.Sequential(
+            nn.Linear(d_model, d_model * 2),
+            nn.LayerNorm(d_model * 2),
+            nn.ReLU(inplace=True),
+            nn.Linear(d_model * 2, d_model),
+            nn.LayerNorm(d_model),
+            nn.ReLU(inplace=True),
+            nn.Linear(d_model, 1),
+        )
 
-        # self.init_weights()
-        # self.output_net_DMS = nn.Sequential(
-        #     nn.Linear(d_model, d_model * 2),
-        #     nn.LayerNorm(d_model * 2),
-        #     nn.ReLU(inplace=True),
-        #     # nn.Flatten(start_dim=1, end_dim=-1),
-        #     nn.Linear(d_model * 2, d_model),
-        #     nn.LayerNorm(d_model),
-        #     nn.ReLU(inplace=True),
-        #     nn.Linear(d_model, 1),
-        # )
+        self.output_net_SHAPE = nn.Sequential(
+            nn.Linear(d_model, d_model * 2),
+            nn.LayerNorm(d_model * 2),
+            nn.ReLU(inplace=True),
+            nn.Linear(d_model * 2, d_model),
+            nn.LayerNorm(d_model),
+            nn.ReLU(inplace=True),
+            nn.Linear(d_model, 1),
+        )
 
-        # self.output_net_SHAPE = nn.Sequential(
-        #     nn.Linear(d_model, d_model * 2),
-        #     nn.LayerNorm(d_model * 2),
-        #     nn.ReLU(inplace=True),
-        #     # nn.Flatten(start_dim=1, end_dim=-1),
-        #     nn.Linear(d_model * 2, d_model),
-        #     nn.LayerNorm(d_model),
-        #     nn.ReLU(inplace=True),
-        #     nn.Linear(d_model, 1),
-        # )
-
-        self.output_net = nn.Linear(d_model, 2)
-        self.drop = nn.Dropout(p=0.5)
-
-        def init_weights(m):
-            if isinstance(m, nn.Linear):
-                torch.nn.init.xavier_uniform(m.weight * 0.001)
-                m.bias.data.fill_(0.0)
-
-        # self.output_net_DMS.apply(init_weights)
-        # self.output_net_SHAPE.apply(init_weights)
 
     def forward(self, src: Tensor) -> Tensor:
         """
@@ -120,18 +120,17 @@ class Transformer(Model):
             output Tensor of shape [seq_len, batch_size, ntoken]
         """
 
-        src = self.encoder(src) * np.sqrt(self.d_model)
+        src = self.encoder(src)
         src = self.pos_encoder(src)
+        
         for i, l in enumerate(self.transformer_encoder):
             src = self.transformer_encoder[i](src)
 
-        # src = self.resnet(src.unsqueeze(dim=1)).squeeze(dim=1)
-
-        src = self.output_net(self.drop(src))
+        src = self.resnet(src.unsqueeze(dim=1)).squeeze(dim=1)
 
         return {
-            "dms": src[:,:,0],
-            "shape": src[:,:,1],
+            "dms": self.output_net_DMS(src).squeeze(axis=2),
+            "shape": self.output_net_SHAPE(src).squeeze(axis=2),
         }
 
 
