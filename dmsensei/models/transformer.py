@@ -131,8 +131,8 @@ class Transformer(Model):
         shape = self.output_net_SHAPE(src)
 
         return {
-            "dms": dms,
-            "shape": shape,
+            "dms": dms.squeeze(dim=-1),
+            "shape": shape.squeeze(dim=-1),
         }
 
 
