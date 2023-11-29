@@ -108,7 +108,7 @@ class WandbFitLogger(LoadBestModel):
         loss = outputs
         # Dataloader_idx is 0 for the validation set
         # The other dataloader_idx are for complementary validation sets
-        logger.valid_loss(torch.sqrt(loss).item(), dataloader_idx)
+        logger.valid_loss(loss.item(), dataloader_idx)
         # Save val_loss for evaluating if this model is the best model
         self.val_losses.append(loss)
 
