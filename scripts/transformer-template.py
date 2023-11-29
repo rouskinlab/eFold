@@ -46,7 +46,7 @@ if __name__ == "__main__":
     model = create_model(
         model="transformer",
         data="multi",
-        quality=True,
+        weight_data=True,
         ntoken=5,
         d_model=d_model,
         nhead=16,
