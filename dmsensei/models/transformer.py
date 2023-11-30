@@ -9,9 +9,6 @@ from ..core.batch import Batch
 dir_name = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(dir_name, ".."))
 
-# from util_torch import *
-
-
 class Transformer(Model):
     def __init__(
         self,
@@ -31,24 +28,10 @@ class Transformer(Model):
         self.nhead = nhead
         self.nlayers = nlayers
         self.model_type = "Transformer"
+
         self.encoder = nn.Embedding(ntoken, d_model)
         self.pos_encoder = PositionalEncoding(d_model, dropout)
-        """
-        self.transformer_encoder = nn.ModuleList(
-            [
-                TransformerEncoderLayer(
-                    d_model,
-                    nhead,
-                    d_hid,
-                    dropout,
-                    batch_first=True,
-                    norm_first=True,
-                    activation="gelu",
-                )
-                for i in range(nlayers)
-            ]
-        )
-        """
+
         self.transformer_encoder = nn.Sequential(
             *[
                 TransformerEncoderLayer(
@@ -58,17 +41,11 @@ class Transformer(Model):
                     dropout,
                     batch_first=True,
                     norm_first=True,
-                    activation="gelu",
+                    activation="relu",
                 )
                 for i in range(nlayers)
             ]
         )
-        # self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
-
-        initrange = 1
-        self.encoder.weight.data.uniform_(0, initrange)
-        # self.decoder.bias.data.zero_()
-        # self.decoder.weight.data.uniform_(0, initrange)
 
         self.resnet = nn.Sequential(
             ResLayer(n_blocks=4, dim_in=1, dim_out=8, kernel_size=3, dropout=dropout),
@@ -77,12 +54,10 @@ class Transformer(Model):
             ResLayer(n_blocks=4, dim_in=8, dim_out=1, kernel_size=3, dropout=dropout),
         )
 
-        # self.init_weights()
         self.output_net_DMS = nn.Sequential(
             nn.Linear(d_model, d_model * 2),
             nn.LayerNorm(d_model * 2),
             nn.ReLU(inplace=True),
-            # nn.Flatten(start_dim=1, end_dim=-1),
             nn.Linear(d_model * 2, d_model),
             nn.LayerNorm(d_model),
             nn.ReLU(inplace=True),
@@ -93,23 +68,11 @@ class Transformer(Model):
             nn.Linear(d_model, d_model * 2),
             nn.LayerNorm(d_model * 2),
             nn.ReLU(inplace=True),
-            # nn.Flatten(start_dim=1, end_dim=-1),
             nn.Linear(d_model * 2, d_model),
             nn.LayerNorm(d_model),
             nn.ReLU(inplace=True),
             nn.Linear(d_model, 1),
         )
-
-        self.output_net = nn.Linear(d_model, 2)
-        self.drop = nn.Dropout(p=0)
-
-        def init_weights(m):
-            if isinstance(m, nn.Linear):
-                torch.nn.init.xavier_uniform(m.weight * 0.001)
-                m.bias.data.fill_(0.0)
-
-        self.output_net_DMS.apply(init_weights)
-        self.output_net_SHAPE.apply(init_weights)
 
     def forward(self, batch: Batch) -> Tensor:
         """
@@ -120,8 +83,9 @@ class Transformer(Model):
             output Tensor of shape [seq_len, batch_size, ntoken]
         """
         src = batch.get("sequence")
-        src = self.encoder(src) * np.sqrt(self.d_model)
+        src = self.encoder(src)
         src = self.pos_encoder(src)
+        
         for i, l in enumerate(self.transformer_encoder):
             src = self.transformer_encoder[i](src)
 
