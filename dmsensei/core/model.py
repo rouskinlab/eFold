@@ -20,11 +20,6 @@ class Model(pl.LightningModule):
         self.automatic_optimization = True
         
         self.weight_data = weight_data
-        if weight_data:
-            self.loss_signal_fn = torch.nn.GaussianNLLLoss(full=True, eps=5E-2, reduction='mean')
-        else:
-            self.loss_signal_fn = torch.nn.MSELoss(reduction='mean')
-        
         self.save_hyperparameters()
 
     def configure_optimizers(self):
@@ -48,8 +43,8 @@ class Model(pl.LightningModule):
         pred, true = batch.get_pairs(data_type)
         mask = true != -1000.0
         if self.weight_data:
-            return self.loss_signal_fn(pred[mask], true[mask], batch.get("error_{}".format(data_type))[mask])
-        return self.loss_signal_fn(pred[mask], true[mask])
+            return F.gaussian_nll_loss(pred[mask], true[mask], batch.get("error_{}".format(data_type))[mask], full=True, eps=5E-2)
+        return F.mse_loss(pred[mask], true[mask])
 
     def _loss_structure(self, batch: Batch):
         # Unsure if this is the correct loss function
@@ -71,17 +66,9 @@ class Model(pl.LightningModule):
         return loss
     
     def _clean_predictions(self, batch, predictions):
-        # Hardcoded values for DMS G/U bases
-        if "dms" in predictions.keys():
-            predictions["dms"][
-                (batch.get("sequence") == seq2int["G"])
-                | (batch.get("sequence") == seq2int["U"])
-            ] = VAL_GU
-
         # clip values to [0, 1]
         for data_type in set(["dms", "shape"]).intersection(predictions.keys()):
             predictions[data_type] = torch.clip(predictions[data_type], min=0, max=1)
-        
         return predictions
 
     def training_step(self, batch: Batch, batch_idx: int):
@@ -92,7 +79,6 @@ class Model(pl.LightningModule):
 
     def validation_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
         predictions = self.forward(batch)
-        # predictions = self._clean_predictions(batch, predictions)
         batch.integrate_prediction(predictions)
         loss = self.loss_fn(batch)
         return loss
