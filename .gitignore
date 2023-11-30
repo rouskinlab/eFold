@@ -3,8 +3,9 @@ data
 wandb
 dmsensei/models/trained_models
 lightning_logs
-models
+models/*
 trash_project_for_testing
 .DS_Store
 test_models
 predict*
+.env

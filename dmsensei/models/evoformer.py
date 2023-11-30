@@ -8,8 +8,8 @@ import typing as T
 from einops import rearrange
 import torch.nn.functional as F
 import numpy as np
-
-from ...core.model import Model
+from ..core.batch import Batch
+from ..core.model import Model
 
 dir_name = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(dir_name, ".."))
@@ -63,9 +63,10 @@ class Evoformer(Model):
                                                 nn.ReLU(),
                                                 nn.Linear(d_model, 1))
 
-    def forward(self, src: Tensor) -> Tensor:
+    def forward(self, batch: Batch) -> Tensor:
         # Encoding of RNA sequence
         # (N, L, d_model)
+        src = batch.get('sequence')
         s = self.encoder(src)
 
         # (N, L, c_z / 2)

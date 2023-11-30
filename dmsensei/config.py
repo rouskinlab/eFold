@@ -26,6 +26,11 @@ TEST_SETS_NAMES = [i for j in TEST_SETS.values() for i in j]
 DATA_TYPES_TEST_SETS = [k for k, v in TEST_SETS.items() for i in v]
 
 DATA_TYPES = ["structure", "dms", "shape"]
+DATA_TYPES_FORMAT = {
+    "structure": torch.int32,
+    "dms": DEFAULT_FORMAT,
+    "shape": DEFAULT_FORMAT,
+}
 REFERENCE_METRIC = {"structure": "f1", "dms": "mae", "shape": "mae"}
 REF_METRIC_SIGN = {"structure": 1, "dms": -1, "shape": -1}
 POSSIBLE_METRICS = {

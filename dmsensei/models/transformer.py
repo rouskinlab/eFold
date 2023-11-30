@@ -3,47 +3,11 @@ from torch import nn, Tensor
 from torch.nn import TransformerEncoderLayer
 import numpy as np
 import os, sys
-from ...core.model import Model
-
+from ..core.model import Model
+from ..core.batch import Batch
 
 dir_name = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(dir_name, ".."))
-
-# from util_torch import *
-
-class TransformerBlock(nn.Module):
-    def __init__(self, d_model, d_hid, n_head, dropout=0.1):
-
-        super(TransformerBlock, self).__init__()
-
-        self.att = nn.MultiheadAttention(d_model, n_head, dropout, batch_first=True)
-        self.ffn = nn.Sequential(
-                    nn.Linear(d_model, d_hid),
-                    nn.ReLU(inplace=True),
-                    nn.Linear(d_hid, d_model),
-                )
-
-        self.layernorm1 = nn.LayerNorm(d_model, eps=1e-6)
-        self.layernorm2 = nn.LayerNorm(d_model, eps=1e-6)
-
-        self.dropout1 = nn.Dropout(dropout)
-        self.dropout2 = nn.Dropout(dropout)
-
-    def forward(self, src):
-
-        # att_mask = tf.expand_dims(mask, axis=-1)
-        # att_mask = tf.repeat(att_mask, repeats=tf.shape(att_mask)[1], axis=-1)
-
-        attn_output = self.att(src, src, src, need_weights=False)[0]
-        attn_output = self.dropout1(attn_output)
-
-        out1 = self.layernorm1(src + attn_output)
-        ffn_output = self.ffn(out1)
-        ffn_output = self.dropout2(ffn_output)
-
-        return self.layernorm2(out1 + ffn_output)
-
-
 
 class Transformer(Model):
     def __init__(
@@ -110,8 +74,7 @@ class Transformer(Model):
             nn.Linear(d_model, 1),
         )
 
-
-    def forward(self, src: Tensor) -> Tensor:
+    def forward(self, batch: Batch) -> Tensor:
         """
         Args:
             src: Tensor, shape [seq_len, batch_size]
@@ -119,7 +82,7 @@ class Transformer(Model):
         Returns:
             output Tensor of shape [seq_len, batch_size, ntoken]
         """
-
+        src = batch.get("sequence")
         src = self.encoder(src)
         src = self.pos_encoder(src)
         
@@ -128,9 +91,12 @@ class Transformer(Model):
 
         src = self.resnet(src.unsqueeze(dim=1)).squeeze(dim=1)
 
+        dms = self.output_net_DMS(src)
+        shape = self.output_net_SHAPE(src)
+
         return {
-            "dms": self.output_net_DMS(src).squeeze(axis=2),
-            "shape": self.output_net_SHAPE(src).squeeze(axis=2),
+            "dms": dms.squeeze(dim=-1),
+            "shape": shape.squeeze(dim=-1),
         }
 
 

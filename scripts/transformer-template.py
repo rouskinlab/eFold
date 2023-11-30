@@ -1,5 +1,6 @@
 import sys, os
-
+import envbash
+envbash.load.load_envbash('.env')
 sys.path.append(os.path.abspath("."))
 from dmsensei import DataModule, create_model
 from dmsensei.config import device
@@ -19,7 +20,7 @@ if __name__ == "__main__":
     USE_WANDB = 1
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        wandb_logger = WandbLogger(project='Transformer-tuning')
+        wandb_logger = WandbLogger(project='CHANGE_ME')
 
         
     lr = 5e-4
@@ -43,7 +44,7 @@ if __name__ == "__main__":
     model = create_model(
         model="transformer",
         data="multi",
-        quality=False,
+        weight_data=True,
         ntoken=5,
         d_model=128,
         nhead=16,
@@ -83,31 +84,31 @@ if __name__ == "__main__":
     )
 
     trainer.fit(model, datamodule=dm)
-    # trainer.test(model, datamodule=dm)
+    trainer.test(model, datamodule=dm)
     
-    # dm = DataModule(
-    #     name=["ribo-test"],
-    #     data_type=["dms", "shape"],
-    #     force_download=False,
-    #     batch_size=batch_size,
-    #     num_workers=0,
-    #     train_split=0,
-    #     valid_split=0,
-    #     predict_split=1.,
-    #     overfit_mode=False,
-    #     shuffle_valid=False,
-    # )
+    dm = DataModule(
+        name=["ribo-test"],
+        data_type=["dms", "shape"],
+        force_download=False,
+        batch_size=batch_size,
+        num_workers=0,
+        train_split=0,
+        valid_split=0,
+        predict_split=1.,
+        overfit_mode=False,
+        shuffle_valid=False,
+    )
     
-    # trainer = Trainer(
-    #     accelerator=device,
-    #     devices=1,
-    #     callbacks=[KaggleLogger(
-    #         push_to_kaggle=True, 
-    #         load_model=None # 'best', None or path to model
-    #         )]
-    # )
+    trainer = Trainer(
+        accelerator=device,
+        devices=1,
+        callbacks=[KaggleLogger(
+            push_to_kaggle=True, 
+            load_model=None # 'best', None or path to model
+            )]
+    )
 
-    # trainer.predict(model, datamodule=dm)
+    trainer.predict(model, datamodule=dm)
 
     if USE_WANDB:
         wandb.finish()

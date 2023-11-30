@@ -1,37 +1,22 @@
-from .dms import MultiLayerPerceptron as dms_mlp
-from .multi import Transformer as multi_transformer
-from .multi import Evoformer as multi_evoformer
-
+from .transformer import Transformer
+from .evoformer import Evoformer
 
 class ModelFactory:
+    models = ["transformer", "evoformer"]
     def __init__(self):
-        self.models = {
-            "dms": ["mlp", "transformer", "evoformer"],
-            "structure": [],
-            "multi": ["transformer", "evoformer"],
-        }
+        pass
+    
+    def __call__(self, model: str, **kwargs):
+        return self.get_model(model, **kwargs)
 
-    def __call__(self, data: str, model: str, **kwargs):
-        data = data.lower()
-        return self.get_model(data, model, **kwargs)
+    def get_model(self, model: str, *args, **kwargs):
 
-    def get_model(self, data: str, model: str, *args, **kwargs):
-        assert data in list(
-            self.models.keys()
-        ), f"Data must be one of {list(self.models.keys())}"
-        assert model in self.models[data], f"Model must be one of {self.models[data]}"
+        assert model in self.models, f"Model must be one of {self.models}"
+        
+        if model == "transformer":
+            return Transformer(*args, **kwargs)
+        if model == "evoformer":
+            return Evoformer(*args, **kwargs)
 
-        if data == "dms":
-            if model == "mlp":
-                return dms_mlp(**kwargs)
-        if data == "multi":
-            if model == "transformer":
-                return multi_transformer(*args, **kwargs)
-            if model == "evoformer":
-                return multi_evoformer(*args, **kwargs)
-
-        raise NotImplementedError(f"Model {model} for data {data} not implemented.")
-
-
-def create_model(data: str, model: str, **kwargs):
-    return ModelFactory()(data, model, **kwargs)
+def create_model(model: str, **kwargs):
+    return ModelFactory()(model, **kwargs)

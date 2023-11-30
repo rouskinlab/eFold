@@ -88,8 +88,6 @@ class DataModule(pl.LightningDataModule):
                 merge.list_of_datapoints + dataset.list_of_datapoints
             )
         merge.collate_fn = collate_fn
-        for index, datapoint in enumerate(merge.list_of_datapoints):
-            datapoint.metadata.index = index
         return merge
 
     def setup(self, stage: str = None):
