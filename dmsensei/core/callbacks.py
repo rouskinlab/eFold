@@ -123,7 +123,7 @@ class WandbFitLogger(LoadBestModel):
         # #### PLOT ####
 
         # For multi-gpu training. Only plot for the validation set
-        if (rank_zero_only.rank or dataloader_idx) and not trainer.current_epoch % self.log_plots_every_n_epoch:
+        if (rank_zero_only.rank or dataloader_idx) and not trainer.current_epoch % self.log_plots_every_n_epoch or True: # TODO: remove True
             return
 
         # plot one example per epoch and per data_type
@@ -152,9 +152,7 @@ class WandbFitLogger(LoadBestModel):
             idx = batch.get("reference").index(
                 self.validation_examples_references[data_type]
             )
-            length = batch.get("length", index=idx)
             pred, true = batch.get(f"pred_{data_type}", index=idx), batch.get(data_type, index=torch.where(batch.get('index_dms') == idx)[0][0])
-            pred, true = pred[:length], true[:length]
             plot = plot_factory[(data_type, name)](
                 pred=pred,
                 true=true,

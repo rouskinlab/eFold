@@ -175,12 +175,15 @@ class Batch:
         
         if data_type in ["reference", "sequence", "length"]:
             out = getattr(self, data_type)
+            data_part = None
         else:
             data_part, data_type = split_data_type(data_type)
             out = getattr(getattr(self, data_type), data_part)
         
         if index is not None:
             out = out[index]
+            if data_part in ['true','error']: # use the right length
+                index = self.get(f"index_{data_type}")[index]
             if hasattr(out, '__len__'):
                 out = out[:self.get("length")[index]]
 
