@@ -152,7 +152,7 @@ class WandbFitLogger(LoadBestModel):
             idx = batch.get("reference").index(
                 self.validation_examples_references[data_type]
             )
-            pred, true = batch.get(f"pred_{data_type}", index=idx), batch.get(data_type, index=idx)
+            pred, true = batch.get(f"pred_{data_type}", index=idx), batch.get(data_type, index=torch.where(batch.get('index_dms') == idx)[0][0])
             plot = plot_factory[(data_type, name)](
                 pred=pred,
                 true=true,
