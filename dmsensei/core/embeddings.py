@@ -37,8 +37,8 @@ def base_pairs_to_pairing_matrix(base_pairs, sequence_length):
     pairing_matrix = torch.zeros((sequence_length, sequence_length))
     base_pairs = torch.tensor(base_pairs)
     if len(base_pairs) > 0:
-        pairing_matrix[base_pairs[:,0], base_pairs[:,1]] = 1.0
-        pairing_matrix[base_pairs[:,1], base_pairs[:,0]] = 1.0
+        pairing_matrix[base_pairs[:, 0], base_pairs[:, 1]] = 1.0
+        pairing_matrix[base_pairs[:, 1], base_pairs[:, 0]] = 1.0
     return pairing_matrix
 
 

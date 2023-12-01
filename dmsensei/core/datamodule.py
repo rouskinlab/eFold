@@ -1,14 +1,8 @@
-from ..config import TEST_SETS
-import torch
 from torch.utils.data import DataLoader, random_split, Subset
 import lightning.pytorch as pl
-import numpy as np
 from typing import Union, List
 from .dataset import Dataset
-
-# set seed
-torch.manual_seed(0)
-np.random.seed(0)
+from ..config import TEST_SETS
 
 
 class DataModule(pl.LightningDataModule):
@@ -84,9 +78,8 @@ class DataModule(pl.LightningDataModule):
         merge = datasets[0]
         collate_fn = merge.collate_fn
         for dataset in datasets[1:]:
-            merge.list_of_datapoints = (
-                merge.list_of_datapoints + dataset.list_of_datapoints
-            )
+            # TODO: implement this method
+            merge = merge + dataset
         merge.collate_fn = collate_fn
         return merge
 

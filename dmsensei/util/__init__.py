@@ -8,6 +8,7 @@ str2fun = {
     "l1_loss": nn.functional.l1_loss,
 }
 
+
 def unzip(f):
     def wrapper(*args, **kwargs):
         out = f(*args, **kwargs)
@@ -16,4 +17,5 @@ def unzip(f):
         if len(out) == 1:
             return out[0]
         return out
+
     return wrapper

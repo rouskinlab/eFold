@@ -1,6 +1,5 @@
 import torch
 from ..config import device, UKN
-from .embeddings import base_pairs_to_pairing_matrix
 import torch.nn.functional as F
 from .util import _pad
 
@@ -25,36 +24,24 @@ class DataTypeBatch(DataType):
     def __init__(self, true, pred, index, error=None):
         super().__init__(true, pred=pred, index=index, error=error)
 
-    # @classmethod
-    # def from_list_of_datapoints(cls, datapoints: list, data_type: str):
-    #     for id
 
-    def get(self, idx, L):
-        if not hasattr(self.true, "__iter__"):
-            raise ValueError("This data type is not iterable.")
-        if not idx in self.index:
-            return None
-        return data_type_factory['datapoint'][self.name](
-            true=self.true[idx][:L],
-            pred=self.pred[idx][:L] if self.pred is not None else None,
-            error=self.error[idx][:L] if self.error is not None else None,
-        )
- 
 class DataTypeDataset(DataType):
     def __init__(self, true, index, error=None):
         super().__init__(true=true, error=error, index=index)
-    
+
     @classmethod
-    def from_data_json(cls, data_json: dict, L:int, refs:list):
+    def from_data_json(cls, data_json: dict, L: int, refs: list):
         data_type = cls.name
         index, true, error = [], [], []
         for idx, ref in enumerate(refs):
             values = data_json[ref]
             if data_type in values:
                 index.append(idx)
-                if data_type != 'structure':
+                if data_type != "structure":
                     true.append(_pad(values[data_type], L, data_type))
-                    error.append(_pad(values["error_{}".format(data_type)], L, data_type))
+                    error.append(
+                        _pad(values["error_{}".format(data_type)], L, data_type)
+                    )
                 else:
                     true.append(values[data_type])
 
@@ -62,7 +49,7 @@ class DataTypeDataset(DataType):
             return None
 
         def post_process(x, dtype, dim=1):
-            if cls.name == 'structure' and dim == 2:
+            if cls.name == "structure" and dim == 2:
                 return x
             if len(x) == 0:
                 return None
@@ -72,38 +59,39 @@ class DataTypeDataset(DataType):
                 return torch.stack(x).to(dtype=dtype)
             raise ValueError(f"dim must be 1 or 2, got {dim}")
 
-        return cls(**{
-            "true": post_process(true, torch.float32, dim=2),
-            "error": post_process(error, torch.float32, dim=2),
-            "index": post_process(index, torch.int32, dim=1),
-        })
-        
-
-class DataTypeDatapoint(DataType):
-    def __init__(self, true, pred, index, error=None):
-        super().__init__(true=true, pred=pred, index=index, error=error)
+        return cls(
+            **{
+                "true": post_process(true, torch.float32, dim=2),
+                "error": post_process(error, torch.float32, dim=2),
+                "index": post_process(index, torch.int32, dim=1),
+            }
+        )
 
 
 class DMSBatch(DataTypeBatch):
     name = "dms"
+
     def __init__(self, true, pred=None, error=None, index=None):
         super().__init__(true=true, pred=pred, index=index, error=error)
 
 
 class SHAPEBatch(DataTypeBatch):
     name = "shape"
+
     def __init__(self, true, pred=None, error=None, index=None):
         super().__init__(true=true, pred=pred, index=index, error=error)
 
 
 class StructureBatch(DataTypeBatch):
     name = "structure"
+
     def __init__(self, true, pred=None, index=None, error=None):
         super().__init__(true=true, pred=pred, index=index)
 
 
 class DMSDataset(DataTypeDataset):
     name = "dms"
+
     def __init__(self, true, error=None, index=None):
         super().__init__(true=true, error=error, index=index)
 
@@ -115,13 +103,14 @@ class DMSDataset(DataTypeDataset):
             "true": self.true[local_idx],
             "error": self.error[local_idx],
         }
-        
-        
+
+
 class SHAPEDataset(DataTypeDataset):
     name = "shape"
+
     def __init__(self, true, error=None, index=None):
         super().__init__(true=true, error=error, index=index)
-        
+
     def __getitem__(self, idx):
         if not idx in self.index:
             return None
@@ -130,12 +119,14 @@ class SHAPEDataset(DataTypeDataset):
             "true": self.true[local_idx],
             "error": self.error[local_idx],
         }
-        
+
+
 class StructureDataset(DataTypeDataset):
     name = "structure"
+
     def __init__(self, true, index=None, error=None):
         super().__init__(true=true, index=index)
-        
+
     def __getitem__(self, idx):
         if not idx in self.index:
             return None
@@ -143,40 +134,13 @@ class StructureDataset(DataTypeDataset):
         return {
             "true": self.true[local_idx],
         }
-
-class DMSDatapoint(DataTypeDatapoint):
-    name = "dms"
-    def __init__(self, true, pred=None, error=None, index=None):
-        super().__init__(true=true, pred=pred, error=error, index=index)
-
-
-class SHAPEDatapoint(DataTypeDatapoint):
-    name = "shape"
-    def __init__(self, true, pred=None, error=None, index=None):
-        super().__init__(true=true, pred=pred, error=error, index=index)
-        
-
-class StructureDatapoint(DataTypeDatapoint):
-    name = "structure"
-    def __init__(self, true, pred=None, index=None, error=None):
-        super().__init__(true=true, pred=pred, index=index)
 
 
 data_type_factory = {
-    'batch':{
-        'dms':DMSBatch,
-        'shape':SHAPEBatch,
-        'structure':StructureBatch
+    "batch": {"dms": DMSBatch, "shape": SHAPEBatch, "structure": StructureBatch},
+    "dataset": {
+        "dms": DMSDataset,
+        "shape": SHAPEDataset,
+        "structure": StructureDataset,
     },
-    'dataset':{
-        'dms':DMSDataset,
-        'shape':SHAPEDataset,
-        'structure':StructureDataset
-    },
-    'datapoint':{
-        'dms':DMSDatapoint,
-        'shape':SHAPEDatapoint,
-        'structure':StructureDatapoint
-    }
 }
-

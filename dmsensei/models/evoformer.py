@@ -31,9 +31,11 @@ class Evoformer(Model):
         **kwargs,
     ):
         self.save_hyperparameters()
-        super(Evoformer, self).__init__(lr=lr, loss_fn=loss_fn, optimizer_fn=optimizer_fn, **kwargs)
+        super(Evoformer, self).__init__(
+            lr=lr, loss_fn=loss_fn, optimizer_fn=optimizer_fn, **kwargs
+        )
 
-        self.model_type = 'Evoformer'
+        self.model_type = "Evoformer"
         self.lr = lr
         self.gamma = gamma
         self.train_losses = []
@@ -53,20 +55,24 @@ class Evoformer(Model):
             no_recycles=no_recycles,
         )
 
-        self.output_net_DMS = nn.Sequential(nn.LayerNorm(d_model),
-                                                nn.Linear(d_model, d_model), 
-                                                nn.ReLU(),
-                                                nn.Linear(d_model, 1))
+        self.output_net_DMS = nn.Sequential(
+            nn.LayerNorm(d_model),
+            nn.Linear(d_model, d_model),
+            nn.ReLU(),
+            nn.Linear(d_model, 1),
+        )
 
-        self.output_net_SHAPE = nn.Sequential(nn.LayerNorm(d_model),
-                                                nn.Linear(d_model, d_model), 
-                                                nn.ReLU(),
-                                                nn.Linear(d_model, 1))
+        self.output_net_SHAPE = nn.Sequential(
+            nn.LayerNorm(d_model),
+            nn.Linear(d_model, d_model),
+            nn.ReLU(),
+            nn.Linear(d_model, 1),
+        )
 
     def forward(self, batch: Batch) -> Tensor:
         # Encoding of RNA sequence
         # (N, L, d_model)
-        src = batch.get('sequence')
+        src = batch.get("sequence")
         s = self.encoder(src)
 
         # (N, L, c_z / 2)
@@ -88,8 +94,8 @@ class Evoformer(Model):
         # return output.squeeze(-1)
 
         return {
-            'dms': self.output_net_DMS(s).squeeze(axis=2),
-            'shape': self.output_net_SHAPE(s).squeeze(axis=2)
+            "dms": self.output_net_DMS(s).squeeze(axis=2),
+            "shape": self.output_net_SHAPE(s).squeeze(axis=2),
         }
 
 

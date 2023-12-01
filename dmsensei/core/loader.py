@@ -29,7 +29,7 @@ class Loader:
         return self.path.split("/")[-1].split(".")[0]
 
     def write_in_log(self, epoch, mae):
-        with open("models/log.txt", "a") as f:
+        with open("models/_log.txt", "a") as f:
             f.write(f"{epoch} {self.get_name()}\t{mae}\n")
         return self
 

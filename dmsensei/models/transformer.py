@@ -9,6 +9,7 @@ from ..core.batch import Batch
 dir_name = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(dir_name, ".."))
 
+
 class Transformer(Model):
     def __init__(
         self,
@@ -85,7 +86,7 @@ class Transformer(Model):
         src = batch.get("sequence")
         src = self.encoder(src)
         src = self.pos_encoder(src)
-        
+
         for i, l in enumerate(self.transformer_encoder):
             src = self.transformer_encoder[i](src)
 

@@ -9,7 +9,7 @@ from .batch import Batch
 
 
 class Model(pl.LightningModule):
-    def __init__(self, lr: float, optimizer_fn, weight_data:bool=False, **kwargs):
+    def __init__(self, lr: float, optimizer_fn, weight_data: bool = False, **kwargs):
         super().__init__()
 
         # Set attributes
@@ -18,7 +18,7 @@ class Model(pl.LightningModule):
         self.lr = lr
         self.optimizer_fn = optimizer_fn
         self.automatic_optimization = True
-        
+
         self.weight_data = weight_data
         self.save_hyperparameters()
 
@@ -43,7 +43,13 @@ class Model(pl.LightningModule):
         pred, true = batch.get_pairs(data_type)
         mask = true != -1000.0
         if self.weight_data:
-            return F.gaussian_nll_loss(pred[mask], true[mask], batch.get("error_{}".format(data_type))[mask], full=True, eps=5E-2)
+            return F.gaussian_nll_loss(
+                pred[mask],
+                true[mask],
+                batch.get("error_{}".format(data_type))[mask],
+                full=True,
+                eps=5e-2,
+            )
         return F.mse_loss(pred[mask], true[mask])
 
     def _loss_structure(self, batch: Batch):
@@ -53,18 +59,22 @@ class Model(pl.LightningModule):
 
     def loss_fn(self, batch: Batch):
         loss = torch.tensor(0.0, device=self.device)
-        count = {dt: batch.count(dt) for dt in batch.data_types if batch.contains(dt) and batch.contains(f"pred_{dt}")}
-        if 'dms' in count.keys():
+        count = {
+            dt: batch.count(dt)
+            for dt in batch.data_types
+            if batch.contains(dt) and batch.contains(f"pred_{dt}")
+        }
+        if "dms" in count.keys():
             loss += count["dms"] * self._loss_signal(batch, "dms")
-        if 'shape' in count.keys():
+        if "shape" in count.keys():
             loss += count["shape"] * self._loss_signal(batch, "shape")
-        if 'structure' in count.keys():
+        if "structure" in count.keys():
             loss += count["structure"] * self._loss_structure(batch)
         loss = loss / np.sum(list(count.values()))
         if not self.weight_data:
             loss = torch.sqrt(loss)
         return loss
-    
+
     def _clean_predictions(self, batch, predictions):
         # clip values to [0, 1]
         for data_type in set(["dms", "shape"]).intersection(predictions.keys()):

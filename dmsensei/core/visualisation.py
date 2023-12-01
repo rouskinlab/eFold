@@ -96,7 +96,7 @@ def plot_signal(
             )
         ax.set_xlabel("True {}".format(data_type))
         ax.set_ylabel("Predicted {}".format(data_type))
-        
+
         # minimal window is 0, 1
         xmin, xmax = ax.get_xlim()
         ymin, ymax = ax.get_ylim()

@@ -4,7 +4,7 @@ envbash.load.load_envbash('.env')
 sys.path.append(os.path.abspath("."))
 from dmsensei import DataModule, create_model
 from dmsensei.config import device
-from dmsensei.core.callbacks import WandbFitLogger, KaggleLogger, WandbTestLogger
+from dmsensei.core.callbacks import WandbFitLogger, KaggleLogger
 from lightning.pytorch import Trainer
 from lightning.pytorch import Trainer
 from dmsensei.config import device
@@ -17,10 +17,10 @@ import wandb
 sys.path.append(os.path.abspath("."))
 
 if __name__ == "__main__":
-    USE_WANDB = 1
+    USE_WANDB = True
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        wandb_logger = WandbLogger(project='CHANGE_ME')
+        wandb_logger = WandbLogger(project='CHANGE_ME', name = 'debug')
 
         
     lr = 5e-4
@@ -34,8 +34,8 @@ if __name__ == "__main__":
         force_download=False,
         batch_size=batch_size,
         num_workers=0,
-        train_split=298281,
-        valid_split=4096,
+        train_split=256,
+        valid_split=128,
         predict_split=0,
         overfit_mode=False,
         shuffle_valid=False,
@@ -67,8 +67,8 @@ if __name__ == "__main__":
     # train with both splits
     trainer = Trainer(
         accelerator=device,
-        devices=4,
-        strategy="ddp",
+        # devices=4,
+        # strategy="ddp",
         # precision="16-mixed",
         # accumulate_grad_batches=2,
         max_epochs=300,
@@ -76,7 +76,6 @@ if __name__ == "__main__":
         callbacks=[  
             LearningRateMonitor(logging_interval="epoch"),
             WandbFitLogger(dm=dm, batch_size=batch_size, load_model=None),
-            WandbTestLogger(dm=dm, n_best_worst=10, load_model='best'), # 'best', None or path to model
         ]
         if USE_WANDB
         else [],
@@ -84,7 +83,6 @@ if __name__ == "__main__":
     )
 
     trainer.fit(model, datamodule=dm)
-    trainer.test(model, datamodule=dm)
     
     dm = DataModule(
         name=["ribo-test"],
@@ -104,7 +102,7 @@ if __name__ == "__main__":
         devices=1,
         callbacks=[KaggleLogger(
             push_to_kaggle=True, 
-            load_model=None # 'best', None or path to model
+            load_model=None # don't change this
             )]
     )
 
