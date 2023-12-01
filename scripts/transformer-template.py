@@ -1,21 +1,21 @@
+import envbash
+from dmsensei import DataModule, create_model
+from dmsensei.config import device
+from dmsensei.core.callbacks import WandbFitLogger, KaggleLogger
 import wandb
 from lightning.pytorch.callbacks import LearningRateMonitor
 from lightning.pytorch.loggers import WandbLogger
 import os
 import sys
 from lightning.pytorch import Trainer
-from dmsensei.core.callbacks import WandbFitLogger, KaggleLogger
-from dmsensei.config import device
-from dmsensei import DataModule, create_model
-import envbash
+
+sys.path.append(os.path.abspath("."))
 
 envbash.load.load_envbash(".env")
 sys.path.append(os.path.abspath("."))
 
-sys.path.append(os.path.abspath("."))
-
 if __name__ == "__main__":
-    USE_WANDB = True
+    USE_WANDB = False
     print("Running on device: {}".format(device))
     if USE_WANDB:
         wandb_logger = WandbLogger(project="CHANGE_ME", name="debug")
@@ -72,7 +72,7 @@ if __name__ == "__main__":
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
             LearningRateMonitor(logging_interval="epoch"),
-            WandbFitLogger(dm=dm, batch_size=batch_size, load_model=None),
+            WandbFitLogger(dm=dm, load_model=None),
         ]
         if USE_WANDB
         else [],
