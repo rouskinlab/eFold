@@ -32,3 +32,22 @@ junit_family = "xunit2"
 
 [tool.poetry.include]
 include = ["dmsensei/resources/*.csv"]
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.env
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
