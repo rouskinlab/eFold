@@ -11,3 +11,4 @@ rouskinhf
 einops
 huggingface-hub
 kaggle
+pre-commit
