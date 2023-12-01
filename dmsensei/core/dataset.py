@@ -2,7 +2,6 @@ import os
 import numpy as np
 import torch
 from torch.utils.data import ConcatDataset, Dataset as TorchDataset, Dataset
-import torch.nn.functional as F
 from typing import List
 
 from .batch import Batch
@@ -70,12 +69,8 @@ class Dataset(TorchDataset):
             self.L = max(self.length)
 
             print("Dump sequences              \r", end="")
-            self.sequence = torch.stack(
-                [
-                    _pad(sequence_to_int(data[ref]["sequence"]), self.L, "sequence")
-                    for ref in self.refs
-                ]
-            )
+            self.sequence = torch.stack([_pad(sequence_to_int(
+                data[ref]["sequence"]), self.L, "sequence") for ref in self.refs])
             path.dump_sequence(np.array(self.sequence))
 
             print("Dump dms              \r", end="")
@@ -87,7 +82,8 @@ class Dataset(TorchDataset):
             path.dump_shape(self.shape)
 
             print("Dump structure              \r", end="")
-            self.structure = StructureDataset.from_data_json(data, self.L, self.refs)
+            self.structure = StructureDataset.from_data_json(
+                data, self.L, self.refs)
             path.dump_structure(self.structure)
 
             for dt in ["dms", "shape", "structure"]:

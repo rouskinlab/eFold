@@ -1,7 +1,8 @@
 import numpy as np
 import torch
 from torch import nn, Tensor
-import os, sys
+import os
+import sys
 from contextlib import ExitStack
 
 import typing as T
@@ -126,7 +127,8 @@ class EvoBlock(nn.Module):
         # bias attention heads
         self.pair_to_sequence = PairToSequence(c_z, no_heads_s)
 
-        self.seq_attention = Attention(c_s, no_heads_s, c_s / no_heads_s, gated=True)
+        self.seq_attention = Attention(
+            c_s, no_heads_s, c_s / no_heads_s, gated=True)
 
         self.resNet = ResLayer(
             dim_in=c_z, dim_out=c_z, n_blocks=2, kernel_size=3, dropout=dropout
@@ -218,9 +220,10 @@ class EvoBlock(nn.Module):
         # Update pairwise state
         pairwise_state = pairwise_state + self.sequence_to_pair(sequence_state)
 
-        pairwise_state = self.resNet(pairwise_state.permute(0, 3, 1, 2)).permute(
-            0, 2, 3, 1
-        )
+        pairwise_state = self.resNet(
+            pairwise_state.permute(
+                0, 3, 1, 2)).permute(
+            0, 2, 3, 1)
 
         # # Axial attention
         # pairwise_state = pairwise_state + self.row_drop(
@@ -265,7 +268,8 @@ class EvoFold(nn.Module):
         # First 'recycle' is just the standard forward pass through the model.
         self.itters = no_recycles + 1
 
-        self.pairwise_positional_embedding = RelativePosition(position_bins, c_z)
+        self.pairwise_positional_embedding = RelativePosition(
+            position_bins, c_z)
 
         self.blocks = nn.ModuleList(
             [
@@ -369,7 +373,7 @@ class Dropout(nn.Module):
         super(Dropout, self).__init__()
 
         self.r = r
-        if type(batch_dim) == int:
+        if isinstance(batch_dim, int):
             batch_dim = [batch_dim]
         self.batch_dim = batch_dim
         self.dropout = nn.Dropout(self.r)
@@ -453,7 +457,10 @@ class Attention(nn.Module):
           sequence projection (B x L x embed_dim), attention maps (B x L x L x num_heads)
         """
 
-        t = rearrange(self.proj(x), "... l (h c) -> ... h l c", h=self.num_heads)
+        t = rearrange(
+            self.proj(x),
+            "... l (h c) -> ... h l c",
+            h=self.num_heads)
         q, k, v = t.chunk(3, dim=-1)
 
         q = self.rescale_factor * q

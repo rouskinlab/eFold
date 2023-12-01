@@ -18,7 +18,7 @@ TEST_SETS = {
     "structure": [],  # ["CT_files_pdbee"], #TODO #16 add structure test sets
     "sequence": [],
     "dms": ["sarah_supermodel"],  # "utr", "SARS2", "pri-miRNA"],
-    "shape": [],  #'ribonanza_LQ']
+    "shape": [],  # 'ribonanza_LQ']
 }
 
 

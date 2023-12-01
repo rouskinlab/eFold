@@ -2,7 +2,8 @@ import torch
 from torch import nn, Tensor
 from torch.nn import TransformerEncoderLayer
 import numpy as np
-import os, sys
+import os
+import sys
 from ..core.model import Model
 from ..core.batch import Batch
 from einops import rearrange
@@ -15,7 +16,10 @@ sys.path.append(os.path.join(dir_name, ".."))
 class CNN(Model):
     def __init__(
         self,
-        ntoken: int, d_model: int, d_cnn: int, n_heads: int,
+        ntoken: int,
+        d_model: int,
+        d_cnn: int,
+        n_heads: int,
         dropout: float = 0.1,
         lr: float = 1e-5,
         optimizer_fn=torch.optim.Adam,
@@ -29,19 +33,42 @@ class CNN(Model):
 
         self.encoder = nn.Embedding(ntoken, d_model)
         self.pos_encoder = PositionalEncoding(d_model, dropout)
-        self.encoder_adapter = nn.Linear(d_model, d_cnn//2)
-        self.structure_adapter = nn.Linear(d_cnn//8, n_heads)
+        self.encoder_adapter = nn.Linear(d_model, d_cnn // 2)
+        self.structure_adapter = nn.Linear(d_cnn // 8, n_heads)
         self.activ = nn.ReLU()
 
         self.res_layers = nn.Sequential(
-            ResLayer(dim_in=2*d_cnn//2, dim_out=d_cnn//2, n_blocks=3, kernel_size=3, dropout=dropout),
-            ResLayer(dim_in=d_cnn//2,   dim_out=d_cnn//4, n_blocks=6, kernel_size=3, dropout=dropout),
-            ResLayer(dim_in=d_cnn//4,   dim_out=d_cnn//8, n_blocks=4, kernel_size=3, dropout=dropout)
+            ResLayer(
+                dim_in=2 * d_cnn // 2,
+                dim_out=d_cnn // 2,
+                n_blocks=3,
+                kernel_size=3,
+                dropout=dropout,
+            ),
+            ResLayer(
+                dim_in=d_cnn // 2,
+                dim_out=d_cnn // 4,
+                n_blocks=6,
+                kernel_size=3,
+                dropout=dropout,
+            ),
+            ResLayer(
+                dim_in=d_cnn // 4,
+                dim_out=d_cnn // 8,
+                n_blocks=4,
+                kernel_size=3,
+                dropout=dropout,
+            ),
         )
 
-        self.output_structure = ResLayer(dim_in=d_cnn//8, dim_out=1, n_blocks=3, kernel_size=3, dropout=dropout)
+        self.output_structure = ResLayer(
+            dim_in=d_cnn // 8,
+            dim_out=1,
+            n_blocks=3,
+            kernel_size=3,
+            dropout=dropout)
 
-        self.seq_attention = Attention(d_model, n_heads, d_model//n_heads)
+        self.seq_attention = Attention(d_model, n_heads, d_model // n_heads)
 
         self.output_net_DMS = nn.Sequential(
             nn.Linear(d_model, d_model * 2),
@@ -75,20 +102,27 @@ class CNN(Model):
         src = self.encoder(src)
         src = self.pos_encoder(src)
 
-        x = self.activ(self.encoder_adapter(src))    # (N, L, d_cnn/2)
+        x = self.activ(self.encoder_adapter(src))  # (N, L, d_cnn/2)
 
         # Outer concatenation
-        matrix = x.unsqueeze(1).repeat(1,x.shape[1],1,1)                # (N, L, L, d_cnn/2)
-        matrix = torch.cat((matrix, matrix.permute(0,2,1,3)), dim=-1)   # (N, L, L, d_cnn)
+        matrix = x.unsqueeze(1).repeat(
+            1, x.shape[1], 1, 1)  # (N, L, L, d_cnn/2)
+        matrix = torch.cat(
+            (matrix, matrix.permute(0, 2, 1, 3)), dim=-1
+        )  # (N, L, L, d_cnn)
 
         # Resnet layers
-        matrix = self.res_layers(matrix.permute(0,3,1,2))  # (N, d_cnn//8, L, L)
-        structure = self.output_structure(matrix).squeeze(1) # (N, L, L)
+        matrix = self.res_layers(
+            matrix.permute(
+                0, 3, 1, 2))  # (N, d_cnn//8, L, L)
+        structure = self.output_structure(matrix).squeeze(1)  # (N, L, L)
 
-        matrix = self.activ(self.structure_adapter(matrix.permute(0,2,3,1))) # (N, L, L, d_model)
+        matrix = self.activ(
+            self.structure_adapter(matrix.permute(0, 2, 3, 1))
+        )  # (N, L, L, d_model)
 
         # Sequence layers
-        seq = self.seq_attention(src, matrix) # (N, L, d_model)
+        seq = self.seq_attention(src, matrix)  # (N, L, d_model)
 
         dms = self.output_net_DMS(seq)
         shape = self.output_net_SHAPE(seq)
@@ -96,17 +130,22 @@ class CNN(Model):
         return {
             "dms": dms.squeeze(dim=-1),
             "shape": shape.squeeze(dim=-1),
-            'structure': (structure + structure.permute(0,2,1))/2 
+            "structure": (structure + structure.permute(0, 2, 1)) / 2,
         }
-        
+
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
+    def __init__(
+            self,
+            d_model: int,
+            dropout: float = 0.1,
+            max_len: int = 5000):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
 
         position = torch.arange(max_len).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2) * (-np.log(10000.0) / d_model))
+        div_term = torch.exp(torch.arange(0, d_model, 2)
+                             * (-np.log(10000.0) / d_model))
         pe = torch.zeros(max_len, d_model)
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
@@ -151,7 +190,10 @@ class Attention(nn.Module):
           sequence projection (B x L x embed_dim), attention maps (B x L x L x num_heads)
         """
 
-        t = rearrange(self.proj(x), "... l (h c) -> ... h l c", h=self.num_heads)
+        t = rearrange(
+            self.proj(x),
+            "... l (h c) -> ... h l c",
+            h=self.num_heads)
         q, k, v = t.chunk(3, dim=-1)
 
         q = self.rescale_factor * q
@@ -168,7 +210,7 @@ class Attention(nn.Module):
 
         y = self.o_proj(y)
 
-        return y#, rearrange(a, "... lq lk h -> ... h lq lk")
+        return y  # , rearrange(a, "... lq lk h -> ... h lq lk")
 
 
 class ResLayer(nn.Module):

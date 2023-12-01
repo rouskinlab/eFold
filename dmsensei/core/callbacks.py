@@ -35,8 +35,8 @@ class LoadBestModel(pl.Callback):
             loader = Loader.find_best_model(wandb.run.name)
             if loader is None:
                 raise ValueError(
-                    "Stage:{}, No best model found for this run.".format(self.stage)
-                )
+                    "Stage:{}, No best model found for this run.".format(
+                        self.stage))
         else:
             loader = Loader(path=model_file)
 
@@ -53,7 +53,7 @@ class WandbFitLogger(LoadBestModel):
         self,
         dm: DataModule,
         load_model: str = None,
-        log_plots_every_n_epoch: int = 100000000, # deactivated for now
+        log_plots_every_n_epoch: int = 100000000,  # deactivated for now
     ):
         """
         load_model: path to the model to load. None if no model to load.
@@ -84,7 +84,10 @@ class WandbFitLogger(LoadBestModel):
         logger = Logger(pl_module, self.batch_size)
         logger.train_loss(loss.item())
 
-    def on_train_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
+    def on_train_end(
+            self,
+            trainer: Trainer,
+            pl_module: LightningModule) -> None:
         pass
 
     def on_validation_batch_end(
@@ -152,9 +155,10 @@ class WandbFitLogger(LoadBestModel):
             idx = batch.get("reference").index(
                 self.validation_examples_references[data_type]
             )
-            pred, true = batch.get(f"pred_{data_type}", index=idx), batch.get(
-                data_type, index=torch.where(batch.get("index_dms") == idx)[0][0]
-            )
+            pred, true = batch.get(
+                f"pred_{data_type}", index=idx), batch.get(
+                data_type, index=torch.where(
+                    batch.get("index_dms") == idx)[0][0])
             plot = plot_factory[(data_type, name)](
                 pred=pred,
                 true=true,
@@ -176,7 +180,7 @@ class WandbFitLogger(LoadBestModel):
         # Save best model
         if wandb.run is None:
             return
-        
+
         this_epoch_loss = torch.mean(torch.tensor(self.val_losses)).item()
         if this_epoch_loss < self.best_loss:
             # save the best model per integer MAE
@@ -308,7 +312,10 @@ class WandbFitLogger(LoadBestModel):
 
 
 class KaggleLogger(LoadBestModel):
-    def __init__(self, load_model: str = None, push_to_kaggle: bool = True) -> None:
+    def __init__(
+            self,
+            load_model: str = None,
+            push_to_kaggle: bool = True) -> None:
         """
         load_model: path to the model to load. None if no model to load. 'best' to load the best model from wandb run.
         """
@@ -344,16 +351,14 @@ class KaggleLogger(LoadBestModel):
     @rank_zero_only
     def on_predict_end(self, trainer, pl_module):
         # load data
-        df = pd.DataFrame(
-            {"reference": self.pred_ref, "dms": self.pred_dms, "shape": self.pred_shape}
-        )
+        df = pd.DataFrame({"reference": self.pred_ref,
+                           "dms": self.pred_dms, "shape": self.pred_shape})
 
         # sort by reference
         sequence_ids = pd.read_csv(
             os.path.join(
-                os.path.dirname(__file__), "../resources/test_sequences_ids.csv"
-            )
-        )
+                os.path.dirname(__file__),
+                "../resources/test_sequences_ids.csv"))
         df = pd.merge(sequence_ids, df, on="reference")
         assert len(df) == len(
             sequence_ids
@@ -363,17 +368,20 @@ class KaggleLogger(LoadBestModel):
         dms = np.concatenate(df["dms"].values).round(4)
         shape = np.concatenate(df["shape"].values).round(4)
         pred = (
-            pd.DataFrame({"reactivity_DMS_MaP": dms, "reactivity_2A3_MaP": shape})
-            .reset_index()
-            .rename(columns={"index": "id"})
-        )
+            pd.DataFrame(
+                {
+                    "reactivity_DMS_MaP": dms,
+                    "reactivity_2A3_MaP": shape}) .reset_index() .rename(
+                columns={
+                    "index": "id"}))
 
         pred.to_csv("predictions.csv", index=False)
 
         # zip predictions, return 1 if successful
         import subprocess
 
-        use_zip = not subprocess.call(["zip", "predictions.zip", "predictions.csv"])
+        use_zip = not subprocess.call(
+            ["zip", "predictions.zip", "predictions.csv"])
 
         assert (
             len(pred) == 269796671

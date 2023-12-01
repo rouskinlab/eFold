@@ -1,27 +1,22 @@
-import sys, os
+import numpy as np
+import wandb
+from lightning.pytorch.loggers import WandbLogger
+import os
+import sys
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
+import pandas as pd
+from lightning.pytorch import Trainer
+from dmsensei.util import str2fun
+from dmsensei.config import device
+from dmsensei import DataModule, create_model, metrics
 
 sys.path.append(os.path.abspath("."))
 # os.system('source /Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/RNA_data/env')
-from dmsensei import DataModule, create_model, metrics
-from dmsensei.config import device
-from dmsensei.util import str2fun
-from dmsensei.core.callbacks import PredictionLogger, ModelChecker
-from lightning.pytorch import Trainer
-import pandas as pd
-from dmsensei.core.callbacks import PredictionLogger
-from lightning.pytorch.callbacks.early_stopping import EarlyStopping
-from dmsensei.core.callbacks import PredictionLogger
-import pandas as pd
-from lightning.pytorch import Trainer
-from dmsensei.config import device
-import sys
-import os
-from lightning.pytorch.loggers import WandbLogger
-import wandb
-import numpy as np
 
 sys.path.append(os.path.abspath("."))
-# os.system('source /Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/RNA_data/env') why do you need this?
+# os.system('source
+# /Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/RNA_data/env')
+# why do you need this?
 
 
 sweep_configuration = {

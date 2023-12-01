@@ -2,7 +2,8 @@ import torch
 from torch import nn, Tensor
 from torch.nn import TransformerEncoderLayer
 import numpy as np
-import os, sys
+import os
+import sys
 from ..core.model import Model
 from ..core.batch import Batch
 
@@ -20,7 +21,7 @@ class Transformer(Model):
         nlayers: int,
         dropout: float = 0.1,
         lr: float = 1e-5,
-        c_z = 16,
+        c_z=16,
         optimizer_fn=torch.optim.Adam,
         **kwargs,
     ):
@@ -35,7 +36,7 @@ class Transformer(Model):
         self.pos_encoder = PositionalEncoding(d_model, dropout)
         self.encoder_adapter = nn.Linear(d_model, int(c_z / 2))
         self.activ = nn.ReLU()
-        
+
         self.transformer_encoder = nn.Sequential(
             *[
                 TransformerEncoderLayer(
@@ -52,10 +53,20 @@ class Transformer(Model):
         )
 
         self.resnet = nn.Sequential(
-            ResLayer(n_blocks=4, dim_in=1, dim_out=8, kernel_size=3, dropout=dropout),
+            ResLayer(
+                n_blocks=4,
+                dim_in=1,
+                dim_out=8,
+                kernel_size=3,
+                dropout=dropout),
             # ResLayer(n_blocks=4, dim_in=4, dim_out=8, kernel_size=3, dropout=dropout),
             # ResLayer(n_blocks=4, dim_in=8, dim_out=4, kernel_size=3, dropout=dropout),
-            ResLayer(n_blocks=4, dim_in=8, dim_out=1, kernel_size=3, dropout=dropout),
+            ResLayer(
+                n_blocks=4,
+                dim_in=8,
+                dim_out=1,
+                kernel_size=3,
+                dropout=dropout),
         )
 
         self.output_net_DMS = nn.Sequential(
@@ -77,13 +88,29 @@ class Transformer(Model):
             nn.ReLU(inplace=True),
             nn.Linear(d_model, 1),
         )
-        
+
         assert c_z % 4 == 0, "c_z must be divisible by 4"
         assert c_z >= 8, "c_z must be greater than 8"
         self.output_net_structure = nn.Sequential(
-            ResLayer(n_blocks=4, dim_in=c_z, dim_out=c_z//2, kernel_size=3, dropout=dropout),
-            ResLayer(n_blocks=4, dim_in=c_z//2, dim_out=c_z//4, kernel_size=3, dropout=dropout),
-            ResLayer(n_blocks=4, dim_in=c_z//4, dim_out=1, kernel_size=3, dropout=dropout),
+            ResLayer(
+                n_blocks=4,
+                dim_in=c_z,
+                dim_out=c_z // 2,
+                kernel_size=3,
+                dropout=dropout),
+            ResLayer(
+                n_blocks=4,
+                dim_in=c_z // 2,
+                dim_out=c_z // 4,
+                kernel_size=3,
+                dropout=dropout,
+            ),
+            ResLayer(
+                n_blocks=4,
+                dim_in=c_z // 4,
+                dim_out=1,
+                kernel_size=3,
+                dropout=dropout),
         )
 
     def forward(self, batch: Batch) -> Tensor:
@@ -108,15 +135,19 @@ class Transformer(Model):
 
         # Outer concatenation
         src = self.activ(self.encoder_adapter(src))
-        matrix = src.unsqueeze(1).repeat(1, src.shape[1],1,1)                # (N, d_cnn/2, L, L)
-        matrix = torch.cat((matrix, matrix.permute(0,2,1,3)), dim=-1)   # (N, d_cnn, L, L)
+        matrix = src.unsqueeze(1).repeat(
+            1, src.shape[1], 1, 1)  # (N, d_cnn/2, L, L)
+        matrix = torch.cat(
+            (matrix, matrix.permute(0, 2, 1, 3)), dim=-1
+        )  # (N, d_cnn, L, L)
 
         # Resnet layers
-        pair_prob = self.output_net_structure(matrix.permute(0,3,1,2)).squeeze(1)   # (N, L, L)
+        pair_prob = self.output_net_structure(
+            matrix.permute(0, 3, 1, 2)).squeeze(1)  # (N, L, L)
 
         # Symmetrize
-        structure = (pair_prob + pair_prob.permute(0,2,1))/2     # (N, L, L)     
-        
+        structure = (pair_prob + pair_prob.permute(0, 2, 1)) / 2  # (N, L, L)
+
         return {
             "dms": dms.squeeze(dim=-1),
             "shape": shape.squeeze(dim=-1),
@@ -125,12 +156,17 @@ class Transformer(Model):
 
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
+    def __init__(
+            self,
+            d_model: int,
+            dropout: float = 0.1,
+            max_len: int = 5000):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
 
         position = torch.arange(max_len).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2) * (-np.log(10000.0) / d_model))
+        div_term = torch.exp(torch.arange(0, d_model, 2)
+                             * (-np.log(10000.0) / d_model))
         pe = torch.zeros(max_len, d_model)
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)

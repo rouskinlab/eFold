@@ -1,26 +1,23 @@
-import sys, os
-
-sys.path.append(os.path.abspath("."))
-# os.system('source /Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/RNA_data/env')
-from dmsensei import DataModule, create_model, metrics
-from dmsensei.config import device
-from dmsensei.core.callbacks import PredictionLogger, ModelChecker
-from lightning.pytorch import Trainer
-import pandas as pd
-from dmsensei.core.callbacks import PredictionLogger
+import numpy as np
+import wandb
+from lightning.pytorch.loggers import WandbLogger
+import os
+import sys
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from dmsensei.core.callbacks import PredictionLogger
 import pandas as pd
 from lightning.pytorch import Trainer
+from dmsensei.core.callbacks import PredictionLogger, ModelChecker
 from dmsensei.config import device
-import sys
-import os
-from lightning.pytorch.loggers import WandbLogger
-import wandb
-import numpy as np
+from dmsensei import DataModule, create_model, metrics
 
 sys.path.append(os.path.abspath("."))
-# os.system('source /Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/RNA_data/env') why do you need this?
+# os.system('source /Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/RNA_data/env')
+
+sys.path.append(os.path.abspath("."))
+# os.system('source
+# /Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/RNA_data/env')
+# why do you need this?
 
 if __name__ == "__main__":
     print("Running on device: {}".format(device))
@@ -35,8 +32,11 @@ if __name__ == "__main__":
     wandb_logger = WandbLogger(
         project="dms mlp",
         name="mlp - 5L - lr {} - batch {} - wd {} - embed {} - model {} - dropout".format(
-            LR, BATCH_SIZE, WD, EMBED, MODEL
-        ),
+            LR,
+            BATCH_SIZE,
+            WD,
+            EMBED,
+            MODEL),
     )
 
     MAX_LEN = 1024
