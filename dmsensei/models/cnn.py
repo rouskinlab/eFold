@@ -5,58 +5,43 @@ import numpy as np
 import os, sys
 from ..core.model import Model
 from ..core.batch import Batch
+from einops import rearrange
+import torch.nn.functional as F
 
 dir_name = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(dir_name, ".."))
 
 
-class Transformer(Model):
+class CNN(Model):
     def __init__(
         self,
-        ntoken: int,
-        d_model: int,
-        nhead: int,
-        d_hid: int,
-        nlayers: int,
+        ntoken: int, d_model: int, d_cnn: int, n_heads: int,
         dropout: float = 0.1,
         lr: float = 1e-5,
-        c_z = 16,
         optimizer_fn=torch.optim.Adam,
         **kwargs,
     ):
         super().__init__(lr=lr, optimizer_fn=optimizer_fn, **kwargs)
 
+        self.model_type = "CNN"
         self.d_model = d_model
-        self.nhead = nhead
-        self.nlayers = nlayers
-        self.model_type = "Transformer"
+        self.d_cnn = d_cnn
 
         self.encoder = nn.Embedding(ntoken, d_model)
         self.pos_encoder = PositionalEncoding(d_model, dropout)
-        self.encoder_adapter = nn.Linear(d_model, int(c_z / 2))
+        self.encoder_adapter = nn.Linear(d_model, d_cnn//2)
+        self.structure_adapter = nn.Linear(d_cnn//8, n_heads)
         self.activ = nn.ReLU()
-        
-        self.transformer_encoder = nn.Sequential(
-            *[
-                TransformerEncoderLayer(
-                    d_model,
-                    nhead,
-                    d_hid,
-                    dropout,
-                    batch_first=True,
-                    norm_first=True,
-                    activation="relu",
-                )
-                for i in range(nlayers)
-            ]
+
+        self.res_layers = nn.Sequential(
+            ResLayer(dim_in=2*d_cnn//2, dim_out=d_cnn//2, n_blocks=3, kernel_size=3, dropout=dropout),
+            ResLayer(dim_in=d_cnn//2,   dim_out=d_cnn//4, n_blocks=6, kernel_size=3, dropout=dropout),
+            ResLayer(dim_in=d_cnn//4,   dim_out=d_cnn//8, n_blocks=4, kernel_size=3, dropout=dropout)
         )
 
-        self.resnet = nn.Sequential(
-            ResLayer(n_blocks=4, dim_in=1, dim_out=8, kernel_size=3, dropout=dropout),
-            # ResLayer(n_blocks=4, dim_in=4, dim_out=8, kernel_size=3, dropout=dropout),
-            # ResLayer(n_blocks=4, dim_in=8, dim_out=4, kernel_size=3, dropout=dropout),
-            ResLayer(n_blocks=4, dim_in=8, dim_out=1, kernel_size=3, dropout=dropout),
-        )
+        self.output_structure = ResLayer(dim_in=d_cnn//8, dim_out=1, n_blocks=3, kernel_size=3, dropout=dropout)
+
+        self.seq_attention = Attention(d_model, n_heads, d_model//n_heads)
 
         self.output_net_DMS = nn.Sequential(
             nn.Linear(d_model, d_model * 2),
@@ -77,14 +62,6 @@ class Transformer(Model):
             nn.ReLU(inplace=True),
             nn.Linear(d_model, 1),
         )
-        
-        assert c_z % 4 == 0, "c_z must be divisible by 4"
-        assert c_z >= 8, "c_z must be greater than 8"
-        self.output_net_structure = nn.Sequential(
-            ResLayer(n_blocks=4, dim_in=c_z, dim_out=c_z//2, kernel_size=3, dropout=dropout),
-            ResLayer(n_blocks=4, dim_in=c_z//2, dim_out=c_z//4, kernel_size=3, dropout=dropout),
-            ResLayer(n_blocks=4, dim_in=c_z//4, dim_out=1, kernel_size=3, dropout=dropout),
-        )
 
     def forward(self, batch: Batch) -> Tensor:
         """
@@ -98,31 +75,30 @@ class Transformer(Model):
         src = self.encoder(src)
         src = self.pos_encoder(src)
 
-        for i, l in enumerate(self.transformer_encoder):
-            src = self.transformer_encoder[i](src)
-
-        src = self.resnet(src.unsqueeze(dim=1)).squeeze(dim=1)
-
-        dms = self.output_net_DMS(src)
-        shape = self.output_net_SHAPE(src)
+        x = self.activ(self.encoder_adapter(src))    # (N, L, d_cnn/2)
 
         # Outer concatenation
-        src = self.activ(self.encoder_adapter(src))
-        matrix = src.unsqueeze(1).repeat(1, src.shape[1],1,1)                # (N, d_cnn/2, L, L)
-        matrix = torch.cat((matrix, matrix.permute(0,2,1,3)), dim=-1)   # (N, d_cnn, L, L)
+        matrix = x.unsqueeze(1).repeat(1,x.shape[1],1,1)                # (N, L, L, d_cnn/2)
+        matrix = torch.cat((matrix, matrix.permute(0,2,1,3)), dim=-1)   # (N, L, L, d_cnn)
 
         # Resnet layers
-        pair_prob = self.output_net_structure(matrix.permute(0,3,1,2)).squeeze(1)   # (N, L, L)
+        matrix = self.res_layers(matrix.permute(0,3,1,2))  # (N, d_cnn//8, L, L)
+        structure = self.output_structure(matrix).squeeze(1) # (N, L, L)
 
-        # Symmetrize
-        structure = (pair_prob + pair_prob.permute(0,2,1))/2     # (N, L, L)     
-        
+        matrix = self.activ(self.structure_adapter(matrix.permute(0,2,3,1))) # (N, L, L, d_model)
+
+        # Sequence layers
+        seq = self.seq_attention(src, matrix) # (N, L, d_model)
+
+        dms = self.output_net_DMS(seq)
+        shape = self.output_net_SHAPE(seq)
+
         return {
             "dms": dms.squeeze(dim=-1),
             "shape": shape.squeeze(dim=-1),
-            "structure": structure,
+            'structure': (structure + structure.permute(0,2,1))/2 
         }
-
+        
 
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
@@ -146,7 +122,55 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 
-## Resnet module definitions ##
+class Attention(nn.Module):
+    def __init__(self, embed_dim, num_heads, head_width):
+        super(Attention, self).__init__()
+        assert embed_dim == num_heads * head_width
+
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_width = head_width
+
+        self.proj = nn.Linear(embed_dim, embed_dim * 3, bias=False)
+        self.o_proj = nn.Linear(embed_dim, embed_dim, bias=True)
+
+        self.rescale_factor = self.head_width**-0.5
+
+        torch.nn.init.zeros_(self.o_proj.bias)
+
+    def forward(self, x, bias=None):
+        """
+        Basic self attention with optional mask and external pairwise bias.
+        To handle sequences of different lengths, use mask.
+
+        Inputs:
+          x: batch of input sequneces (.. x L x C)
+          bias: batch of scalar pairwise attention biases (.. x Lq x Lk x num_heads). optional.
+
+        Outputs:
+          sequence projection (B x L x embed_dim), attention maps (B x L x L x num_heads)
+        """
+
+        t = rearrange(self.proj(x), "... l (h c) -> ... h l c", h=self.num_heads)
+        q, k, v = t.chunk(3, dim=-1)
+
+        q = self.rescale_factor * q
+        a = torch.einsum("...qc,...kc->...qk", q, k)
+
+        # Add external attention bias.
+        if bias is not None:
+            a = a + rearrange(bias, "... lq lk h -> ... h lq lk")
+
+        a = F.softmax(a, dim=-1)
+
+        y = torch.einsum("...hqk,...hkc->...qhc", a, v)
+        y = rearrange(y, "... h c -> ... (h c)", h=self.num_heads)
+
+        y = self.o_proj(y)
+
+        return y#, rearrange(a, "... lq lk h -> ... h lq lk")
+
+
 class ResLayer(nn.Module):
     def __init__(self, n_blocks, dim_in, dim_out, kernel_size, dropout=0.0):
         super(ResLayer, self).__init__()
@@ -154,14 +178,14 @@ class ResLayer(nn.Module):
         # Basic Residula block
         self.res_layers = []
         for i in range(n_blocks):
-            dilation = pow(2, (i % 3))
+            # dilation = pow(2, (i % 3))
             self.res_layers.append(
                 ResBlock(
                     inplanes=dim_in,
                     planes=dim_in,
                     kernel_size=kernel_size,
-                    dilation1=8 * (4 - i % 4),
-                    dilation2=pow(2, (i % 3)),
+                    dilation1=12 * (4 - i % 4),
+                    dilation2=pow(2, (i % 4)),
                     dropout=dropout,
                 )
             )
@@ -200,13 +224,8 @@ class ResBlock(nn.Module):
         )
         self.dropout = nn.Dropout(p=dropout)
         self.relu2 = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv2d(
-            planes,
-            planes,
-            kernel_size=5,
-            padding=2 * dilation2,
-            dilation=dilation2,
-            bias=False,
+        self.conv2 = conv3x3(
+            planes, planes, dilation=dilation2, kernel_size=kernel_size
         )
 
     def forward(self, x: Tensor) -> Tensor:

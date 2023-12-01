@@ -52,16 +52,15 @@ class WandbFitLogger(LoadBestModel):
     def __init__(
         self,
         dm: DataModule,
-        batch_size: int,
         load_model: str = None,
-        log_plots_every_n_epoch: int = 1,
+        log_plots_every_n_epoch: int = 100000000, # deactivated for now
     ):
         """
         load_model: path to the model to load. None if no model to load.
         """
         self.stage = "fit"
         self.data_type = dm.data_type
-        self.batch_size = batch_size
+        self.batch_size = dm.batch_size
         self.model_file = load_model
         self.dm = dm
         self.log_plots_every_n_epoch = log_plots_every_n_epoch
@@ -100,10 +99,12 @@ class WandbFitLogger(LoadBestModel):
         ### LOG ###
         # Log loss to Wandb
         logger = Logger(pl_module, self.batch_size)
-        loss = outputs
+        loss, losses = outputs
         # Dataloader_idx is 0 for the validation set
         # The other dataloader_idx are for complementary validation sets
-        logger.valid_loss(loss.item(), dataloader_idx)
+        if dataloader_idx == 0:
+            logger.valid_loss(loss.item())
+            logger.valid_loss_pack(losses)
         # Save val_loss for evaluating if this model is the best model
         self.val_losses.append(loss)
 
@@ -173,6 +174,9 @@ class WandbFitLogger(LoadBestModel):
             return
 
         # Save best model
+        if wandb.run is None:
+            return
+        
         this_epoch_loss = torch.mean(torch.tensor(self.val_losses)).item()
         if this_epoch_loss < self.best_loss:
             # save the best model per integer MAE
