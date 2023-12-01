@@ -2,8 +2,7 @@ import lightning.pytorch as pl
 import torch.nn as nn
 import torch
 import numpy as np
-from ..config import VAL_GU
-from rouskinhf import seq2int
+from ..config import device
 import torch.nn.functional as F
 from .batch import Batch
 
@@ -54,26 +53,30 @@ class Model(pl.LightningModule):
 
     def _loss_structure(self, batch: Batch):
         # Unsure if this is the correct loss function
-        pred, true = batch.get("structure")
-        return F.binary_cross_entropy(input=pred, target=true, reduction="mean")
+        pred, true = batch.get_pairs("structure")
+        lossBCE = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([300])).to(device)
+        return lossBCE(pred, true)
+
 
     def loss_fn(self, batch: Batch):
-        loss = torch.tensor(0.0, device=self.device)
         count = {
             dt: batch.count(dt)
             for dt in batch.data_types
             if batch.contains(dt) and batch.contains(f"pred_{dt}")
         }
+        losses = {}
         if "dms" in count.keys():
-            loss += count["dms"] * self._loss_signal(batch, "dms")
+            losses['dms'] = self._loss_signal(batch, "dms")
         if "shape" in count.keys():
-            loss += count["shape"] * self._loss_signal(batch, "shape")
+            losses['shape'] = self._loss_signal(batch, "shape")
         if "structure" in count.keys():
-            loss += count["structure"] * self._loss_structure(batch)
-        loss = loss / np.sum(list(count.values()))
+            losses['structure'] = self._loss_structure(batch)
+        loss = sum([losses[k] * count[k] for k in count.keys()]) / sum(
+            count.values()
+        )
         if not self.weight_data:
             loss = torch.sqrt(loss)
-        return loss
+        return loss, losses
 
     def _clean_predictions(self, batch, predictions):
         # clip values to [0, 1]
@@ -84,14 +87,14 @@ class Model(pl.LightningModule):
     def training_step(self, batch: Batch, batch_idx: int):
         predictions = self.forward(batch)
         batch.integrate_prediction(predictions)
-        loss = self.loss_fn(batch)
+        loss = self.loss_fn(batch)[0]
         return loss
 
     def validation_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
         predictions = self.forward(batch)
         batch.integrate_prediction(predictions)
-        loss = self.loss_fn(batch)
-        return loss
+        loss, losses = self.loss_fn(batch)
+        return loss, losses
 
     def test_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
         predictions = self.forward(batch)
