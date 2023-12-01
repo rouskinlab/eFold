@@ -19,6 +19,7 @@ class DataModule(pl.LightningDataModule):
         overfit_mode=False,
         shuffle_train=True,
         shuffle_valid=False,
+        pin_memory=True,
         tqdm=True,
         **kwargs,
     ):
@@ -48,6 +49,7 @@ class DataModule(pl.LightningDataModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.data_type = data_type
+        self.pin_memory = pin_memory
         self.splits = {
             "train": train_split,
             "valid": valid_split,
@@ -144,6 +146,7 @@ class DataModule(pl.LightningDataModule):
             shuffle=self.shuffle["train"],
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
+            pin_memory=self.pin_memory,
         )
 
     def val_dataloader(self):
@@ -152,6 +155,7 @@ class DataModule(pl.LightningDataModule):
             shuffle=self.shuffle["valid"],
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
+            pin_memory=self.pin_memory,
         )
 
         ###################################
@@ -167,6 +171,7 @@ class DataModule(pl.LightningDataModule):
                 test_set,
                 collate_fn=test_set.collate_fn,
                 batch_size=self.batch_size,
+                pin_memory=self.pin_memory,
             )
             for test_set in self.test_sets
         ]
@@ -176,6 +181,8 @@ class DataModule(pl.LightningDataModule):
             self.predict_set,
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
+            pin_memory=self.pin_memory,
+            shuffle=False,
         )
 
     def teardown(self, stage: str):
