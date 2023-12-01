@@ -21,6 +21,9 @@ def sequence_to_int(sequence: str):
     return torch.tensor([seq2int[s] for s in sequence], dtype=torch.int64)
 
 
+# from dmsensei.core.embeddings import int_to_sequence
+
+
 def int_to_sequence(sequence: torch.tensor):
     return "".join([int2seq[i.item()] for i in sequence])
 
