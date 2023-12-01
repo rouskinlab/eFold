@@ -29,7 +29,7 @@ if __name__ == "__main__":
         wandb_logger = WandbLogger(project=project)
 
     # fit loop
-    batch_size = 32
+    batch_size = 16
     dm = DataModule(
         name=["ribo-kaggle"],
         data_type=["dms",'shape'],
@@ -48,8 +48,8 @@ if __name__ == "__main__":
         data="multi",
         quality=False,
         ntoken=5,
-        d_model=640,
-        d_cnn=512,
+        d_model=128,
+        d_cnn=256,
         n_heads=16,
         dropout=0,
         lr=1e-3,
@@ -69,6 +69,7 @@ if __name__ == "__main__":
         accelerator=device,
         devices=1,
         # strategy=DDPStrategy(find_unused_parameters=True),
+        precision="16-mixed",
         max_epochs=1000,
         log_every_n_steps=1,
         accumulate_grad_batches=1,
