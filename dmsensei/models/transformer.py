@@ -20,6 +20,7 @@ class Transformer(Model):
         nlayers: int,
         dropout: float = 0.1,
         lr: float = 1e-5,
+        c_z = 16,
         optimizer_fn=torch.optim.Adam,
         **kwargs,
     ):
@@ -32,7 +33,9 @@ class Transformer(Model):
 
         self.encoder = nn.Embedding(ntoken, d_model)
         self.pos_encoder = PositionalEncoding(d_model, dropout)
-
+        self.encoder_adapter = nn.Linear(d_model, int(c_z / 2))
+        self.activ = nn.ReLU()
+        
         self.transformer_encoder = nn.Sequential(
             *[
                 TransformerEncoderLayer(
@@ -74,6 +77,14 @@ class Transformer(Model):
             nn.ReLU(inplace=True),
             nn.Linear(d_model, 1),
         )
+        
+        assert c_z % 4 == 0, "c_z must be divisible by 4"
+        assert c_z >= 8, "c_z must be greater than 8"
+        self.output_net_structure = nn.Sequential(
+            ResLayer(n_blocks=4, dim_in=c_z, dim_out=c_z//2, kernel_size=3, dropout=dropout),
+            ResLayer(n_blocks=4, dim_in=c_z//2, dim_out=c_z//4, kernel_size=3, dropout=dropout),
+            ResLayer(n_blocks=4, dim_in=c_z//4, dim_out=1, kernel_size=3, dropout=dropout),
+        )
 
     def forward(self, batch: Batch) -> Tensor:
         """
@@ -95,9 +106,21 @@ class Transformer(Model):
         dms = self.output_net_DMS(src)
         shape = self.output_net_SHAPE(src)
 
+        # Outer concatenation
+        src = self.activ(self.encoder_adapter(src))
+        matrix = src.unsqueeze(1).repeat(1, src.shape[1],1,1)                # (N, d_cnn/2, L, L)
+        matrix = torch.cat((matrix, matrix.permute(0,2,1,3)), dim=-1)   # (N, d_cnn, L, L)
+
+        # Resnet layers
+        pair_prob = self.output_net_structure(matrix.permute(0,3,1,2)).squeeze(1)   # (N, L, L)
+
+        # Symmetrize
+        structure = (pair_prob + pair_prob.permute(0,2,1))/2     # (N, L, L)     
+        
         return {
             "dms": dms.squeeze(dim=-1),
             "shape": shape.squeeze(dim=-1),
+            "structure": structure,
         }
 
 
