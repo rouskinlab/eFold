@@ -22,7 +22,7 @@ sys.path.append(os.path.abspath("."))
 
 # Train loop
 if __name__ == "__main__":
-    USE_WANDB = 0
+    USE_WANDB = 1
     print("Running on device: {}".format(device))
     if USE_WANDB:
         project = 'Structure_prediction'
@@ -36,8 +36,8 @@ if __name__ == "__main__":
         force_download=False,
         batch_size=batch_size,
         num_workers=1,
-        train_split=None, # all but valid_split
-        valid_split=4096,
+        train_split=5000, # all but valid_split
+        valid_split=2048,
         predict_split=0,
         overfit_mode=False,
         shuffle_valid=False,
@@ -52,7 +52,7 @@ if __name__ == "__main__":
         d_cnn=256,
         n_heads=16,
         dropout=0,
-        lr=1e-3,
+        lr=5e-5,
         weight_decay=0,
         gamma=0.997,
         wandb=USE_WANDB,
@@ -67,18 +67,18 @@ if __name__ == "__main__":
 
     trainer = Trainer(
         accelerator=device,
-        devices=1,
-        # strategy=DDPStrategy(find_unused_parameters=True),
+        devices=8,
+        strategy=DDPStrategy(find_unused_parameters=True),
         precision="16-mixed",
         max_epochs=1000,
         log_every_n_steps=1,
-        accumulate_grad_batches=1,
+        accumulate_grad_batches=2,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
             LearningRateMonitor(logging_interval='epoch'),
             # PredictionLogger(data="dms"),
             # ModelChecker(log_every_nstep=10000, model=model),
-            WandbFitLogger(dm=dm, batch_size=batch_size, load_model=None),
+            WandbFitLogger(dm=dm, load_model=None),
             # WandbTestLogger(dm=dm, n_best_worst=10, load_model='best'), # 'best', None or path to model
         ]
         if USE_WANDB
