@@ -152,6 +152,7 @@ class DataModule(pl.LightningDataModule):
             shuffle=self.shuffle["valid"],
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
+            pin_memory=self.pin_memory,
         )
 
         ###################################
@@ -167,6 +168,7 @@ class DataModule(pl.LightningDataModule):
                 test_set,
                 collate_fn=test_set.collate_fn,
                 batch_size=self.batch_size,
+                pin_memory=self.pin_memory,
             )
             for test_set in self.test_sets
         ]
@@ -176,6 +178,8 @@ class DataModule(pl.LightningDataModule):
             self.predict_set,
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
+            pin_memory=self.pin_memory,
+            shuffle=False,
         )
 
     def teardown(self, stage: str):
