@@ -96,7 +96,7 @@ class DMSDataset(DataTypeDataset):
         super().__init__(true=true, error=error, index=index)
 
     def __getitem__(self, idx):
-        if not idx in self.index:
+        if idx not in self.index:
             return None
         local_idx = torch.where(self.index == idx)[0].item()
         return {
@@ -112,7 +112,7 @@ class SHAPEDataset(DataTypeDataset):
         super().__init__(true=true, error=error, index=index)
 
     def __getitem__(self, idx):
-        if not idx in self.index:
+        if idx not in self.index:
             return None
         local_idx = torch.where(self.index == idx)[0].item()
         return {
@@ -128,7 +128,7 @@ class StructureDataset(DataTypeDataset):
         super().__init__(true=true, index=index)
 
     def __getitem__(self, idx):
-        if not idx in self.index:
+        if idx not in self.index:
             return None
         local_idx = torch.where(self.index == idx)[0].item()
         return {
@@ -137,7 +137,10 @@ class StructureDataset(DataTypeDataset):
 
 
 data_type_factory = {
-    "batch": {"dms": DMSBatch, "shape": SHAPEBatch, "structure": StructureBatch},
+    "batch": {
+        "dms": DMSBatch,
+        "shape": SHAPEBatch,
+        "structure": StructureBatch},
     "dataset": {
         "dms": DMSDataset,
         "shape": SHAPEDataset,

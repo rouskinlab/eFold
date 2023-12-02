@@ -20,15 +20,18 @@ def clean_data(datapath: str):
     for ref, values in data.items():
         copy = values.copy()
         for k, v in values.items():
-            if v == None or (type(v) == float and np.isnan(v)):
+            if v is None or (isinstance(v, float) and np.isnan(v)):
                 copy.pop(k)
         data[ref] = copy
     return data
 
 
 def upload_dataset(
-    datapath: str, exist_ok=False, commit_message: str = None, add_card=True, **kwargs
-):
+        datapath: str,
+        exist_ok=False,
+        commit_message: str = None,
+        add_card=True,
+        **kwargs):
     api = HfApi()
     name = name_from_path(datapath)
     # data = clean_data(datapath)
@@ -93,7 +96,7 @@ date: {}
     data = json.load(open(datapath, "r"))
     for dp in data.values():
         for k, v in dp.items():
-            if v == None or (type(v) == float and np.isnan(v)):
+            if v is None or (isinstance(v, float) and np.isnan(v)):
                 continue
             if k not in data_type_count:
                 data_type_count[k] = 0

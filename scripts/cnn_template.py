@@ -1,22 +1,22 @@
-import sys, os
+from dmsensei.core.callbacks import WandbFitLogger, KaggleLogger  # , WandbTestLogger
+from lightning.pytorch.strategies import DDPStrategy
+import wandb
+from lightning.pytorch.loggers import WandbLogger
+import os
+import sys
+import pandas as pd
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
+from lightning.pytorch import Trainer
+from lightning.pytorch.callbacks import LearningRateMonitor
+from dmsensei.config import device
+from dmsensei import DataModule, create_model
+import sys
+import os
+
 # import envbash
 # envbash.load.load_envbash('.env')
 
 sys.path.append(os.path.abspath("."))
-from dmsensei import DataModule, create_model
-from dmsensei.config import device
-from dmsensei.core.callbacks import WandbFitLogger, KaggleLogger#, WandbTestLogger
-from lightning.pytorch.callbacks import LearningRateMonitor
-from lightning.pytorch import Trainer
-from lightning.pytorch.callbacks.early_stopping import EarlyStopping
-import pandas as pd
-from lightning.pytorch import Trainer
-from dmsensei.config import device
-import sys
-import os
-from lightning.pytorch.loggers import WandbLogger
-import wandb
-from lightning.pytorch.strategies import DDPStrategy
 
 sys.path.append(os.path.abspath("."))
 
@@ -25,14 +25,14 @@ if __name__ == "__main__":
     USE_WANDB = 1
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        project = 'Structure_prediction'
+        project = "Structure_prediction"
         wandb_logger = WandbLogger(project=project)
 
     # fit loop
     batch_size = 16
     dm = DataModule(
         name=["ribo-kaggle"],
-        data_type=["dms",'shape'],
+        data_type=["dms", "shape"],
         force_download=False,
         batch_size=batch_size,
         num_workers=1,
@@ -57,11 +57,11 @@ if __name__ == "__main__":
         gamma=0.997,
         wandb=USE_WANDB,
     )
-    
+
     # import torch
     # model.load_state_dict(torch.load('/root/DMSensei/dmsensei/models/trained_models/vocal-voice-12.pt',
     #                                  map_location=torch.device(device)))
-    
+
     if USE_WANDB:
         wandb_logger.watch(model, log="all")
 
@@ -75,7 +75,7 @@ if __name__ == "__main__":
         accumulate_grad_batches=2,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
-            LearningRateMonitor(logging_interval='epoch'),
+            LearningRateMonitor(logging_interval="epoch"),
             # PredictionLogger(data="dms"),
             # ModelChecker(log_every_nstep=10000, model=model),
             WandbFitLogger(dm=dm, load_model=None),
@@ -85,12 +85,10 @@ if __name__ == "__main__":
         else [],
         enable_checkpointing=False,
     )
-    
-    
+
     trainer.fit(model, datamodule=dm)
     # trainer.test(model, datamodule=dm)
-    
-    
+
     # # Predict loop
     # dm = DataModule(
     #     name=["ribo-test"],
@@ -104,15 +102,15 @@ if __name__ == "__main__":
     #     overfit_mode=False,
     #     shuffle_valid=False,
     # )
-    
+
     # trainer = Trainer(
     #     accelerator=device,
     #     callbacks=[KaggleLogger(
-    #         push_to_kaggle=True, 
+    #         push_to_kaggle=True,
     #         load_model='best' # 'best', None or path to model
     #         )]
     # )
-    
+
     # trainer.predict(model, datamodule=dm)
 
     if USE_WANDB:

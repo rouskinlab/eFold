@@ -38,8 +38,8 @@ class Path:
     """
 
     def __init__(self, name, root=Env.get_data_folder()) -> None:
-        assert type(name) == str, f"name {name} is not a string"
-        assert type(root) == str, f"root {root} is not a string"
+        assert isinstance(name, str), f"name {name} is not a string"
+        assert isinstance(root, str), f"root {root} is not a string"
         self.root = root
         self.name = name
 

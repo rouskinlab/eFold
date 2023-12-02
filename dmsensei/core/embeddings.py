@@ -6,7 +6,10 @@ from rouskinhf.util import seq2int, dot2int, int2seq
 NUM_BASES = len(set(seq2int.values()))
 
 
-def base_pairs_to_int_dot_bracket(base_pairs, sequence_length, dtype=torch.int64):
+def base_pairs_to_int_dot_bracket(
+        base_pairs,
+        sequence_length,
+        dtype=torch.int64):
     dot_bracket = ["."] * sequence_length
     for i, j in base_pairs:
         dot_bracket[i] = "("
@@ -17,14 +20,19 @@ def base_pairs_to_int_dot_bracket(base_pairs, sequence_length, dtype=torch.int64
 def sequence_to_int(sequence: str):
     return torch.tensor([seq2int[s] for s in sequence], dtype=torch.int64)
 
+
 # from dmsensei.core.embeddings import int_to_sequence
+
+
 def int_to_sequence(sequence: torch.tensor):
     return "".join([int2seq[i.item()] for i in sequence])
 
 
 def sequence_to_one_hot(sequence_batch: torch.tensor):
     """Converts a sequence to a one-hot encoding"""
-    return nn.functional.one_hot(sequence_batch, NUM_BASES).type(DEFAULT_FORMAT)
+    return nn.functional.one_hot(
+        sequence_batch,
+        NUM_BASES).type(DEFAULT_FORMAT)
 
 
 def int_dot_bracket_to_one_hot(int_dot_bracket: torch.tensor):
@@ -34,7 +42,7 @@ def int_dot_bracket_to_one_hot(int_dot_bracket: torch.tensor):
 
 def base_pairs_to_pairing_matrix(base_pairs, sequence_length):
     pairing_matrix = torch.zeros((sequence_length, sequence_length))
-    base_pairs = torch.tensor(base_pairs) - 1 # Convert to 0-indexed
+    base_pairs = torch.tensor(base_pairs) - 1  # Convert to 0-indexed
     if len(base_pairs) > 0:
         pairing_matrix[base_pairs[:, 0], base_pairs[:, 1]] = 1.0
         pairing_matrix[base_pairs[:, 1], base_pairs[:, 0]] = 1.0
@@ -42,7 +50,7 @@ def base_pairs_to_pairing_matrix(base_pairs, sequence_length):
 
 
 def pairing_matrix_to_base_pairs(pairing_matrix):
-    pairing_matrix = pairing_matrix + 1 # Convert to 1-indexed
+    pairing_matrix = pairing_matrix + 1  # Convert to 1-indexed
     base_pairs = []
     for i in range(pairing_matrix.shape[0]):
         for j in range(pairing_matrix.shape[1]):

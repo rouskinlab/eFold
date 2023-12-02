@@ -56,7 +56,8 @@ class Batch:
         reference = [d["reference"] for d in datapoints]
         length = [d["length"] for d in datapoints]
         L = max(length)
-        sequence = torch.stack([d["sequence"][:L] for d in datapoints]).to(device)
+        sequence = torch.stack([d["sequence"][:L]
+                               for d in datapoints]).to(device)
         batch_size = len(datapoints)
 
         data = {}
@@ -148,7 +149,7 @@ class Batch:
         if (
             not hasattr(self, data_type)
             or getattr(self, data_type) is None
-            or not data_type in self.data_types
+            or data_type not in self.data_types
         ):
             return False
         if (

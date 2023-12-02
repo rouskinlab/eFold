@@ -68,9 +68,9 @@ class DataModule(pl.LightningDataModule):
         self.save_hyperparameters(ignore=["force_download"])
 
     def _use_multiple_datasets(self, name):
-        if type(name) == str:
+        if isinstance(name, str):
             return False
-        elif type(name) == list or type(name) == tuple:
+        elif isinstance(name, list) or isinstance(name, tuple):
             return True
         raise ValueError("name must be a string or a list of strings")
 
@@ -84,7 +84,7 @@ class DataModule(pl.LightningDataModule):
         return merge
 
     def setup(self, stage: str = None):
-        if stage == None or (
+        if stage is None or (
             stage in ["fit", "predict"] and not hasattr(self, "all_datasets")
         ):
             self.all_datasets = self._dataset_merge(
@@ -121,7 +121,7 @@ class DataModule(pl.LightningDataModule):
                 range(
                     0,
                     round(len(self.all_datasets) * self.splits["predict"])
-                    if type(self.splits["predict"]) == float
+                    if isinstance(self.splits["predict"], float)
                     else self.splits["predict"],
                 ),
             )
@@ -152,6 +152,7 @@ class DataModule(pl.LightningDataModule):
             shuffle=self.shuffle["valid"],
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
+            pin_memory=self.pin_memory,
         )
 
         ###################################
@@ -167,6 +168,7 @@ class DataModule(pl.LightningDataModule):
                 test_set,
                 collate_fn=test_set.collate_fn,
                 batch_size=self.batch_size,
+                pin_memory=self.pin_memory,
             )
             for test_set in self.test_sets
         ]
@@ -176,6 +178,8 @@ class DataModule(pl.LightningDataModule):
             self.predict_set,
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
+            pin_memory=self.pin_memory,
+            shuffle=False,
         )
 
     def teardown(self, stage: str):
@@ -212,13 +216,13 @@ def _compute_size_sets(len_data, train_split, valid_split):
     (40, 20, 40)
     """
 
-    if valid_split <= 1 and type(valid_split) == float:
+    if valid_split <= 1 and isinstance(valid_split, float):
         valid_split = int(valid_split * len_data)
 
     if train_split is None:
         train_split = len_data - valid_split
 
-    elif train_split <= 1 and type(train_split) == float:
+    elif train_split <= 1 and isinstance(train_split, float):
         train_split = len_data - int((1 - train_split) * len_data)
 
     assert (

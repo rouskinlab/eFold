@@ -1,29 +1,28 @@
-import sys, os
-
-sys.path.append(os.path.abspath("."))
-# os.system('source /Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/RNA_data/env')
-from dmsensei import DataModule, create_model
-from dmsensei.config import device
-from dmsensei.util import str2fun
-from dmsensei.core.callbacks import PredictionLogger, ModelChecker
-from lightning.pytorch import Trainer
-import pandas as pd
-from dmsensei.core.callbacks import PredictionLogger
+import torch
+from lightning.pytorch.callbacks import LearningRateMonitor
+import numpy as np
+import wandb
+from lightning.pytorch.loggers import WandbLogger
+import os
+import sys
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from dmsensei.core.callbacks import PredictionLogger
 import pandas as pd
 from lightning.pytorch import Trainer
+from dmsensei.core.callbacks import PredictionLogger, ModelChecker
+from dmsensei.util import str2fun
 from dmsensei.config import device
+from dmsensei import DataModule, create_model
 import sys
 import os
-from lightning.pytorch.loggers import WandbLogger
-import wandb
-import numpy as np
-from lightning.pytorch.callbacks import LearningRateMonitor
-import torch
 
 sys.path.append(os.path.abspath("."))
-# os.system('source /Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/RNA_data/env') why do you need this?
+# os.system('source /Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/RNA_data/env')
+
+sys.path.append(os.path.abspath("."))
+# os.system('source
+# /Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/RNA_data/env')
+# why do you need this?
 
 
 sweep_configuration = {

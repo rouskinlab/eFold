@@ -12,7 +12,8 @@ class Logger:
         if value is None:
             return
         self._model.log(
-            name="/".join([k for k in [stage, data_type, metric] if k is not None]),
+            name="/".join([k for k in [stage, data_type, metric]
+                          if k is not None]),
             value=float(value),
             sync_dist=True,
             # on_step=True,
@@ -35,7 +36,7 @@ class Logger:
 
     def valid_loss(self, loss):
         self.log("valid", "loss", loss)
-    
+
     def valid_loss_pack(self, losses: dict):
         for data_type, loss in losses.items():
             self.log("valid", "loss_{}".format(data_type), loss.item())
