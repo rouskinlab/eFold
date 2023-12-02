@@ -152,7 +152,6 @@ class DataModule(pl.LightningDataModule):
             shuffle=self.shuffle["valid"],
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
-            pin_memory=self.pin_memory,
         )
 
         ###################################

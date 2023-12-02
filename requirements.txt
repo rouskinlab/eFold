@@ -12,3 +12,4 @@ einops
 huggingface-hub
 kaggle
 pre-commit
+scikit-learn
