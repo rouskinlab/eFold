@@ -1,9 +1,11 @@
+import os
+import sys
+sys.path.append(os.path.abspath("."))
+
 from dmsensei.core.callbacks import WandbFitLogger, KaggleLogger  # , WandbTestLogger
 from lightning.pytorch.strategies import DDPStrategy
 import wandb
 from lightning.pytorch.loggers import WandbLogger
-import os
-import sys
 import pandas as pd
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch import Trainer
@@ -16,7 +18,7 @@ import os
 # import envbash
 # envbash.load.load_envbash('.env')
 
-sys.path.append(os.path.abspath("."))
+
 
 sys.path.append(os.path.abspath("."))
 
@@ -31,13 +33,13 @@ if __name__ == "__main__":
     # fit loop
     batch_size = 16
     dm = DataModule(
-        name=["ribo-kaggle"],
-        data_type=["dms", "shape"],
+        name=["ribo-kaggleGU"],
+        data_type=["dms", "shape","structure"],
         force_download=False,
         batch_size=batch_size,
         num_workers=1,
-        train_split=5000, # all but valid_split
-        valid_split=2048,
+        train_split=298281, # all but valid_split
+        valid_split=4096,
         predict_split=0,
         overfit_mode=False,
         shuffle_valid=False,
@@ -46,15 +48,15 @@ if __name__ == "__main__":
     model = create_model(
         model="cnn",
         data="multi",
-        quality=False,
+        quality=True,
         ntoken=5,
         d_model=128,
         d_cnn=256,
         n_heads=16,
         dropout=0,
-        lr=5e-5,
+        lr=3e-4,
         weight_decay=0,
-        gamma=0.997,
+        gamma=0.995,
         wandb=USE_WANDB,
     )
 
@@ -68,11 +70,11 @@ if __name__ == "__main__":
     trainer = Trainer(
         accelerator=device,
         devices=8,
-        strategy=DDPStrategy(find_unused_parameters=True),
+        strategy=DDPStrategy(find_unused_parameters=False),
         precision="16-mixed",
         max_epochs=1000,
         log_every_n_steps=1,
-        accumulate_grad_batches=2,
+        accumulate_grad_batches=1,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
             LearningRateMonitor(logging_interval="epoch"),
