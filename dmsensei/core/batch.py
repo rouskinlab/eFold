@@ -100,14 +100,13 @@ class Batch:
         )
 
     def get(self, data_type, index=None, to_numpy=False):
-        if not self.contains(data_type):
-            raise ValueError(f"Batch does not contain {data_type}")
-
         if data_type in ["reference", "sequence", "length"]:
             out = getattr(self, data_type)
             data_part = None
         else:
             data_part, data_type = split_data_type(data_type)
+            if not self.contains(data_type):
+                raise ValueError(f"Batch does not contain {data_type}")
             out = getattr(getattr(self, data_type), data_part)
 
         if index is not None:

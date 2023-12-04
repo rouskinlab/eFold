@@ -78,7 +78,7 @@ class DataModule(pl.LightningDataModule):
         merge = datasets[0]
         collate_fn = merge.collate_fn
         for dataset in datasets[1:]:
-            # TODO: implement this method
+            # TODO: #23 implement this method
             merge = merge + dataset
         merge.collate_fn = collate_fn
         return merge
@@ -152,7 +152,6 @@ class DataModule(pl.LightningDataModule):
             shuffle=self.shuffle["valid"],
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
-            pin_memory=self.pin_memory,
         )
 
         ###################################
@@ -168,7 +167,6 @@ class DataModule(pl.LightningDataModule):
                 test_set,
                 collate_fn=test_set.collate_fn,
                 batch_size=self.batch_size,
-                pin_memory=self.pin_memory,
             )
             for test_set in self.test_sets
         ]
@@ -178,7 +176,6 @@ class DataModule(pl.LightningDataModule):
             self.predict_set,
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
-            pin_memory=self.pin_memory,
             shuffle=False,
         )
 
