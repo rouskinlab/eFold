@@ -105,15 +105,17 @@ class WandbFitLogger(LoadBestModel):
         loss, losses = outputs
         # Dataloader_idx is 0 for the validation set
         # The other dataloader_idx are for complementary validation sets
-        if dataloader_idx == 0:
-            logger.valid_loss(loss.item())
-            logger.valid_loss_pack(losses)
-        # Save val_loss for evaluating if this model is the best model
-        self.val_losses.append(loss)
+        logger.valid_loss(loss, is_test=dataloader_idx == 1)
+        logger.valid_loss_pack(losses, is_test=dataloader_idx == 1)
 
         # Compute metrics and log them to Wandb.
         metrics = batch.compute_metrics()
-        logger.error_metrics_pack("valid", metrics)
+        logger.error_metrics_pack(
+            "valid", metrics, suffix="_test" if dataloader_idx == 1 else "")
+
+        # Save val_loss for evaluating if this model is the best model
+        if dataloader_idx == 0:
+            self.val_losses.append(loss)
 
         # ### END LOG ###
 

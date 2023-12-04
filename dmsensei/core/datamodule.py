@@ -19,6 +19,7 @@ class DataModule(pl.LightningDataModule):
         overfit_mode=False,
         shuffle_train=True,
         shuffle_valid=False,
+        ribo_validation=False,
         tqdm=True,
         **kwargs,
     ):
@@ -48,6 +49,7 @@ class DataModule(pl.LightningDataModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.data_type = data_type
+        self.ribo_validation = ribo_validation
         self.splits = {
             "train": train_split,
             "valid": valid_split,
@@ -78,7 +80,7 @@ class DataModule(pl.LightningDataModule):
         merge = datasets[0]
         collate_fn = merge.collate_fn
         for dataset in datasets[1:]:
-            # TODO: implement this method
+            # TODO: #23 implement this method
             merge = merge + dataset
         merge.collate_fn = collate_fn
         return merge
@@ -109,6 +111,13 @@ class DataModule(pl.LightningDataModule):
             self.train_set, self.val_set, _ = random_split(
                 self.all_datasets, self.size_sets
             )
+            if self.ribo_validation:
+                self.ribo_val_set = Dataset(
+                    name='ribo-valid',
+                    data_type=["dms", "shape", "structure"],
+                    force_download=self.force_download,
+                    tqdm=self.tqdm,
+                )
 
         if stage == "test":
             self.test_sets = self._select_test_dataset(
@@ -152,14 +161,22 @@ class DataModule(pl.LightningDataModule):
             shuffle=self.shuffle["valid"],
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
-            pin_memory=self.pin_memory,
         )
 
+        val_dls = [valid]
         ###################################
         # Add validation set here if needed
         ###################################
+        if self.ribo_validation:
+            val_dls.append(
+                DataLoader(
+                    self.ribo_val_set,
+                    shuffle=False,
+                    collate_fn=self.collate_fn,
+                    batch_size=self.batch_size,
+                )
+            )
 
-        val_dls = [valid]
         return val_dls
 
     def test_dataloader(self):
@@ -168,7 +185,6 @@ class DataModule(pl.LightningDataModule):
                 test_set,
                 collate_fn=test_set.collate_fn,
                 batch_size=self.batch_size,
-                pin_memory=self.pin_memory,
             )
             for test_set in self.test_sets
         ]
@@ -178,7 +194,6 @@ class DataModule(pl.LightningDataModule):
             self.predict_set,
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
-            pin_memory=self.pin_memory,
             shuffle=False,
         )
 
