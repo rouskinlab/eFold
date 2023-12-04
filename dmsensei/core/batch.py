@@ -126,6 +126,11 @@ class Batch:
         for data_type, value in prediction.items():
             if getattr(self, data_type) is not None:
                 getattr(self, data_type).pred = value
+            else:
+                setattr(self, data_type, data_type_factory["batch"][data_type](
+                    true=None,
+                    pred=value,
+                ))
 
     def get_pairs(self, data_type, to_numpy=False):
         index = self.get_index(data_type)
