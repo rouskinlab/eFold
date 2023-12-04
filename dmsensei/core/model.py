@@ -55,7 +55,7 @@ class Model(pl.LightningModule):
                 batch.get("error_{}".format(data_type))[mask],
                 full=True,
                 eps=5e-2,
-            )
+            )/8
         return F.mse_loss(pred[mask], true[mask])
 
     def _loss_structure(self, batch: Batch):
