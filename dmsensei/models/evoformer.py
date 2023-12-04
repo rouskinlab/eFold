@@ -22,6 +22,7 @@ class Evoformer(Model):
         ntoken: int,
         d_model: int,
         c_z: int,
+        d_cnn: int, 
         num_blocks: int,
         no_recycles: int,
         dropout: float = 0,
@@ -70,33 +71,43 @@ class Evoformer(Model):
             nn.Linear(d_model, 1),
         )
 
+        self.structure_adapter = nn.Linear(c_z, d_cnn)
+        self.output_structure = nn.Sequential(
+            ResLayer(
+                dim_in=d_cnn,
+                dim_out=d_cnn//2,
+                n_blocks=4,
+                kernel_size=3,
+                dropout=dropout,
+            ),
+            ResLayer(
+                dim_in=d_cnn//2,
+                dim_out=1,
+                n_blocks=4,
+                kernel_size=3,
+                dropout=dropout)
+        )
+
+
     def forward(self, batch: Batch) -> Tensor:
         # Encoding of RNA sequence
-        # (N, L, d_model)
         src = batch.get("sequence")
-        s = self.encoder(src)
+        s = self.encoder(src)   # (N, L, d_model)
 
-        # (N, L, c_z / 2)
-        z = self.activ(self.encoder_adapter(s))
+        z = self.activ(self.encoder_adapter(s)) # (N, L, c_z / 2)
         # Outer concatenation
-        # (N,  c_z / 2, L, L)
-        z = z.unsqueeze(1).repeat(1, z.shape[1], 1, 1)
-        # (N, c_z, L, L)
-        z = torch.cat((z, z.permute(0, 2, 1, 3)), dim=-1)
+        z = z.unsqueeze(1).repeat(1, z.shape[1], 1, 1) # (N, L, L, c_z / 2)
+        z = torch.cat((z, z.permute(0, 2, 1, 3)), dim=-1) # (N, L, L, c_z)
 
-        s = self.evoformer(s, z)
+        s, z = self.evoformer(s, z)
 
-        # z = self.output(z.permute(0,3,1,2)).squeeze(1)
-
-        # Symmetrize
-        # z = (z + z.permute(0,2,1)) / 2.0
-
-        # output = self.output_adapter(s)
-        # return output.squeeze(-1)
+        structure = self.structure_adapter(z) # (N, L, L, d_cnn)
+        structure = self.output_structure(structure.permute(0, 3, 1, 2)).squeeze(1) # (N, L, L)
 
         return {
             "dms": self.output_net_DMS(s).squeeze(axis=2),
             "shape": self.output_net_SHAPE(s).squeeze(axis=2),
+            "structure": (structure + structure.permute(0, 2, 1)) / 2,
         }
 
 
@@ -157,8 +168,8 @@ class EvoBlock(nn.Module):
         # )
 
         # Transition
-        self.mlp_seq = ResidueMLP(c_s, 4 * c_s, dropout=dropout)
-        self.mlp_pair = ResidueMLP(c_z, 4 * c_z, dropout=dropout)
+        self.mlp_seq = ResidueMLP(c_s, 2 * c_s, dropout=dropout)
+        self.mlp_pair = ResidueMLP(c_z, 2 * c_z, dropout=dropout)
 
         assert dropout < 0.4
         self.drop = nn.Dropout(dropout)
@@ -321,7 +332,7 @@ class EvoFold(nn.Module):
 
                 s, z = applyTrunk(s, z, res_index)
 
-        return s
+        return s, z
 
 
 class SequenceToPair(nn.Module):
