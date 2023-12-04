@@ -100,16 +100,16 @@ class Batch:
         )
 
     def get(self, data_type, index=None, to_numpy=False):
-        if not self.contains(data_type):
-            raise ValueError(f"Batch does not contain {data_type}")
 
         if data_type in ["reference", "sequence", "length"]:
             out = getattr(self, data_type)
             data_part = None
         else:
             data_part, data_type = split_data_type(data_type)
+            if not self.contains(data_type):
+                raise ValueError(f"Batch does not contain {data_type}")
             out = getattr(getattr(self, data_type), data_part)
-
+        
         if index is not None:
             out = out[index]
             if data_part in ["true", "error"]:  # use the right length
@@ -123,13 +123,12 @@ class Batch:
         return out
 
     def integrate_prediction(self, prediction):
-        for data_type, value in prediction.items():
+        for data_type, pred in prediction.items():
             if getattr(self, data_type) is not None:
-                getattr(self, data_type).pred = value
+                getattr(self, data_type).pred = pred
             else:
-                setattr(self, data_type, data_type_factory["batch"][data_type](
-                    true=None,
-                    pred=value,
+                setattr(self, data_type, data_type_factory['batch'][data_type](
+                    true=None, pred=pred
                 ))
 
     def get_pairs(self, data_type, to_numpy=False):
