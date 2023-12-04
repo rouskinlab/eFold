@@ -110,8 +110,10 @@ class WandbFitLogger(LoadBestModel):
 
         # Compute metrics and log them to Wandb.
         metrics = batch.compute_metrics()
+        stage = 'valid' if dataloader_idx == 0 else 'ribo-valid'
         logger.error_metrics_pack(
-            "valid", metrics, suffix="_test" if dataloader_idx == 1 else "")
+            stage, metrics
+        )
 
         # Save val_loss for evaluating if this model is the best model
         if dataloader_idx == 0:
