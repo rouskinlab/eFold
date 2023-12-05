@@ -31,7 +31,7 @@ if __name__ == "__main__":
         wandb_logger = WandbLogger(project=project)
 
     # fit loop
-    batch_size = 16
+    batch_size = 32
     dm = DataModule(
         name=["ribo-kaggleGU"],
         data_type=["dms", "shape","structure"],
@@ -41,6 +41,7 @@ if __name__ == "__main__":
         train_split=298281, # all but valid_split
         valid_split=4096,
         predict_split=0,
+        ribo_validation = True,
         overfit_mode=False,
         shuffle_valid=False,
     )
