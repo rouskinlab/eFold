@@ -139,7 +139,7 @@ class Batch:
         )
 
     def count(self, data_type):
-        if getattr(self, data_type) is None:
+        if not self.contains(data_type):
             return 0
         return len(self.get_index(data_type))
 
