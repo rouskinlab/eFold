@@ -41,6 +41,7 @@ if __name__ == "__main__":
         train_split=396824, # all but valid_split
         valid_split=4096,
         predict_split=0,
+        ribo_validation = True,
         overfit_mode=False,
         shuffle_valid=False,
         ribo_validation = True,

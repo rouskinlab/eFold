@@ -68,7 +68,8 @@ class CNN(Model):
             kernel_size=3,
             dropout=dropout)
 
-        self.seq_attention = Attention(d_model, n_heads, d_model // n_heads)
+        self.seq_attention1 = Attention(d_model, n_heads, d_model // n_heads)
+        self.seq_attention2 = Attention(d_model, n_heads, d_model // n_heads)
 
         self.output_net_DMS = nn.Sequential(
             nn.Linear(d_model, d_model * 2),
@@ -115,14 +116,17 @@ class CNN(Model):
         matrix = self.res_layers(
             matrix.permute(
                 0, 3, 1, 2))  # (N, d_cnn//8, L, L)
+
+        # Output structure
         structure = self.output_structure(matrix).squeeze(1)  # (N, L, L)
 
         matrix = self.activ(
             self.structure_adapter(matrix.permute(0, 2, 3, 1))
         )  # (N, L, L, d_model)
 
-        # Sequence layers
-        seq = self.seq_attention(src, matrix)  # (N, L, d_model)
+        # Output DMS/SHAPE sequences
+        seq = self.seq_attention1(src, matrix)  # (N, L, d_model)
+        seq = self.seq_attention2(seq, matrix)  # (N, L, d_model)
 
         dms = self.output_net_DMS(seq)
         shape = self.output_net_SHAPE(seq)
