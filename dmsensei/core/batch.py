@@ -106,8 +106,6 @@ class Batch:
             data_part = None
         else:
             data_part, data_type = split_data_type(data_type)
-            if not self.contains(data_type):
-                raise ValueError(f"Batch does not contain {data_type}")
             out = getattr(getattr(self, data_type), data_part)
         
         if index is not None:
