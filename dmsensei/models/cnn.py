@@ -61,8 +61,6 @@ class CNN(Model):
             ),
         )
 
-        self.drop = nn.Dropout(0.5)
-
         self.output_structure = ResLayer(
             dim_in=d_cnn // 8,
             dim_out=1,
@@ -118,7 +116,6 @@ class CNN(Model):
         matrix = self.res_layers(
             matrix.permute(
                 0, 3, 1, 2))  # (N, d_cnn//8, L, L)
-        matrix = self.drop(matrix)
 
         # Output structure
         structure = self.output_structure(matrix).squeeze(1)  # (N, L, L)
