@@ -5,11 +5,11 @@ from torch.utils.data import ConcatDataset, Dataset as TorchDataset, Dataset
 from typing import List
 
 from .batch import Batch
-from ..huggingface import get_dataset
+from rouskinhf import get_dataset
 from .datatype import DMSDataset, SHAPEDataset, StructureDataset
 from .embeddings import sequence_to_int
 from .util import _pad
-from ..huggingface.path import Path
+from .path import Path
 
 
 class Dataset(TorchDataset):
@@ -69,8 +69,12 @@ class Dataset(TorchDataset):
             self.L = max(self.length)
 
             print("Dump sequences              \r", end="")
-            self.sequence = torch.stack([_pad(sequence_to_int(
-                data[ref]["sequence"]), self.L, "sequence") for ref in self.refs])
+            self.sequence = torch.stack(
+                [
+                    _pad(sequence_to_int(data[ref]["sequence"]), self.L, "sequence")
+                    for ref in self.refs
+                ]
+            )
             path.dump_sequence(np.array(self.sequence))
 
             print("Dump dms              \r", end="")
@@ -82,8 +86,7 @@ class Dataset(TorchDataset):
             path.dump_shape(self.shape)
 
             print("Dump structure              \r", end="")
-            self.structure = StructureDataset.from_data_json(
-                data, self.L, self.refs)
+            self.structure = StructureDataset.from_data_json(data, self.L, self.refs)
             path.dump_structure(self.structure)
 
             for dt in ["dms", "shape", "structure"]:
