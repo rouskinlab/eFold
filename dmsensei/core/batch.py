@@ -84,8 +84,6 @@ class Batch:
             else:
                 true, error = [], []
                 for dp in batch_data:
-                    if dt not in dp:
-                        continue
                     true.append(_pad(dp[dt]["true"], L, dt, accept_none=True))
                     if hasattr(dp[dt], "error"):
                         error.append(_pad(dp[dt]["error"], L, dt, accept_none=True))

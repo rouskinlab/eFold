@@ -140,14 +140,14 @@ class Dataset(TorchDataset):
         return len(self.sequence)
 
     def __getitem__(self, index) -> tuple:
-        return {
+        out = {
             "reference": self.refs[index],
             "sequence": self.sequence[index],
             "length": self.length[index],
-            "dms": self.dms[index] if self.dms is not None else None,
-            "shape": self.shape[index] if self.shape is not None else None,
-            "structure": self.structure[index] if self.structure is not None else None,
         }
+        for attr in ["dms", "shape", "structure"]:
+            out[attr] = getattr(self, attr)[index] if hasattr(self, attr) else None
+        return out
 
     def collate_fn(self, batch_data):
         batch = Batch.from_dataset_items(batch_data, self.data_type)
