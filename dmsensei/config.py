@@ -39,5 +39,10 @@ POSSIBLE_METRICS = {
     "shape": ["mae", "r2", "pearson"],
 }
 
+DTYPE_PER_DATA_TYPE = {
+    "structure": torch.int32,
+    "dms": DEFAULT_FORMAT,
+    "shape": DEFAULT_FORMAT,
+}
 
 torch.set_default_dtype(torch.float32)

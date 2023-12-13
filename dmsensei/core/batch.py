@@ -1,6 +1,7 @@
 import torch
+from torch import tensor
 import torch.nn.functional as F
-from .embeddings import base_pairs_to_pairing_matrix
+from .embeddings import base_pairs_to_pairing_matrix, sequence_to_int
 from ..config import device, POSSIBLE_METRICS, UKN
 from .metrics import metric_factory
 from typing import Dict
@@ -8,23 +9,25 @@ from .datatype import data_type_factory
 from .util import split_data_type
 
 
-def _pad(arr, L, data_type):
+def _pad(arr, L, data_type, accept_none=False):
     padding_values = {
         "sequence": 0,
         "dms": UKN,
         "shape": UKN,
     }
-    if data_type == "structure":
-        return base_pairs_to_pairing_matrix(arr, L)
-    else:
-        return F.pad(arr, (0, L - len(arr)), value=padding_values[data_type])
+    assert (
+        data_type in padding_values.keys()
+    ), f"Unknown data type {data_type}. If you want to pad a structure, use base_pairs_to_pairing_matrix."
+    if accept_none and arr is None:
+        return tensor([padding_values[data_type]] * L)
+    return F.pad(arr, (0, L - len(arr)), value=padding_values[data_type])
 
 
 def get_padded_vector(dp, data_type, data_part, L):
     if getattr(dp, data_type) is None:
-        return None
+        return tensor([UKN] * L)
     if getattr(getattr(dp, data_type), data_part) is None:
-        return None
+        return tensor([UKN] * L)
     return _pad(getattr(getattr(dp, data_type), data_part), L, data_type)
 
 
@@ -52,41 +55,48 @@ class Batch:
         self.data_types = data_types
 
     @classmethod
-    def from_dataset_items(cls, datapoints: list, data_type: str):
-        reference = [d["reference"] for d in datapoints]
-        length = [d["length"] for d in datapoints]
+    def from_dataset_items(cls, batch_data: list, data_type: str):
+        reference = batch_data["reference"]
+        length = batch_data["length"]
         L = max(length)
-        sequence = torch.stack([d["sequence"][:L]
-                               for d in datapoints]).to(device)
-        batch_size = len(datapoints)
+
+        # move the conversion to the dataset
+        sequence = torch.stack(
+            [_pad(sequence_to_int(s), L, "sequence") for s in batch_data["sequence"]]
+        ).to(device)
+        batch_size = len(reference)
 
         data = {}
         for dt in data_type:
-            true, error, index = [], [], []
-            for idx, dp in enumerate(datapoints):
-                if dt in dp and dp[dt] is not None:
-                    true.append(dp[dt]["true"])
-                    if dt != "structure":
-                        error.append(dp[dt]["error"])
-                    index.append(idx)
-
-            if len(true) == 0:
-                continue
-
-            if dt != "structure":
-                data[dt] = data_type_factory["batch"][dt](
-                    true=torch.stack(true)[:, :L].to(device),
+            if dt == "structure":
+                data["structure"] = data_type_factory["batch"][dt](
+                    true=torch.stack(
+                        [
+                            base_pairs_to_pairing_matrix(base_pairs, l, padding=L)
+                            for (base_pairs, l) in zip(batch_data[dt]["true"], length)
+                        ]
+                    ).to(device),
+                    error=None,
                     pred=None,
-                    error=torch.stack(error)[:, :L].to(device),
-                    index=torch.tensor(index).to(device),
                 )
             else:
                 data[dt] = data_type_factory["batch"][dt](
-                    true=torch.stack([_pad(t, L, "structure") for t in true]).to(
-                        device
-                    ),
+                    true=torch.stack(
+                        [
+                            _pad(arr, L, dt, accept_none=True)
+                            for arr in batch_data[dt]["true"]
+                        ]
+                    ).to(device),
+                    error=torch.stack(
+                        [
+                            _pad(arr, L, dt, accept_none=True)
+                            for arr in batch_data[dt]["error"]
+                        ]
+                    ).to(device)
+                    if hasattr(batch_data[dt], "error")
+                    and batch_data[dt]["error"] is not None
+                    else None,
                     pred=None,
-                    index=torch.tensor(index).to(device),
                 )
 
         return cls(
@@ -100,7 +110,6 @@ class Batch:
         )
 
     def get(self, data_type, index=None, to_numpy=False):
-
         if data_type in ["reference", "sequence", "length"]:
             out = getattr(self, data_type)
             data_part = None
@@ -109,11 +118,9 @@ class Batch:
             if not self.contains(data_type):
                 raise ValueError(f"Batch does not contain {data_type}")
             out = getattr(getattr(self, data_type), data_part)
-        
+
         if index is not None:
             out = out[index]
-            if data_part in ["true", "error"]:  # use the right length
-                index = self.get(f"index_{data_type}")[index]
             if hasattr(out, "__len__"):
                 out = out[: self.get("length")[index]]
 
@@ -127,24 +134,27 @@ class Batch:
             if getattr(self, data_type) is not None:
                 getattr(self, data_type).pred = pred
             else:
-                setattr(self, data_type, data_type_factory['batch'][data_type](
-                    true=None, pred=pred
-                ))
+                setattr(
+                    self,
+                    data_type,
+                    data_type_factory["batch"][data_type](true=None, pred=pred),
+                )
 
     def get_pairs(self, data_type, to_numpy=False):
-        index = self.get_index(data_type)
+        idx = [
+            idx
+            for idx, arr in enumerate(getattr(self, data_type).true)
+            if arr is not None
+        ]
         return (
-            self.get("pred_{}".format(data_type), to_numpy=to_numpy)[index],
-            self.get("true_{}".format(data_type), to_numpy=to_numpy),
+            self.get("pred_{}".format(data_type), to_numpy=to_numpy)[idx],
+            self.get("true_{}".format(data_type), to_numpy=to_numpy)[idx],
         )
 
     def count(self, data_type):
-        if getattr(self, data_type) is None:
+        if not self.contains(data_type):
             return 0
-        return len(self.get_index(data_type))
-
-    def get_index(self, data_type):
-        return self.get("index_{}".format(data_type))
+        return len([arr for arr in self.get(data_type=data_type) if arr is not None])
 
     def contains(self, data_type):
         if data_type in ["reference", "sequence", "length"]:

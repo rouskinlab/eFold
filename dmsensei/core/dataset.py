@@ -38,18 +38,12 @@ class Dataset(TorchDataset):
     def __add__(self, other: Dataset) -> Dataset:
         if self.name == other.name:
             raise ValueError("Dataset are the same")
-        L = max(self.L, other.L)
         return Dataset(
             name=self.name,
             data_type=self.data_type,
             refs=np.concatenate([self.refs, other.refs]),
             length=np.concatenate([self.length, other.length]),
-            sequence=torch.cat(
-                [
-                    _pad(self.sequence, L, "sequence"),
-                    _pad(other.sequence, L, "sequence"),
-                ]
-            ),
+            sequence=self.sequence + other.sequence,
             dms=self.dms + other.dms
             if self.dms is not None and other.dms is not None
             else None,
@@ -74,17 +68,17 @@ class Dataset(TorchDataset):
             path.clear()
 
         if os.path.exists(path.get_reference()):
-            print("Loading dataset from disk...")
+            print("Loading dataset from disk")
 
             print("Load references              \r", end="")
-            refs = path.load_reference()
+            refs = path.load_reference().tolist()
 
             print("Load lengths         \r", end="")
-            length = path.load_length()
+            length = path.load_length().tolist()
             L = max(length)
 
             print("Load sequences         \r", end="")
-            sequence = torch.tensor(path.load_sequence())
+            sequence = path.load_sequence().tolist()
             dms, shape, structure = None, None, None
             if "dms" in data_type:
                 print("Load dms         \r", end="")
@@ -102,24 +96,19 @@ class Dataset(TorchDataset):
                 force_download=force_download,
                 tqdm=tqdm,
             )
-            print("Loading dataset into memory...")
+            print("Loading dataset from HF")
 
             print("Dump lengths              \r", end="")
-            length = np.array([len(d["sequence"]) for d in data.values()])
-            path.dump_length(length)
+            length = [len(d["sequence"]) for d in data.values()]
+            path.dump_length(np.array(length))
 
             print("Dump references              \r", end="")
-            refs = np.array(list(data.keys()))
-            path.dump_reference(refs)
+            refs = list(data.keys())
+            path.dump_reference(np.array(list(data.keys())))
             L = max(length)
 
             print("Dump sequences              \r", end="")
-            sequence = torch.stack(
-                [
-                    _pad(sequence_to_int(data[ref]["sequence"]), L, "sequence")
-                    for ref in refs
-                ]
-            )
+            sequence = [d["sequence"] for d in data.values()]
             path.dump_sequence(np.array(sequence))
 
             print("Dump dms              \r", end="")
@@ -134,7 +123,7 @@ class Dataset(TorchDataset):
             structure = StructureDataset.from_data_json(data, L, refs)
             path.dump_structure(structure)
 
-            print("Done!")
+        print("Done!                            ")
 
         return cls(
             name=name,
