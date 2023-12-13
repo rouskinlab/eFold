@@ -146,7 +146,9 @@ class Dataset(TorchDataset):
             "length": self.length[index],
         }
         for attr in ["dms", "shape", "structure"]:
-            out[attr] = getattr(self, attr)[index] if hasattr(self, attr) else None
+            out[attr] = (
+                getattr(self, attr)[index] if getattr(self, attr) != None else None
+            )
         return out
 
     def collate_fn(self, batch_data):

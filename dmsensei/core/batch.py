@@ -135,16 +135,9 @@ class Batch:
                 )
 
     def get_pairs(self, data_type, to_numpy=False):
-        idx = torch.tensor(
-            [
-                idx
-                for idx, arr in enumerate(getattr(self, data_type).true)
-                if arr is not None
-            ]
-        )
         return (
-            self.get("pred_{}".format(data_type), to_numpy=to_numpy)[idx],
-            self.get("true_{}".format(data_type), to_numpy=to_numpy)[idx],
+            self.get("pred_{}".format(data_type), to_numpy=to_numpy),
+            self.get("true_{}".format(data_type), to_numpy=to_numpy),
         )
 
     def count(self, data_type):
