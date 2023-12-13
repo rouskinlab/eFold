@@ -38,7 +38,7 @@ class Path(RouskinPath):
     PathDatafolder(name='my_test_datafolder_pytest')
     """
 
-    def __init__(self, name, root=Env.get_data_folder()) -> None:
+    def __init__(self, name, root="data") -> None:
         super().__init__(name=name, root=root)
 
     def get_data_pickle(self) -> str:

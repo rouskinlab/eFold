@@ -80,7 +80,6 @@ class DataModule(pl.LightningDataModule):
         merge = datasets[0]
         collate_fn = merge.collate_fn
         for dataset in datasets[1:]:
-            # TODO: #23 implement this method
             merge = merge + dataset
         merge.collate_fn = collate_fn
         return merge
@@ -91,7 +90,7 @@ class DataModule(pl.LightningDataModule):
         ):
             self.all_datasets = self._dataset_merge(
                 [
-                    Dataset(
+                    Dataset.from_local_or_download(
                         name=name,
                         data_type=self.data_type,
                         force_download=self.force_download,
@@ -112,8 +111,8 @@ class DataModule(pl.LightningDataModule):
                 self.all_datasets, self.size_sets
             )
             if self.ribo_validation:
-                self.ribo_val_set = Dataset(
-                    name='ribo-valid',
+                self.ribo_val_set = Dataset.from_local_or_download(
+                    name="ribo-valid",
                     data_type=["dms", "shape", "structure"],
                     force_download=self.force_download,
                     tqdm=self.tqdm,
@@ -137,7 +136,7 @@ class DataModule(pl.LightningDataModule):
 
     def _select_test_dataset(self, force_download=False):
         return [
-            Dataset(
+            Dataset.from_local_or_download(
                 name=name,
                 data_type=[data_type],
                 force_download=force_download,

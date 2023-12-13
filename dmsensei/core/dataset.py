@@ -17,13 +17,58 @@ class Dataset(TorchDataset):
         self,
         name: str,
         data_type: List[str],
-        force_download: bool,
-        tqdm=True,
+        refs: np.ndarray,
+        length: np.ndarray,
+        sequence: torch.Tensor,
+        dms: DMSDataset = None,
+        shape: SHAPEDataset = None,
+        structure: StructureDataset = None,
     ) -> None:
         super().__init__()
         self.name = name
         self.data_type = data_type
+        self.refs = refs
+        self.length = length
+        self.sequence = sequence
+        self.dms = dms
+        self.shape = shape
+        self.structure = structure
+        self.L = max(self.length)
 
+    def __add__(self, other: Dataset) -> Dataset:
+        if self.name == other.name:
+            raise ValueError("Dataset are the same")
+        L = max(self.L, other.L)
+        return Dataset(
+            name=self.name,
+            data_type=self.data_type,
+            refs=np.concatenate([self.refs, other.refs]),
+            length=np.concatenate([self.length, other.length]),
+            sequence=torch.cat(
+                [
+                    _pad(self.sequence, L, "sequence"),
+                    _pad(other.sequence, L, "sequence"),
+                ]
+            ),
+            dms=self.dms + other.dms
+            if self.dms is not None and other.dms is not None
+            else None,
+            shape=self.shape + other.shape
+            if self.shape is not None and other.shape is not None
+            else None,
+            structure=self.structure + other.structure
+            if self.structure is not None and other.structure is not None
+            else None,
+        )
+
+    @classmethod
+    def from_local_or_download(
+        cls,
+        name: str,
+        data_type: List[str] = ["dms", "shape", "structure"],
+        force_download: bool = False,
+        tqdm=True,
+    ):
         path = Path(name=name)
         if force_download:
             path.clear()
@@ -32,24 +77,24 @@ class Dataset(TorchDataset):
             print("Loading dataset from disk...")
 
             print("Load references              \r", end="")
-            self.refs = path.load_reference()
+            refs = path.load_reference()
 
             print("Load lengths         \r", end="")
-            self.length = path.load_length()
-            self.L = max(self.length)
+            length = path.load_length()
+            L = max(length)
 
             print("Load sequences         \r", end="")
-            self.sequence = torch.tensor(path.load_sequence())
-            self.dms, self.shape, self.structure = None, None, None
+            sequence = torch.tensor(path.load_sequence())
+            dms, shape, structure = None, None, None
             if "dms" in data_type:
                 print("Load dms         \r", end="")
-                self.dms = path.load_dms()
+                dms = path.load_dms()
             if "shape" in data_type:
                 print("Load shape         \r", end="")
-                self.shape = path.load_shape()
+                shape = path.load_shape()
             if "structure" in data_type:
                 print("Load structure      \r", end="")
-                self.structure = path.load_structure()
+                structure = path.load_structure()
 
         else:
             data = get_dataset(
@@ -60,40 +105,47 @@ class Dataset(TorchDataset):
             print("Loading dataset into memory...")
 
             print("Dump lengths              \r", end="")
-            self.length = np.array([len(d["sequence"]) for d in data.values()])
-            path.dump_length(self.length)
+            length = np.array([len(d["sequence"]) for d in data.values()])
+            path.dump_length(length)
 
             print("Dump references              \r", end="")
-            self.refs = np.array(list(data.keys()))
-            path.dump_reference(self.refs)
-            self.L = max(self.length)
+            refs = np.array(list(data.keys()))
+            path.dump_reference(refs)
+            L = max(length)
 
             print("Dump sequences              \r", end="")
-            self.sequence = torch.stack(
+            sequence = torch.stack(
                 [
-                    _pad(sequence_to_int(data[ref]["sequence"]), self.L, "sequence")
-                    for ref in self.refs
+                    _pad(sequence_to_int(data[ref]["sequence"]), L, "sequence")
+                    for ref in refs
                 ]
             )
-            path.dump_sequence(np.array(self.sequence))
+            path.dump_sequence(np.array(sequence))
 
             print("Dump dms              \r", end="")
-            self.dms = DMSDataset.from_data_json(data, self.L, self.refs)
-            path.dump_dms(self.dms)
+            dms = DMSDataset.from_data_json(data, L, refs)
+            path.dump_dms(dms)
 
             print("Dump shape              \r", end="")
-            self.shape = SHAPEDataset.from_data_json(data, self.L, self.refs)
-            path.dump_shape(self.shape)
+            shape = SHAPEDataset.from_data_json(data, L, refs)
+            path.dump_shape(shape)
 
             print("Dump structure              \r", end="")
-            self.structure = StructureDataset.from_data_json(data, self.L, self.refs)
-            path.dump_structure(self.structure)
-
-            for dt in ["dms", "shape", "structure"]:
-                if dt not in self.data_type:
-                    setattr(self, dt, None)
+            structure = StructureDataset.from_data_json(data, L, refs)
+            path.dump_structure(structure)
 
             print("Done!")
+
+        return cls(
+            name=name,
+            data_type=data_type,
+            refs=refs,
+            length=length,
+            sequence=sequence,
+            dms=dms,
+            shape=shape,
+            structure=structure,
+        )
 
     def __len__(self) -> int:
         return len(self.sequence)
@@ -107,9 +159,6 @@ class Dataset(TorchDataset):
             "shape": self.shape[index] if self.shape is not None else None,
             "structure": self.structure[index] if self.structure is not None else None,
         }
-
-    def __add__(self, other: Dataset) -> ConcatDataset:
-        raise NotImplementedError
 
     def collate_fn(self, batch_data):
         batch = Batch.from_dataset_items(batch_data, self.data_type)

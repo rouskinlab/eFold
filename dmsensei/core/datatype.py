@@ -35,20 +35,35 @@ class DataTypeDataset(DataType):
 
     def __add__(self, other):
         if self.name != other.name:
-            raise ValueError("Cannot add datasets of different types")
+            raise ValueError(
+                f"Cannot concatenate {self.name} and {other.name} datasets."
+            )
+        if self.name == "structure":
+            true = self.true + other.true
+            error = None
+        else:
+            L = max(self.true.shape[1], other.true.shape[1])
+            true = torch.cat(
+                [_pad(self.true, L, self.name), _pad(other.true, L, self.name)], dim=0
+            )
+            error = torch.cat(
+                [_pad(self.error, L, self.name), _pad(other.error, L, self.name)], dim=0
+            )
 
-        L = max(self.true.shape[1], other.true.shape[1])
+        if other is None:
+            return self
 
         return data_type_factory["dataset"][self.name](
-            true=torch.cat(
-                [_pad(self.true, L, self.name), _pad(other.true, L, self.name)], dim=0
-            ),
-            error=torch.cat(
-                [_pad(self.error, L, self.name), _pad(other.error, L, self.name)], dim=0
-            ),
+            true=true,
+            error=error,
             index=torch.cat([self.index, other.index + self.max_index]),
             max_index=self.max_index + other.max_index,
         )
+
+    def __radd__(self, other):
+        if other is None:
+            return self
+        return other + self
 
     @classmethod
     def from_data_json(cls, data_json: dict, L: int, refs: list):
