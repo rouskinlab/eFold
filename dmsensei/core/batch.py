@@ -56,13 +56,13 @@ class Batch:
 
     @classmethod
     def from_dataset_items(cls, batch_data: list, data_type: str):
-        reference = batch_data["reference"]
-        length = batch_data["length"]
+        reference = [dp["reference"] for dp in batch_data]
+        length = [len(dp["sequence"]) for dp in batch_data]
         L = max(length)
 
         # move the conversion to the dataset
         sequence = torch.stack(
-            [_pad(sequence_to_int(s), L, "sequence") for s in batch_data["sequence"]]
+            [_pad(sequence_to_int(dp["sequence"]), L, "sequence") for dp in batch_data]
         ).to(device)
         batch_size = len(reference)
 
@@ -72,31 +72,27 @@ class Batch:
                 data["structure"] = data_type_factory["batch"][dt](
                     true=torch.stack(
                         [
-                            base_pairs_to_pairing_matrix(base_pairs, l, padding=L)
-                            for (base_pairs, l) in zip(batch_data[dt]["true"], length)
+                            base_pairs_to_pairing_matrix(
+                                dp["structure"]["true"], l, padding=L
+                            )
+                            for (dp, l) in zip(batch_data, length)
                         ]
                     ).to(device),
                     error=None,
                     pred=None,
                 )
             else:
-                data[dt] = data_type_factory["batch"][dt](
-                    true=torch.stack(
-                        [
-                            _pad(arr, L, dt, accept_none=True)
-                            for arr in batch_data[dt]["true"]
-                        ]
-                    ).to(device),
-                    error=torch.stack(
-                        [
-                            _pad(arr, L, dt, accept_none=True)
-                            for arr in batch_data[dt]["error"]
-                        ]
-                    ).to(device)
-                    if hasattr(batch_data[dt], "error")
-                    and batch_data[dt]["error"] is not None
-                    else None,
-                    pred=None,
+                true, error = [], []
+                for dp in batch_data:
+                    if dt not in dp:
+                        continue
+                    true.append(_pad(dp[dt]["true"], L, dt, accept_none=True))
+                    if hasattr(dp[dt], "error"):
+                        error.append(_pad(dp[dt]["error"], L, dt, accept_none=True))
+                true = torch.stack(true).to(device)
+                error = torch.stack(error).to(device) if len(error) else None
+                data[dt] = data_type_factory["batch"][dt](true=true, error=error).to(
+                    device
                 )
 
         return cls(
@@ -141,11 +137,13 @@ class Batch:
                 )
 
     def get_pairs(self, data_type, to_numpy=False):
-        idx = [
-            idx
-            for idx, arr in enumerate(getattr(self, data_type).true)
-            if arr is not None
-        ]
+        idx = torch.tensor(
+            [
+                idx
+                for idx, arr in enumerate(getattr(self, data_type).true)
+                if arr is not None
+            ]
+        )
         return (
             self.get("pred_{}".format(data_type), to_numpy=to_numpy)[idx],
             self.get("true_{}".format(data_type), to_numpy=to_numpy)[idx],
@@ -154,7 +152,13 @@ class Batch:
     def count(self, data_type):
         if not self.contains(data_type):
             return 0
-        return len([arr for arr in self.get(data_type=data_type) if arr is not None])
+        return len(
+            [
+                arr
+                for arr in self.get(data_type=data_type)
+                if arr is not None and len(torch.unique(arr)) > 1
+            ]
+        )  # TODO: remove the unique check since you could have a structure with only 0s for example
 
     def contains(self, data_type):
         if data_type in ["reference", "sequence", "length"]:

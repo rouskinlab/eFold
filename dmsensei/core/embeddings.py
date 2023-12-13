@@ -37,6 +37,8 @@ def int_dot_bracket_to_one_hot(int_dot_bracket: torch.tensor):
 
 def base_pairs_to_pairing_matrix(base_pairs, sequence_length, padding):
     pairing_matrix = torch.ones((padding, padding)) * UKN
+    if base_pairs is None:
+        return pairing_matrix
     pairing_matrix[:sequence_length, :sequence_length] = 0.0
     if len(base_pairs) > 0:
         pairing_matrix[base_pairs[:, 0], base_pairs[:, 1]] = 1.0
