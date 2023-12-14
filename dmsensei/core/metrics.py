@@ -1,26 +1,9 @@
 import torch
 from ..config import UKN
+import torch
 
 
-# make a decorator to run the metrics on the batch
-def batch_mean(fn):
-    def wrapper(pred, true, batch=False, *args, **kwargs):
-        if not batch:
-            return fn(pred=pred, true=true, *args, **kwargs)
-        scores = []
-        for p, t in zip(pred, true):
-            scores.append(fn(pred=p.squeeze(), true=t.squeeze(), *args, **kwargs))
-        avg = torch.nanmean(torch.tensor(scores))
-        if ~torch.isnan(avg):
-            return avg.item()
-        else:
-            return None
-
-    return wrapper
-
-
-@batch_mean
-def f1(pred, true, batch=None, threshold=0.5):
+def f1(pred, true, threshold=0.5):
     """
     Compute the F1 score of the predictions.
 
@@ -42,42 +25,40 @@ def f1(pred, true, batch=None, threshold=0.5):
         return (2 * torch.sum(pred * true) / sum_pair).item()
 
 
-@batch_mean
-def mFMI(pred, true, batch=None, threshold=0.5):
-    """
-    Compute the mFMI score of the predictions.
+# def mFMI(pred, true, threshold=0.5):
+#     """
+#     Compute the mFMI score of the predictions.
 
-    :param pred: Predicted pairing matrix probability  (L,L)
-    :param true: True binary pairing matrix (L,L)
-    :return: mFMI score for this RNA structure
-    """
+#     :param pred: Predicted pairing matrix probability  (L,L)
+#     :param true: True binary pairing matrix (L,L)
+#     :return: mFMI score for this RNA structure
+#     """
 
-    mask = true != UKN
-    pred = pred[mask]
-    true = true[mask]
+#     mask = true != UKN
+#     pred = pred[mask]
+#     true = true[mask]
 
-    pred = (pred > threshold).float()
+#     pred = (pred > threshold).float()
 
-    TP = torch.sum(pred * true)
+#     TP = torch.sum(pred * true)
 
-    prod_true = torch.sum(pred) * torch.sum(true)
-    if prod_true > 0:
-        FMI = TP / torch.sqrt(prod_true)
-    else:
-        FMI = 0
+#     prod_true = torch.sum(pred) * torch.sum(true)
+#     if prod_true > 0:
+#         FMI = TP / torch.sqrt(prod_true)
+#     else:
+#         FMI = 0
 
-    u = (
-        torch.sum((~torch.sum(pred, dim=1).bool()) * (~torch.sum(true, dim=1).bool()))
-        / pred.shape[-1]
-    )
+#     u = (
+#         torch.sum((~torch.sum(pred).bool()) * (~torch.sum(true).bool()))
+#         / pred.shape[-1]
+#     )
 
-    mFMI = u + (1 - u) * FMI
+#     mFMI = u + (1 - u) * FMI
 
-    return mFMI.item()
+#     return mFMI.item()
 
 
-@batch_mean
-def r2_score(pred, true, batch=None):
+def r2_score(pred, true):
     """
     Compute the R2 score of the predictions.
 
@@ -95,8 +76,7 @@ def r2_score(pred, true, batch=None):
     ).item()
 
 
-@batch_mean
-def pearson_coefficient(pred, true, batch=None):
+def pearson_coefficient(pred, true):
     """
     Compute the Pearson correlation coefficient of the predictions.
 
@@ -114,8 +94,7 @@ def pearson_coefficient(pred, true, batch=None):
     ).item()
 
 
-@batch_mean
-def mae_score(pred, true, batch=None):
+def mae_score(pred, true):
     """
     Compute the Mean Average Error of the predictions.
 
@@ -133,7 +112,6 @@ def mae_score(pred, true, batch=None):
 
 metric_factory = {
     "f1": f1,
-    "mFMI": mFMI,
     "r2": r2_score,
     "pearson": pearson_coefficient,
     "mae": mae_score,
