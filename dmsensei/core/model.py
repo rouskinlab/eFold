@@ -50,7 +50,7 @@ class Model(pl.LightningModule):
         #         full=True,
         #         eps=5e-2,
         #     )/8
-        return F.mse_loss(pred[mask], true[mask])
+        return torch.sqrt(F.mse_loss(pred[mask], true[mask]))
 
     def _loss_structure(self, batch: Batch):
         # Unsure if this is the correct loss function
@@ -60,11 +60,7 @@ class Model(pl.LightningModule):
         return lossBCE(pred[mask], true[mask])
 
     def loss_fn(self, batch: Batch):
-        count = {
-            dt: batch.count(dt)
-            for dt in batch.data_types
-            if batch.contains(dt) and batch.contains(f"pred_{dt}")
-        }
+        count = batch.dt_count
         losses = {}
         if "dms" in count.keys():
             losses["dms"] = self._loss_signal(batch, "dms")
@@ -73,7 +69,6 @@ class Model(pl.LightningModule):
         if "structure" in count.keys():
             losses["structure"] = self._loss_structure(batch)
         loss = sum([losses[k] * count[k] for k in count.keys()]) / sum(count.values())
-        loss = torch.sqrt(loss)
         return loss, losses
 
     def _clean_predictions(self, batch, predictions):

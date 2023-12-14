@@ -7,6 +7,8 @@ import torch
 def mask_and_flatten(func):
     def wrapped(pred, true):
         mask = true != UKN
+        if torch.sum(mask) == 0:
+            return None
         pred = pred[mask]
         true = true[mask]
         return func(pred, true)

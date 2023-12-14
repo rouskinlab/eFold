@@ -40,6 +40,7 @@ class Batch:
         L,
         batch_size,
         data_types,
+        dt_count,
         dms=None,
         shape=None,
         structure=None,
@@ -53,6 +54,7 @@ class Batch:
         self.L = L
         self.batch_size = batch_size
         self.data_types = data_types
+        self.dt_count = dt_count
 
     @classmethod
     def from_dataset_items(cls, batch_data: list, data_type: str):
@@ -67,31 +69,48 @@ class Batch:
         batch_size = len(reference)
 
         data = {}
+        dt_count = {
+            dt: len([1 for dp in batch_data if dp[dt]["true"] is not None])
+            for dt in data_type
+        }
         for dt in data_type:
             if dt == "structure":
-                data["structure"] = data_type_factory["batch"][dt](
-                    true=torch.stack(
-                        [
-                            base_pairs_to_pairing_matrix(
-                                dp["structure"]["true"], l, padding=L
-                            )
-                            for (dp, l) in zip(batch_data, length)
-                        ]
-                    ).to(device),
-                    error=None,
-                    pred=None,
-                )
+                if dt_count["structure"]:
+                    data["structure"] = data_type_factory["batch"][dt](
+                        true=torch.stack(
+                            [
+                                base_pairs_to_pairing_matrix(
+                                    dp["structure"]["true"], l, padding=L
+                                )
+                                for (dp, l) in zip(batch_data, length)
+                            ]
+                        ).to(device),
+                        error=None,
+                        pred=None,
+                    )
+                else:
+                    data["structure"] = None
             else:
                 true, error = [], []
-                for dp in batch_data:
-                    true.append(_pad(dp[dt]["true"], L, dt, accept_none=True))
-                    if hasattr(dp[dt], "error"):
-                        error.append(_pad(dp[dt]["error"], L, dt, accept_none=True))
-                true = torch.stack(true).to(device)
-                error = torch.stack(error).to(device) if len(error) else None
-                data[dt] = data_type_factory["batch"][dt](true=true, error=error).to(
-                    device
-                )
+                # if there's a single non-None signal, put every datapoint into the batch
+                if not dt_count[dt]:
+                    data[dt] = None
+                else:
+                    for dp in batch_data:
+                        true.append(_pad(dp[dt]["true"], L, dt, accept_none=True))
+                    true = torch.stack(true).to(device)
+
+                    # use error if there's a single non-None error and if the true signal is not None
+                    if len([1 for dp in batch_data if dp[dt]["error"] is not None]):
+                        for dp in batch_data:
+                            error.append(_pad(dp[dt]["error"], L, dt, accept_none=True))
+                        error = torch.stack(error).to(device)
+                    else:
+                        error = None
+
+                    data[dt] = data_type_factory["batch"][dt](
+                        true=true, error=error
+                    ).to(device)
 
         return cls(
             reference=reference,
@@ -100,6 +119,7 @@ class Batch:
             L=L,
             batch_size=batch_size,
             data_types=data_type,
+            dt_count=dt_count,
             **data,
         )
 
@@ -109,8 +129,16 @@ class Batch:
             data_part = None
         else:
             data_part, data_type = split_data_type(data_type)
-            if not self.contains(data_type):
-                raise ValueError(f"Batch does not contain {data_type}")
+
+            # could be data but wasn't requested
+            if data_type not in self.data_types:
+                return None
+
+            # no data for this data_type
+            if getattr(self, data_type) is None:
+                return None
+
+            # get data from the objects
             out = getattr(getattr(self, data_type), data_part)
 
         if index is not None:
@@ -156,13 +184,14 @@ class Batch:
             return True
         data_part, data_type = split_data_type(data_type)
         if (
-            not hasattr(self, data_type)
+            not hasattr(self, data_type)  # that's more of a sanity check
             or getattr(self, data_type) is None
-            or data_type not in self.data_types
         ):
             return False
         if (
-            not hasattr(getattr(self, data_type), data_part)
+            not hasattr(
+                getattr(self, data_type), data_part
+            )  # that's more of a sanity check
             or getattr(getattr(self, data_type), data_part) is None
         ):
             return False
@@ -183,7 +212,11 @@ class Batch:
             out[data_type] = {}
             pred, true = self.get_pairs(data_type)
             for metric in POSSIBLE_METRICS[data_type]:
-                out[data_type][metric] = metric_factory[metric](
-                    pred=pred, true=true, batch=self.count(data_type) > 1
-                )
+                scores = []
+                for p, t in zip(pred, true):
+                    score = metric_factory[metric](pred=p, true=t)
+                    if score is not None:
+                        scores.append(score)
+                if len(scores):
+                    out[data_type][metric] = torch.nanmean(torch.tensor(scores)).item()
         return out
