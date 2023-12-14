@@ -38,6 +38,7 @@ class Batch:
         sequence,
         length,
         L,
+        use_error,
         batch_size,
         data_types,
         dt_count,
@@ -48,6 +49,7 @@ class Batch:
         self.reference = reference
         self.sequence = sequence
         self.length = length
+        self.use_error = use_error
         self.dms = dms
         self.shape = shape
         self.structure = structure
@@ -57,9 +59,9 @@ class Batch:
         self.dt_count = dt_count
 
     @classmethod
-    def from_dataset_items(cls, batch_data: list, data_type: str):
+    def from_dataset_items(cls, batch_data: list, data_type: str, use_error: bool):
         reference = [dp["reference"] for dp in batch_data]
-        length = [len(dp["sequence"]) for dp in batch_data]
+        length = [dp["length"] for dp in batch_data]
         L = max(length)
 
         # move the conversion to the dataset
@@ -101,7 +103,9 @@ class Batch:
                     true = torch.stack(true).to(device)
 
                     # use error if there's a single non-None error and if the true signal is not None
-                    if len([1 for dp in batch_data if dp[dt]["error"] is not None]):
+                    if use_error and len(
+                        [1 for dp in batch_data if dp[dt]["error"] is not None]
+                    ):
                         for dp in batch_data:
                             error.append(_pad(dp[dt]["error"], L, dt, accept_none=True))
                         error = torch.stack(error).to(device)
@@ -116,6 +120,7 @@ class Batch:
             reference=reference,
             sequence=sequence,
             length=length,
+            use_error=use_error,
             L=L,
             batch_size=batch_size,
             data_types=data_type,
@@ -171,22 +176,13 @@ class Batch:
     def count(self, data_type):
         if not self.contains(data_type):
             return 0
-        return len(
-            [
-                arr
-                for arr in self.get(data_type=data_type)
-                if arr is not None and len(torch.unique(arr)) > 1
-            ]
-        )  # TODO: remove the unique check since you could have a structure with only 0s for example
+        return self.dt_count[data_type]
 
     def contains(self, data_type):
         if data_type in ["reference", "sequence", "length"]:
             return True
         data_part, data_type = split_data_type(data_type)
-        if (
-            not hasattr(self, data_type)  # that's more of a sanity check
-            or getattr(self, data_type) is None
-        ):
+        if not self.count(data_type):
             return False
         if (
             not hasattr(

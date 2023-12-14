@@ -20,6 +20,7 @@ class DataModule(pl.LightningDataModule):
         shuffle_train=True,
         shuffle_valid=False,
         ribo_validation=False,
+        use_error=False,
         tqdm=True,
         **kwargs,
     ):
@@ -60,6 +61,7 @@ class DataModule(pl.LightningDataModule):
             "valid": shuffle_valid,
         }
         self.tqdm = tqdm
+        self.use_error = use_error
 
         # we need to know the max sequence length for padding
         self.overfit_mode = overfit_mode
@@ -94,6 +96,7 @@ class DataModule(pl.LightningDataModule):
                         name=name,
                         data_type=self.data_type,
                         force_download=self.force_download,
+                        use_error=self.use_error,
                         tqdm=self.tqdm,
                     )
                     for name in self.name
@@ -115,6 +118,7 @@ class DataModule(pl.LightningDataModule):
                     name="ribo-valid",
                     data_type=["dms", "shape", "structure"],
                     force_download=self.force_download,
+                    use_error=self.use_error,
                     tqdm=self.tqdm,
                 )
 

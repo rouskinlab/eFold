@@ -20,6 +20,7 @@ class Dataset(TorchDataset):
         refs: np.ndarray,
         length: np.ndarray,
         sequence: torch.Tensor,
+        use_error: bool = False,
         dms: DMSDataset = None,
         shape: SHAPEDataset = None,
         structure: StructureDataset = None,
@@ -27,6 +28,7 @@ class Dataset(TorchDataset):
         super().__init__()
         self.name = name
         self.data_type = data_type
+        self.use_error = use_error
         self.refs = refs
         self.length = length
         self.sequence = sequence
@@ -41,6 +43,7 @@ class Dataset(TorchDataset):
         return Dataset(
             name=self.name,
             data_type=self.data_type,
+            use_error=self.use_error or other.use_error,
             refs=np.concatenate([self.refs, other.refs]),
             length=np.concatenate([self.length, other.length]),
             sequence=self.sequence + other.sequence,
@@ -61,6 +64,7 @@ class Dataset(TorchDataset):
         name: str,
         data_type: List[str] = ["dms", "shape", "structure"],
         force_download: bool = False,
+        use_error: bool = False,
         tqdm=True,
     ):
         path = Path(name=name)
@@ -128,6 +132,7 @@ class Dataset(TorchDataset):
         return cls(
             name=name,
             data_type=data_type,
+            use_error=use_error,
             refs=refs,
             length=length,
             sequence=sequence,
@@ -152,5 +157,7 @@ class Dataset(TorchDataset):
         return out
 
     def collate_fn(self, batch_data):
-        batch = Batch.from_dataset_items(batch_data, self.data_type)
+        batch = Batch.from_dataset_items(
+            batch_data, self.data_type, use_error=self.use_error
+        )
         return batch
