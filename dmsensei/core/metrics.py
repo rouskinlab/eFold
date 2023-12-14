@@ -10,11 +10,10 @@ def batch_mean(fn):
         scores = []
         for p, t in zip(pred, true):
             scores.append(fn(pred=p.squeeze(), true=t.squeeze(), *args, **kwargs))
-        avg = torch.mean(torch.tensor(scores))
+        avg = torch.nanmean(torch.tensor(scores))
         if ~torch.isnan(avg):
             return avg.item()
         else:
-            print("NaN encountered in metric, returning None")
             return None
 
     return wrapper
@@ -29,6 +28,9 @@ def f1(pred, true, batch=None, threshold=0.5):
     :param true: True binary pairing matrix (L,L)
     :return: F1 score for this RNA structure
     """
+    mask = true != UKN
+    pred = pred[mask]
+    true = true[mask]
 
     pred = (pred > threshold).float()
 
@@ -49,6 +51,10 @@ def mFMI(pred, true, batch=None, threshold=0.5):
     :param true: True binary pairing matrix (L,L)
     :return: mFMI score for this RNA structure
     """
+
+    mask = true != UKN
+    pred = pred[mask]
+    true = true[mask]
 
     pred = (pred > threshold).float()
 
