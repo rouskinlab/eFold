@@ -3,6 +3,18 @@ from ..config import UKN
 import torch
 
 
+# wrapper for metrics
+def mask_and_flatten(func):
+    def wrapped(pred, true):
+        mask = true != UKN
+        pred = pred[mask]
+        true = true[mask]
+        return func(pred, true)
+
+    return wrapped
+
+
+@mask_and_flatten
 def f1(pred, true, threshold=0.5):
     """
     Compute the F1 score of the predictions.
@@ -11,9 +23,6 @@ def f1(pred, true, threshold=0.5):
     :param true: True binary pairing matrix (L,L)
     :return: F1 score for this RNA structure
     """
-    mask = true != UKN
-    pred = pred[mask]
-    true = true[mask]
 
     pred = (pred > threshold).float()
 
@@ -58,6 +67,7 @@ def f1(pred, true, threshold=0.5):
 #     return mFMI.item()
 
 
+@mask_and_flatten
 def r2_score(pred, true):
     """
     Compute the R2 score of the predictions.
@@ -67,15 +77,12 @@ def r2_score(pred, true):
     :return: R2 score
     """
 
-    mask = true != UKN
-    pred = pred[mask]
-    true = true[mask]
-
     return (
         1 - torch.sum((true - pred) ** 2) / torch.sum((true - torch.mean(true)) ** 2)
     ).item()
 
 
+@mask_and_flatten
 def pearson_coefficient(pred, true):
     """
     Compute the Pearson correlation coefficient of the predictions.
@@ -84,9 +91,7 @@ def pearson_coefficient(pred, true):
     :param pred: Predicted values
     :return: pearson coefficient
     """
-    mask = true != UKN
-    pred = pred[mask]
-    true = true[mask]
+
     return torch.mean(
         (pred - torch.mean(pred))
         * (true - torch.mean(true))
@@ -94,6 +99,7 @@ def pearson_coefficient(pred, true):
     ).item()
 
 
+@mask_and_flatten
 def mae_score(pred, true):
     """
     Compute the Mean Average Error of the predictions.
@@ -102,10 +108,6 @@ def mae_score(pred, true):
     :param pred: Predicted values
     :return: MAE score
     """
-
-    mask = true != UKN
-    pred = pred[mask]
-    true = true[mask]
 
     return torch.mean(torch.abs(true - pred)).item()
 
