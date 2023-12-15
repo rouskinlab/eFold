@@ -19,6 +19,8 @@ class Model(pl.LightningModule):
 
         self.weight_data = weight_data
         self.save_hyperparameters()
+        self.lossBCE = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([300])).to(device)
+
 
     def configure_optimizers(self):
         optimizer = self.optimizer_fn(
@@ -56,8 +58,7 @@ class Model(pl.LightningModule):
         # Unsure if this is the correct loss function
         pred, true = batch.get_pairs("structure")
         mask = true != UKN
-        lossBCE = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([300])).to(device)
-        return lossBCE(pred[mask], true[mask])
+        return self.lossBCE(pred[mask], true[mask])
 
     def loss_fn(self, batch: Batch):
         count = batch.dt_count
