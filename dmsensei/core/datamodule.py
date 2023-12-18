@@ -168,7 +168,6 @@ class DataModule(pl.LightningDataModule):
             self.val_set if not self.overfit_mode else self.train_set,
             shuffle=self.shuffle["valid"],
             collate_fn=self.collate_fn,
-            max_len=self.max_len,
             batch_size=self.batch_size,
         )
 
