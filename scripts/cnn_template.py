@@ -31,18 +31,20 @@ if __name__ == "__main__":
         wandb_logger = WandbLogger(project=project)
 
     # fit loop
-    batch_size = 16
+    batch_size = 4
     dm = DataModule(
-        name=["ribo-kaggleGU"],
+        name=["gros_dataset_short"],
         data_type=["dms", "shape","structure"],
         force_download=False,
         batch_size=batch_size,
         num_workers=1,
-        train_split=298281, # all but valid_split
+        train_split=396824, # all but valid_split
         valid_split=4096,
         predict_split=0,
+        ribo_validation = True,
         overfit_mode=False,
         shuffle_valid=False,
+        ribo_validation = True,
     )
 
     model = create_model(
@@ -70,11 +72,11 @@ if __name__ == "__main__":
     trainer = Trainer(
         accelerator=device,
         devices=8,
-        strategy=DDPStrategy(find_unused_parameters=False),
+        strategy=DDPStrategy(find_unused_parameters=True),
         precision="16-mixed",
         max_epochs=1000,
         log_every_n_steps=1,
-        accumulate_grad_batches=1,
+        accumulate_grad_batches=4,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
             LearningRateMonitor(logging_interval="epoch"),

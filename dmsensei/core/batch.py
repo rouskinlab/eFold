@@ -134,7 +134,6 @@ class Batch:
             data_part = None
         else:
             data_part, data_type = split_data_type(data_type)
-
             # could be data but wasn't requested
             if data_type not in self.data_types:
                 return None
@@ -174,7 +173,7 @@ class Batch:
         )
 
     def count(self, data_type):
-        if getattr(self, data_type) is None:
+        if not self.contains(data_type):
             return 0
         return self.dt_count[data_type]
 
