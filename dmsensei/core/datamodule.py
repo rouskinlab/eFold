@@ -2,7 +2,7 @@ from torch.utils.data import DataLoader, random_split, Subset
 import lightning.pytorch as pl
 from typing import Union, List
 from .dataset import Dataset
-from ..config import TEST_SETS
+from ..config import TEST_SETS, UKN
 
 
 class DataModule(pl.LightningDataModule):
@@ -22,6 +22,7 @@ class DataModule(pl.LightningDataModule):
         ribo_validation=False,
         use_error=False,
         max_len=500,
+        structure_padding_value=UKN,
         tqdm=True,
         **kwargs,
     ):
@@ -47,7 +48,6 @@ class DataModule(pl.LightningDataModule):
         else:
             self.name = name
 
-        self.force_download = force_download
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.data_type = data_type
@@ -62,8 +62,13 @@ class DataModule(pl.LightningDataModule):
             "valid": shuffle_valid,
         }
         self.tqdm = tqdm
-        self.use_error = use_error
-        self.max_len = max_len
+        self.dataset_args = {
+            "structure_padding_value": structure_padding_value,
+            "max_len": max_len,
+            "use_error": use_error,
+            "force_download": force_download,
+            "tqdm": tqdm,
+        }
 
         # we need to know the max sequence length for padding
         self.overfit_mode = overfit_mode
@@ -97,10 +102,7 @@ class DataModule(pl.LightningDataModule):
                     Dataset.from_local_or_download(
                         name=name,
                         data_type=self.data_type,
-                        force_download=self.force_download,
-                        use_error=self.use_error,
-                        max_len=self.max_len,
-                        tqdm=self.tqdm,
+                        **self.dataset_args,
                     )
                     for name in self.name
                 ]
@@ -120,10 +122,7 @@ class DataModule(pl.LightningDataModule):
                 self.ribo_val_set = Dataset.from_local_or_download(
                     name="ribo-valid",
                     data_type=["dms", "shape", "structure"],
-                    force_download=self.force_download,
-                    use_error=self.use_error,
-                    max_len=self.max_len,
-                    tqdm=self.tqdm,
+                    **self.dataset_args,
                 )
 
         if stage == "test":
@@ -147,9 +146,7 @@ class DataModule(pl.LightningDataModule):
             Dataset.from_local_or_download(
                 name=name,
                 data_type=[data_type],
-                force_download=force_download,
-                max_len=self.max_len,
-                tqdm=self.tqdm,
+                **self.dataset_args,
             )
             for data_type, datasets in TEST_SETS.items()
             for name in datasets

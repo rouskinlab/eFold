@@ -59,7 +59,13 @@ class Batch:
         self.dt_count = dt_count
 
     @classmethod
-    def from_dataset_items(cls, batch_data: list, data_type: str, use_error: bool):
+    def from_dataset_items(
+        cls,
+        batch_data: list,
+        data_type: str,
+        use_error: bool,
+        structure_padding_value: float = UKN,
+    ):
         reference = [dp["reference"] for dp in batch_data]
         length = [dp["length"] for dp in batch_data]
         L = max(length)
@@ -82,7 +88,10 @@ class Batch:
                         true=torch.stack(
                             [
                                 base_pairs_to_pairing_matrix(
-                                    dp["structure"]["true"], l, padding=L
+                                    dp["structure"]["true"],
+                                    l,
+                                    padding=L,
+                                    pad_value=structure_padding_value,
                                 )
                                 for (dp, l) in zip(batch_data, length)
                             ]
