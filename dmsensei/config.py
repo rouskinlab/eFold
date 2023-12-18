@@ -34,10 +34,15 @@ DATA_TYPES_FORMAT = {
 REFERENCE_METRIC = {"structure": "f1", "dms": "mae", "shape": "mae"}
 REF_METRIC_SIGN = {"structure": 1, "dms": -1, "shape": -1}
 POSSIBLE_METRICS = {
-    "structure": ["f1", "mFMI"],
+    "structure": ["f1"],  # , "mFMI"],
     "dms": ["mae", "r2", "pearson"],
     "shape": ["mae", "r2", "pearson"],
 }
 
+DTYPE_PER_DATA_TYPE = {
+    "structure": torch.int32,
+    "dms": DEFAULT_FORMAT,
+    "shape": DEFAULT_FORMAT,
+}
 
 torch.set_default_dtype(torch.float32)

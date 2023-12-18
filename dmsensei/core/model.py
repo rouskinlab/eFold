@@ -1,18 +1,13 @@
 import lightning.pytorch as pl
 import torch.nn as nn
 import torch
-from ..config import device
+from ..config import device, UKN
 import torch.nn.functional as F
 from .batch import Batch
 
 
 class Model(pl.LightningModule):
-    def __init__(
-            self,
-            lr: float,
-            optimizer_fn,
-            weight_data: bool = False,
-            **kwargs):
+    def __init__(self, lr: float, optimizer_fn, weight_data: bool = False, **kwargs):
         super().__init__()
 
         # Set attributes
@@ -24,21 +19,20 @@ class Model(pl.LightningModule):
 
         self.weight_data = weight_data
         self.save_hyperparameters()
+        self.lossBCE = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([300])).to(device)
+
 
     def configure_optimizers(self):
         optimizer = self.optimizer_fn(
             self.parameters(),
             lr=self.lr,
-            weight_decay=self.weight_decay if hasattr(
-                self,
-                "weight_decay") else 0,
+            weight_decay=self.weight_decay if hasattr(self, "weight_decay") else 0,
         )
 
         if not hasattr(self, "gamma") or self.gamma is None:
             return optimizer
 
-        scheduler = torch.optim.lr_scheduler.ExponentialLR(
-            optimizer, gamma=self.gamma)
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=self.gamma)
         return [optimizer], [scheduler]
 
     def _loss_signal(self, batch: Batch, data_type: str):
@@ -47,31 +41,27 @@ class Model(pl.LightningModule):
             "shape",
         ], "This function only works for dms and shape data"
         pred, true = batch.get_pairs(data_type)
-        mask = true != -1000.0
-        if self.weight_data:
-            return F.gaussian_nll_loss(
-                pred[mask],
-                true[mask],
-                batch.get("error_{}".format(data_type))[mask],
-                full=True,
-                eps=5e-2,
-            )/8
-        return F.mse_loss(pred[mask], true[mask])
+        mask = true != UKN
+        # print(batch.get("error_{}".format(data_type)))
+        # error = batch.get("error_{}".format(data_type))
+        # if self.weight_data and
+        #     return F.gaussian_nll_loss(
+        #         pred[mask],
+        #         true[mask],
+        #         batch.get("error_{}".format(data_type))[mask],
+        #         full=True,
+        #         eps=5e-2,
+        #     )/8
+        return torch.sqrt(F.mse_loss(pred[mask], true[mask]))
 
     def _loss_structure(self, batch: Batch):
         # Unsure if this is the correct loss function
         pred, true = batch.get_pairs("structure")
-        lossBCE = nn.BCEWithLogitsLoss(
-            pos_weight=torch.tensor(
-                [300])).to(device)
-        return lossBCE(pred, true)
+        mask = true != UKN
+        return self.lossBCE(pred[mask], true[mask])
 
     def loss_fn(self, batch: Batch):
-        count = {
-            dt: batch.count(dt)
-            for dt in batch.data_types
-            if batch.contains(dt) and batch.contains(f"pred_{dt}")
-        }
+        count = batch.dt_count
         losses = {}
         if "dms" in count.keys():
             losses["dms"] = self._loss_signal(batch, "dms")
@@ -79,18 +69,13 @@ class Model(pl.LightningModule):
             losses["shape"] = self._loss_signal(batch, "shape")
         if "structure" in count.keys():
             losses["structure"] = self._loss_structure(batch)
-        loss = sum([losses[k] * count[k]
-                   for k in count.keys()]) / sum(count.values())
-        if not self.weight_data:
-            loss = torch.sqrt(loss)
+        loss = sum([losses[k] * count[k] for k in count.keys()]) / sum(count.values())
         return loss, losses
 
     def _clean_predictions(self, batch, predictions):
         # clip values to [0, 1]
-        for data_type in set(["dms", "shape"]).intersection(
-                predictions.keys()):
-            predictions[data_type] = torch.clip(
-                predictions[data_type], min=0, max=1)
+        for data_type in set(["dms", "shape"]).intersection(predictions.keys()):
+            predictions[data_type] = torch.clip(predictions[data_type], min=0, max=1)
         return predictions
 
     def training_step(self, batch: Batch, batch_idx: int):

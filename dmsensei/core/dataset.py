@@ -5,11 +5,11 @@ from torch.utils.data import ConcatDataset, Dataset as TorchDataset, Dataset
 from typing import List
 
 from .batch import Batch
-from ..huggingface import get_dataset
+from rouskinhf import get_dataset
 from .datatype import DMSDataset, SHAPEDataset, StructureDataset
 from .embeddings import sequence_to_int
 from .util import _pad
-from ..huggingface.path import Path
+from .path import Path
 
 
 class Dataset(TorchDataset):
@@ -17,39 +17,99 @@ class Dataset(TorchDataset):
         self,
         name: str,
         data_type: List[str],
-        force_download: bool,
-        tqdm=True,
+        refs: np.ndarray,
+        length: np.ndarray,
+        sequence: torch.Tensor,
+        use_error: bool = False,
+        max_len=500,
+        dms: DMSDataset = None,
+        shape: SHAPEDataset = None,
+        structure: StructureDataset = None,
     ) -> None:
         super().__init__()
         self.name = name
         self.data_type = data_type
+        self.use_error = use_error
+        self.refs = refs
+        self.length = length
+        self.sequence = sequence
+        self.dms = dms
+        self.shape = shape
+        self.structure = structure
+        self.L = max(self.length)
+        self._remove_long_sequences(max_len)
 
+    def _remove_long_sequences(self, max_len):
+        # remove long sequences
+        idx_too_long = [i for i, l in enumerate(self.length) if l > max_len]
+        for idx in idx_too_long[::-1]:
+            del self.refs[idx]
+            del self.length[idx]
+            del self.sequence[idx]
+            if self.dms is not None:
+                del self.dms[idx]
+            if self.shape is not None:
+                del self.shape[idx]
+            if self.structure is not None:
+                del self.structure[idx]
+
+    def __add__(self, other: Dataset) -> Dataset:
+        if self.name == other.name:
+            raise ValueError("Dataset are the same")
+        return Dataset(
+            name=self.name,
+            data_type=self.data_type,
+            use_error=self.use_error or other.use_error,
+            refs=np.concatenate([self.refs, other.refs]),
+            length=np.concatenate([self.length, other.length]),
+            sequence=self.sequence + other.sequence,
+            dms=self.dms + other.dms
+            if self.dms is not None and other.dms is not None
+            else None,
+            shape=self.shape + other.shape
+            if self.shape is not None and other.shape is not None
+            else None,
+            structure=self.structure + other.structure
+            if self.structure is not None and other.structure is not None
+            else None,
+        )
+
+    @classmethod
+    def from_local_or_download(
+        cls,
+        name: str,
+        data_type: List[str] = ["dms", "shape", "structure"],
+        force_download: bool = False,
+        use_error: bool = False,
+        max_len=500,
+        tqdm=True,
+    ):
         path = Path(name=name)
         if force_download:
             path.clear()
 
         if os.path.exists(path.get_reference()):
-            print("Loading dataset from disk...")
+            print("Loading dataset from disk")
 
             print("Load references              \r", end="")
-            self.refs = path.load_reference()
+            refs = path.load_reference().tolist()
 
             print("Load lengths         \r", end="")
-            self.length = path.load_length()
-            self.L = max(self.length)
+            length = path.load_length().tolist()
+            L = max(length)
 
             print("Load sequences         \r", end="")
-            self.sequence = torch.tensor(path.load_sequence())
-            self.dms, self.shape, self.structure = None, None, None
+            sequence = path.load_sequence().tolist()
+            dms, shape, structure = None, None, None
             if "dms" in data_type:
                 print("Load dms         \r", end="")
-                self.dms = path.load_dms()
+                dms = path.load_dms()
             if "shape" in data_type:
                 print("Load shape         \r", end="")
-                self.shape = path.load_shape()
+                shape = path.load_shape()
             if "structure" in data_type:
                 print("Load structure      \r", end="")
-                self.structure = path.load_structure()
+                structure = path.load_structure()
 
         else:
             data = get_dataset(
@@ -57,57 +117,65 @@ class Dataset(TorchDataset):
                 force_download=force_download,
                 tqdm=tqdm,
             )
-            print("Loading dataset into memory...")
+            print("Loading dataset from HF")
 
             print("Dump lengths              \r", end="")
-            self.length = np.array([len(d["sequence"]) for d in data.values()])
-            path.dump_length(self.length)
+            length = [len(d["sequence"]) for d in data.values()]
+            path.dump_length(np.array(length))
 
             print("Dump references              \r", end="")
-            self.refs = np.array(list(data.keys()))
-            path.dump_reference(self.refs)
-            self.L = max(self.length)
+            refs = list(data.keys())
+            path.dump_reference(np.array(list(data.keys())))
+            L = max(length)
 
             print("Dump sequences              \r", end="")
-            self.sequence = torch.stack([_pad(sequence_to_int(
-                data[ref]["sequence"]), self.L, "sequence") for ref in self.refs])
-            path.dump_sequence(np.array(self.sequence))
+            sequence = [d["sequence"] for d in data.values()]
+            path.dump_sequence(np.array(sequence))
 
             print("Dump dms              \r", end="")
-            self.dms = DMSDataset.from_data_json(data, self.L, self.refs)
-            path.dump_dms(self.dms)
+            dms = DMSDataset.from_data_json(data, L, refs)
+            path.dump_dms(dms)
 
             print("Dump shape              \r", end="")
-            self.shape = SHAPEDataset.from_data_json(data, self.L, self.refs)
-            path.dump_shape(self.shape)
+            shape = SHAPEDataset.from_data_json(data, L, refs)
+            path.dump_shape(shape)
 
             print("Dump structure              \r", end="")
-            self.structure = StructureDataset.from_data_json(
-                data, self.L, self.refs)
-            path.dump_structure(self.structure)
+            structure = StructureDataset.from_data_json(data, L, refs)
+            path.dump_structure(structure)
 
-            for dt in ["dms", "shape", "structure"]:
-                if dt not in self.data_type:
-                    setattr(self, dt, None)
+        print("Done!                            ")
 
-            print("Done!")
+        return cls(
+            name=name,
+            data_type=data_type,
+            use_error=use_error,
+            refs=refs,
+            length=length,
+            sequence=sequence,
+            dms=dms,
+            shape=shape,
+            structure=structure,
+            max_len=max_len,
+        )
 
     def __len__(self) -> int:
         return len(self.sequence)
 
     def __getitem__(self, index) -> tuple:
-        return {
+        out = {
             "reference": self.refs[index],
             "sequence": self.sequence[index],
             "length": self.length[index],
-            "dms": self.dms[index] if self.dms is not None else None,
-            "shape": self.shape[index] if self.shape is not None else None,
-            "structure": self.structure[index] if self.structure is not None else None,
         }
-
-    def __add__(self, other: Dataset) -> ConcatDataset:
-        raise NotImplementedError
+        for attr in ["dms", "shape", "structure"]:
+            out[attr] = (
+                getattr(self, attr)[index] if getattr(self, attr) != None else None
+            )
+        return out
 
     def collate_fn(self, batch_data):
-        batch = Batch.from_dataset_items(batch_data, self.data_type)
+        batch = Batch.from_dataset_items(
+            batch_data, self.data_type, use_error=self.use_error
+        )
         return batch

@@ -16,7 +16,7 @@ def _pad(arr, L, data_type):
     else:
         if isinstance(arr, list):
             arr = torch.tensor(arr)
-        return F.pad(arr, (0, L - len(arr)), value=padding_values[data_type])
+        return F.pad(arr, (0, L - arr.shape[1]), value=padding_values[data_type])
 
 
 def split_data_type(data_type):

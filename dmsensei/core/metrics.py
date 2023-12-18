@@ -1,27 +1,23 @@
 import torch
 from ..config import UKN
+import torch
 
 
-# make a decorator to run the metrics on the batch
-def batch_mean(fn):
-    def wrapper(pred, true, batch=False, *args, **kwargs):
-        if not batch:
-            return fn(pred=pred, true=true, *args, **kwargs)
-        scores = []
-        for p, t in zip(pred, true):
-            scores.append(fn(pred=p.squeeze(), true=t.squeeze(), *args, **kwargs))
-        avg = torch.mean(torch.tensor(scores))
-        if ~torch.isnan(avg):
-            return avg.item()
-        else:
-            print("NaN encountered in metric, returning None")
+# wrapper for metrics
+def mask_and_flatten(func):
+    def wrapped(pred, true):
+        mask = true != UKN
+        if torch.sum(mask) == 0:
             return None
+        pred = pred[mask]
+        true = true[mask]
+        return func(pred, true)
 
-    return wrapper
+    return wrapped
 
 
-@batch_mean
-def f1(pred, true, batch=None, threshold=0.5):
+@mask_and_flatten
+def f1(pred, true, threshold=0.5):
     """
     Compute the F1 score of the predictions.
 
@@ -40,38 +36,41 @@ def f1(pred, true, batch=None, threshold=0.5):
         return (2 * torch.sum(pred * true) / sum_pair).item()
 
 
-@batch_mean
-def mFMI(pred, true, batch=None, threshold=0.5):
-    """
-    Compute the mFMI score of the predictions.
+# def mFMI(pred, true, threshold=0.5):
+#     """
+#     Compute the mFMI score of the predictions.
 
-    :param pred: Predicted pairing matrix probability  (L,L)
-    :param true: True binary pairing matrix (L,L)
-    :return: mFMI score for this RNA structure
-    """
+#     :param pred: Predicted pairing matrix probability  (L,L)
+#     :param true: True binary pairing matrix (L,L)
+#     :return: mFMI score for this RNA structure
+#     """
 
-    pred = (pred > threshold).float()
+#     mask = true != UKN
+#     pred = pred[mask]
+#     true = true[mask]
 
-    TP = torch.sum(pred * true)
+#     pred = (pred > threshold).float()
 
-    prod_true = torch.sum(pred) * torch.sum(true)
-    if prod_true > 0:
-        FMI = TP / torch.sqrt(prod_true)
-    else:
-        FMI = 0
+#     TP = torch.sum(pred * true)
 
-    u = (
-        torch.sum((~torch.sum(pred, dim=1).bool()) * (~torch.sum(true, dim=1).bool()))
-        / pred.shape[-1]
-    )
+#     prod_true = torch.sum(pred) * torch.sum(true)
+#     if prod_true > 0:
+#         FMI = TP / torch.sqrt(prod_true)
+#     else:
+#         FMI = 0
 
-    mFMI = u + (1 - u) * FMI
+#     u = (
+#         torch.sum((~torch.sum(pred).bool()) * (~torch.sum(true).bool()))
+#         / pred.shape[-1]
+#     )
 
-    return mFMI.item()
+#     mFMI = u + (1 - u) * FMI
+
+#     return mFMI.item()
 
 
-@batch_mean
-def r2_score(pred, true, batch=None):
+@mask_and_flatten
+def r2_score(pred, true):
     """
     Compute the R2 score of the predictions.
 
@@ -80,17 +79,13 @@ def r2_score(pred, true, batch=None):
     :return: R2 score
     """
 
-    mask = true != UKN
-    pred = pred[mask]
-    true = true[mask]
-
     return (
         1 - torch.sum((true - pred) ** 2) / torch.sum((true - torch.mean(true)) ** 2)
     ).item()
 
 
-@batch_mean
-def pearson_coefficient(pred, true, batch=None):
+@mask_and_flatten
+def pearson_coefficient(pred, true):
     """
     Compute the Pearson correlation coefficient of the predictions.
 
@@ -98,9 +93,7 @@ def pearson_coefficient(pred, true, batch=None):
     :param pred: Predicted values
     :return: pearson coefficient
     """
-    mask = true != UKN
-    pred = pred[mask]
-    true = true[mask]
+
     return torch.mean(
         (pred - torch.mean(pred))
         * (true - torch.mean(true))
@@ -108,8 +101,8 @@ def pearson_coefficient(pred, true, batch=None):
     ).item()
 
 
-@batch_mean
-def mae_score(pred, true, batch=None):
+@mask_and_flatten
+def mae_score(pred, true):
     """
     Compute the Mean Average Error of the predictions.
 
@@ -118,16 +111,11 @@ def mae_score(pred, true, batch=None):
     :return: MAE score
     """
 
-    mask = true != UKN
-    pred = pred[mask]
-    true = true[mask]
-
     return torch.mean(torch.abs(true - pred)).item()
 
 
 metric_factory = {
     "f1": f1,
-    "mFMI": mFMI,
     "r2": r2_score,
     "pearson": pearson_coefficient,
     "mae": mae_score,

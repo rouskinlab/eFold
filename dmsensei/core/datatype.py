@@ -1,16 +1,15 @@
 import torch
-from ..config import device, UKN
+from ..config import device, UKN, DTYPE_PER_DATA_TYPE
 import torch.nn.functional as F
 from .util import _pad
 
 
 class DataType:
-    attributes = ["true", "pred", "error", "index"]
+    attributes = ["true", "pred", "error"]
 
-    def __init__(self, true, error=None, index=None, pred=None):
+    def __init__(self, true: list, error: list = None, pred: list = None):
         self.true = true
         self.error = error
-        self.index = index
         self.pred = pred
 
     def to(self, device):
@@ -21,49 +20,85 @@ class DataType:
 
 
 class DataTypeBatch(DataType):
-    def __init__(self, true, pred, index, error=None):
-        super().__init__(true, pred=pred, index=index, error=error)
+    def __init__(self, true, pred, error=None):
+        super().__init__(true, pred=pred, error=error)
 
 
 class DataTypeDataset(DataType):
-    def __init__(self, true, index, error=None):
-        super().__init__(true=true, error=error, index=index)
+    def __init__(self, true, error=None):
+        super().__init__(true=true, error=error)
+
+    def __len__(self):
+        return len(self.true)
+
+    def __getitem__(self, idx):
+        out = {
+            "true": self.true[idx],
+        }
+        if self.name != "structure":
+            out["error"] = self.error[idx] if self.error is not None else None
+        return out
+
+    def __add__(self, other):
+        if self.name != other.name:
+            raise ValueError(
+                f"Cannot concatenate {self.name} and {other.name} datasets."
+            )
+
+        if other is None:
+            return self
+
+        return data_type_factory["dataset"][self.name](
+            true=self.true + other.true,
+            error=self.error + other.error if self.name != "structure" else None,
+        )
+
+    def __radd__(self, other):
+        if other is None:
+            return self
+        return other + self
+
+    def __delitem__(self, idx):
+        del self.true[idx]
+        if self.error is not None:
+            del self.error[idx]
+        if self.pred is not None:
+            del self.pred[idx]
 
     @classmethod
     def from_data_json(cls, data_json: dict, L: int, refs: list):
         data_type = cls.name
-        index, true, error = [], [], []
-        for idx, ref in enumerate(refs):
+        true, error = [], []
+        for ref in refs:
             values = data_json[ref]
             if data_type in values:
-                index.append(idx)
-                if data_type != "structure":
-                    true.append(_pad(values[data_type], L, data_type))
-                    error.append(
-                        _pad(values["error_{}".format(data_type)], L, data_type)
+                true.append(
+                    torch.tensor(
+                        values[data_type], dtype=DTYPE_PER_DATA_TYPE[data_type]
                     )
-                else:
-                    true.append(values[data_type])
+                )
+                if data_type != "structure":
+                    if "error_{}".format(data_type) in values:
+                        error.append(
+                            torch.tensor(
+                                values["error_{}".format(data_type)],
+                                dtype=DTYPE_PER_DATA_TYPE[data_type],
+                            )
+                        )
+                    else:
+                        error.append(None)
+            else:
+                true.append(None)
+                if data_type != "structure":
+                    error.append(None)
 
-        if len(index) == 0:
-            return None
-
-        def post_process(x, dtype, dim=1):
-            if cls.name == "structure" and dim == 2:
-                return x
-            if len(x) == 0:
-                return None
-            if dim == 1:
-                return torch.tensor(x, dtype=dtype).to(device)
-            if dim == 2:
-                return torch.stack(x).to(dtype=dtype)
-            raise ValueError(f"dim must be 1 or 2, got {dim}")
+        if len(error):
+            assert len(error) == len(true), "error and true must have the same length"
 
         return cls(
             **{
-                "true": post_process(true, torch.float32, dim=2),
-                "error": post_process(error, torch.float32, dim=2),
-                "index": post_process(index, torch.int32, dim=1),
+                "true": true,
+                "error": error,
             }
         )
 
@@ -71,76 +106,47 @@ class DataTypeDataset(DataType):
 class DMSBatch(DataTypeBatch):
     name = "dms"
 
-    def __init__(self, true, pred=None, error=None, index=None):
-        super().__init__(true=true, pred=pred, index=index, error=error)
+    def __init__(self, true, pred=None, error=None):
+        super().__init__(true=true, pred=pred, error=error)
 
 
 class SHAPEBatch(DataTypeBatch):
     name = "shape"
 
-    def __init__(self, true, pred=None, error=None, index=None):
-        super().__init__(true=true, pred=pred, index=index, error=error)
+    def __init__(self, true, pred=None, error=None):
+        super().__init__(true=true, pred=pred, error=error)
 
 
 class StructureBatch(DataTypeBatch):
     name = "structure"
 
-    def __init__(self, true, pred=None, index=None, error=None):
-        super().__init__(true=true, pred=pred, index=index)
+    def __init__(self, true, pred=None, error=None):
+        super().__init__(true=true, pred=pred)
 
 
 class DMSDataset(DataTypeDataset):
     name = "dms"
 
-    def __init__(self, true, error=None, index=None):
-        super().__init__(true=true, error=error, index=index)
-
-    def __getitem__(self, idx):
-        if idx not in self.index:
-            return None
-        local_idx = torch.where(self.index == idx)[0].item()
-        return {
-            "true": self.true[local_idx],
-            "error": self.error[local_idx],
-        }
+    def __init__(self, true, error=None):
+        super().__init__(true=true, error=error)
 
 
 class SHAPEDataset(DataTypeDataset):
     name = "shape"
 
-    def __init__(self, true, error=None, index=None):
-        super().__init__(true=true, error=error, index=index)
-
-    def __getitem__(self, idx):
-        if idx not in self.index:
-            return None
-        local_idx = torch.where(self.index == idx)[0].item()
-        return {
-            "true": self.true[local_idx],
-            "error": self.error[local_idx],
-        }
+    def __init__(self, true, error=None):
+        super().__init__(true=true, error=error)
 
 
 class StructureDataset(DataTypeDataset):
     name = "structure"
 
-    def __init__(self, true, index=None, error=None):
-        super().__init__(true=true, index=index)
-
-    def __getitem__(self, idx):
-        if idx not in self.index:
-            return None
-        local_idx = torch.where(self.index == idx)[0].item()
-        return {
-            "true": self.true[local_idx],
-        }
+    def __init__(self, true, error=None):
+        super().__init__(true=true)
 
 
 data_type_factory = {
-    "batch": {
-        "dms": DMSBatch,
-        "shape": SHAPEBatch,
-        "structure": StructureBatch},
+    "batch": {"dms": DMSBatch, "shape": SHAPEBatch, "structure": StructureBatch},
     "dataset": {
         "dms": DMSDataset,
         "shape": SHAPEDataset,
