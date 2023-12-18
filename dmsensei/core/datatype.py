@@ -58,6 +58,13 @@ class DataTypeDataset(DataType):
             return self
         return other + self
 
+    def __delitem__(self, idx):
+        del self.true[idx]
+        if self.error is not None:
+            del self.error[idx]
+        if self.pred is not None:
+            del self.pred[idx]
+
     @classmethod
     def from_data_json(cls, data_json: dict, L: int, refs: list):
         data_type = cls.name

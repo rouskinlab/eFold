@@ -21,6 +21,7 @@ class Dataset(TorchDataset):
         length: np.ndarray,
         sequence: torch.Tensor,
         use_error: bool = False,
+        max_len=500,
         dms: DMSDataset = None,
         shape: SHAPEDataset = None,
         structure: StructureDataset = None,
@@ -36,6 +37,21 @@ class Dataset(TorchDataset):
         self.shape = shape
         self.structure = structure
         self.L = max(self.length)
+        self._remove_long_sequences(max_len)
+
+    def _remove_long_sequences(self, max_len):
+        # remove long sequences
+        idx_too_long = [i for i, l in enumerate(self.length) if l > max_len]
+        for idx in idx_too_long[::-1]:
+            del self.refs[idx]
+            del self.length[idx]
+            del self.sequence[idx]
+            if self.dms is not None:
+                del self.dms[idx]
+            if self.shape is not None:
+                del self.shape[idx]
+            if self.structure is not None:
+                del self.structure[idx]
 
     def __add__(self, other: Dataset) -> Dataset:
         if self.name == other.name:
@@ -65,6 +81,7 @@ class Dataset(TorchDataset):
         data_type: List[str] = ["dms", "shape", "structure"],
         force_download: bool = False,
         use_error: bool = False,
+        max_len=500,
         tqdm=True,
     ):
         path = Path(name=name)
@@ -139,6 +156,7 @@ class Dataset(TorchDataset):
             dms=dms,
             shape=shape,
             structure=structure,
+            max_len=max_len,
         )
 
     def __len__(self) -> int:
