@@ -173,7 +173,9 @@ class Batch:
         )
 
     def count(self, data_type):
-        if not self.contains(data_type):
+        if data_type in ["reference", "sequence", "length"]:
+            return self.batch_size
+        if not data_type in self.dt_count or getattr(self, data_type) is None:
             return 0
         return self.dt_count[data_type]
 
