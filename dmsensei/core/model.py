@@ -41,6 +41,7 @@ class Model(pl.LightningModule):
             "shape",
         ], "This function only works for dms and shape data"
         pred, true = batch.get_pairs(data_type)
+        if true==None: return torch.tensor(0.0)
         mask = true != UKN
         # print(batch.get("error_{}".format(data_type)))
         # error = batch.get("error_{}".format(data_type))
@@ -57,6 +58,7 @@ class Model(pl.LightningModule):
     def _loss_structure(self, batch: Batch):
         # Unsure if this is the correct loss function
         pred, true = batch.get_pairs("structure")
+        if true==None: return torch.tensor(0.0)
         mask = true != UKN
         return self.lossBCE(pred[mask], true[mask])
 
