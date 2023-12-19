@@ -44,6 +44,8 @@ class Dataset(TorchDataset):
 
     def _remove_long_sequences(self, max_len):
         # remove long sequences
+        if max_len is None:
+            return
         idx_too_long = [i for i, l in enumerate(self.length) if l > max_len]
         for idx in idx_too_long[::-1]:
             del self.refs[idx]
@@ -59,10 +61,14 @@ class Dataset(TorchDataset):
     def __add__(self, other: Dataset) -> Dataset:
         if self.name == other.name:
             raise ValueError("Dataset are the same")
+        if self.structure_padding_value != other.structure_padding_value:
+            raise ValueError("Structure padding value are not the same")
         return Dataset(
             name=self.name,
-            data_type=self.data_type,
+            data_type=list(set(self.data_type + other.data_type)),
             use_error=self.use_error or other.use_error,
+            max_len=None,
+            structure_padding_value=self.structure_padding_value,
             refs=np.concatenate([self.refs, other.refs]),
             length=np.concatenate([self.length, other.length]),
             sequence=self.sequence + other.sequence,

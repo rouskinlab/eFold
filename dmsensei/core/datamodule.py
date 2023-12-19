@@ -68,6 +68,7 @@ class DataModule(pl.LightningDataModule):
             "use_error": use_error,
             "force_download": force_download,
             "tqdm": tqdm,
+            "max_len": max_len,
         }
 
         # we need to know the max sequence length for padding
@@ -126,9 +127,7 @@ class DataModule(pl.LightningDataModule):
                 )
 
         if stage == "test":
-            self.test_sets = self._select_test_dataset(
-                force_download=self.force_download
-            )
+            self.test_sets = self._select_test_dataset()
 
         if stage == "predict":
             self.predict_set = Subset(
@@ -141,7 +140,7 @@ class DataModule(pl.LightningDataModule):
                 ),
             )
 
-    def _select_test_dataset(self, force_download=False):
+    def _select_test_dataset(self):
         return [
             Dataset.from_local_or_download(
                 name=name,

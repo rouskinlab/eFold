@@ -35,8 +35,8 @@ class LoadBestModel(pl.Callback):
             loader = Loader.find_best_model(wandb.run.name)
             if loader is None:
                 raise ValueError(
-                    "Stage:{}, No best model found for this run.".format(
-                        self.stage))
+                    "Stage:{}, No best model found for this run.".format(self.stage)
+                )
         else:
             loader = Loader(path=model_file)
 
@@ -84,10 +84,7 @@ class WandbFitLogger(LoadBestModel):
         logger = Logger(pl_module, self.batch_size)
         logger.train_loss(loss.item())
 
-    def on_train_end(
-            self,
-            trainer: Trainer,
-            pl_module: LightningModule) -> None:
+    def on_train_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
         pass
 
     def on_validation_batch_end(
@@ -110,10 +107,8 @@ class WandbFitLogger(LoadBestModel):
 
         # Compute metrics and log them to Wandb.
         metrics = batch.compute_metrics()
-        stage = 'valid' if dataloader_idx == 0 else 'ribo-valid'
-        logger.error_metrics_pack(
-            stage, metrics
-        )
+        stage = "valid" if dataloader_idx == 0 else "ribo-valid"
+        logger.error_metrics_pack(stage, metrics)
 
         # Save val_loss for evaluating if this model is the best model
         if dataloader_idx == 0:
@@ -159,10 +154,9 @@ class WandbFitLogger(LoadBestModel):
             idx = batch.get("reference").index(
                 self.validation_examples_references[data_type]
             )
-            pred, true = batch.get(
-                f"pred_{data_type}", index=idx), batch.get(
-                data_type, index=torch.where(
-                    batch.get("index_dms") == idx)[0][0])
+            pred, true = batch.get(f"pred_{data_type}", index=idx), batch.get(
+                data_type, index=torch.where(batch.get("index_dms") == idx)[0][0]
+            )
             plot = plot_factory[(data_type, name)](
                 pred=pred,
                 true=true,
@@ -202,124 +196,123 @@ class WandbFitLogger(LoadBestModel):
         self.val_losses = []
 
 
-# class WandbTestLogger(LoadBestModel):
-#     def __init__(
-#         self,
-#         dm: DataModule,
-#         n_best_worst: int = 10,
-#         load_model: str = None,
-#     ):
-#         """
-#         load_model: path to the model to load. None if no model to load. 'best' to load the best model from wandb run.
-#         """
-#         self.dm = dm
-#         self.batch_size = dm.batch_size
-#         self.stage = "test"
-#         self.n_best_worst = n_best_worst
-#         self.model_file = load_model
+class WandbTestLogger(LoadBestModel):
+    def __init__(
+        self,
+        dm: DataModule,
+        n_best_worst: int = 10,
+        load_model: str = None,
+    ):
+        """
+        load_model: path to the model to load. None if no model to load. 'best' to load the best model from wandb run.
+        """
+        self.dm = dm
+        self.batch_size = dm.batch_size
+        self.stage = "test"
+        self.n_best_worst = n_best_worst
+        self.model_file = load_model
 
-#     @rank_zero_only
-#     def on_test_start(self, trainer, pl_module):
-#         self.test_stacks = [[] for _ in TEST_SETS_NAMES]
-#         self.refs = [[] for _ in TEST_SETS_NAMES]
-#         self.load_model(pl_module, self.model_file)
+    @rank_zero_only
+    def on_test_start(self, trainer, pl_module):
+        self.test_stacks = [[] for _ in TEST_SETS_NAMES]
+        self.refs = [[] for _ in TEST_SETS_NAMES]
+        self.load_model(pl_module, self.model_file)
 
-#     @rank_zero_only
-#     def on_test_batch_end(
-#         self, trainer, pl_module, outputs, batch: Batch, batch_idx, dataloader_idx=0
-#     ):
-#         logger = Logger(pl_module, batch_size=self.batch_size)
+    @rank_zero_only
+    def on_test_batch_end(
+        self, trainer, pl_module, outputs, batch: Batch, batch_idx, dataloader_idx=0
+    ):
+        logger = Logger(pl_module, batch_size=self.batch_size)
 
-#         # Compute metrics and log them to Wandb for each test set
-#         metrics = batch.compute_metrics()
-#         logger.error_metrics_pack(
-#             "test/{}".format(TEST_SETS_NAMES[dataloader_idx]), metrics
-#         )
+        # Compute metrics and log them to Wandb for each test set
+        metrics = batch.compute_metrics()
+        logger.error_metrics_pack(
+            "test/{}".format(TEST_SETS_NAMES[dataloader_idx]), metrics
+        )
 
-#         # log the refs
-#         self.refs[dataloader_idx].extend(batch.get("reference"))
+        # Log the scores
+        data_type = DATA_TYPES_TEST_SETS[dataloader_idx]
+        if not batch.contains(f"pred_{data_type}"):
+            return
+        preds, trues = batch.get_pairs(data_type)
+        for idx, (pred, true) in enumerate(zip(preds, trues)):
+            if pred is None or true is None:
+                continue
+            metric = metric_factory[REFERENCE_METRIC[data_type]](pred=pred, true=true)
+            self.test_stacks[dataloader_idx].append(
+                (batch.get("reference", index=idx), metric)
+            )
 
-#         # Log the scores
-#         data_type = DATA_TYPES_TEST_SETS[dataloader_idx]
-#         if not batch.contains(f"pred_{data_type}"):
-#             return
-#         preds, trues = batch.get_pairs(data_type)
-#         for pred, true, idx in zip(preds, trues, batch.get_index(data_type)):
-#             metric = metric_factory[REFERENCE_METRIC[data_type]](pred=pred, true=true)
-#             self.test_stacks[dataloader_idx].append(
-#                 (batch.get("reference", index=idx), metric)
-#             )
+    @rank_zero_only
+    def on_test_end(self, trainer, pl_module):
+        logger = Logger(pl_module, batch_size=self.batch_size)
 
-#     @rank_zero_only
-#     def on_test_end(self, trainer, pl_module):
-#         logger = Logger(pl_module, batch_size=self.batch_size)
+        for dataloader_idx, data_type in enumerate(DATA_TYPES_TEST_SETS):
+            # Find the best and worst examples
+            df = pd.DataFrame(
+                self.test_stacks[dataloader_idx],
+                columns=["reference", "score"],
+            )
+            if not len(df):
+                continue
+            df.sort_values(
+                by="score", inplace=True, ascending=REF_METRIC_SIGN[data_type] < 0
+            )
+            refs = set(df["reference"].values[: self.n_best_worst]).union(
+                set(df["reference"].values[-self.n_best_worst :])
+            )
 
-#         for dataloader_idx, data_type in enumerate(DATA_TYPES_TEST_SETS):
+            # Useful to find the score for a reference
+            mid_score = df["score"].values[len(df) // 2]
+            df.set_index("reference", inplace=True)
+            best_worse_suffix = lambda ref: (
+                "best" if df.loc[ref, "score"] > mid_score else "worst"
+            )
 
-#             assert len(self.refs[dataloader_idx]) == len(set(self.refs[dataloader_idx])), "There are duplicates in the test set. This is not allowed."
-#             # Find the best and worst examples
-#             df = pd.DataFrame(
-#                 self.test_stacks[dataloader_idx],
-#                 columns=["reference", "score"],
-#             )
-#             if not len(df):
-#                 continue
-#             df.sort_values(
-#                 by="score", inplace=True, ascending=REF_METRIC_SIGN[data_type] < 0
-#             )
-#             refs = set(df["reference"].values[: self.n_best_worst]).union(
-#                 set(df["reference"].values[-self.n_best_worst :])
-#             )
+            # retrieve examples datapoints in the test set
+            list_of_datapoints = []
+            for dp in self.dm.test_sets[dataloader_idx]:
+                if dp["reference"] in refs:
+                    list_of_datapoints.append(dp)
 
-#             # Useful to find the score for a reference
-#             mid_score = df["score"].values[len(df) // 2]
-#             df.set_index("reference", inplace=True)
-#             best_worse_suffix = lambda ref: (
-#                 "best" if df.loc[ref, "score"] > mid_score else "worst"
-#             )
+            # compute predictions for the examples
+            batch = Batch.from_dataset_items(
+                list_of_datapoints, [data_type], use_error=False
+            )
+            prediction = pl_module(batch)
+            batch.integrate_prediction(prediction)
 
-#             # retrieve examples datapoints in the test set
-#             list_of_datapoints = []
-#             for dp in self.dm.test_sets[dataloader_idx]:
-#                 if dp.get("reference") in refs:
-#                     list_of_datapoints.append(dp)
+            # plot the examples and log them into wandb
+            for idx in range(len(batch)):
+                ref = batch.get("reference", index=idx)
+                true = batch.get(data_type, index=idx)
+                pred = batch.get(f"pred_{data_type}", index=idx)
+                if ref not in refs or true is None or pred is None:
+                    continue
+                for plot_data_type, plot_name in plot_factory.keys():
+                    if plot_data_type != data_type:
+                        continue
 
-#             # compute predictions for the examples
-#             batch = Batch.from_list_of_datapoints(
-#                 list_of_datapoints, ["sequence", data_type]
-#             )
-#             prediction = pl_module(batch.get("sequence"))
-#             batch.integrate_prediction(prediction)
+                    # generate plot
+                    plot = plot_factory[(plot_data_type, plot_name)](
+                        pred=pred,
+                        true=true,
+                        sequence=batch.get("sequence", index=idx),
+                        reference=ref,
+                        length=batch.get("length", index=idx),
+                    )  # add arguments here if you want
 
-#             # plot the examples and log them into wandb
-#             for dp in batch.to_list_of_datapoints():
-#                 for plot_data_type, plot_name in plot_factory.keys():
-#                     if plot_data_type != data_type:
-#                         continue
-
-#                     # generate plot
-#                     plot = plot_factory[(plot_data_type, plot_name)](
-#                         pred=dp.get(f"pred_{plot_data_type}"),
-#                         true=dp.get(f"true_{plot_data_type}"),
-#                         sequence=dp.get("sequence"),
-#                         reference=dp.get("reference"),
-#                         length=dp.get("length"),
-#                     )  # add arguments here if you want
-
-#                     # log plot
-#                     logger.test_plot(
-#                         dataloader=TEST_SETS_NAMES[dataloader_idx],
-#                         data_type=data_type,
-#                         name=plot_name + "_" + best_worse_suffix(dp.get("reference")),
-#                         plot=plot,
-#                     )
+                    # log plot
+                    logger.test_plot(
+                        dataloader=TEST_SETS_NAMES[dataloader_idx],
+                        data_type=data_type,
+                        name=plot_name + "_" + best_worse_suffix(ref),
+                        plot=plot,
+                    )
 
 
 class KaggleLogger(LoadBestModel):
-    def __init__(
-            self,
-            load_model: str = None,
-            push_to_kaggle: bool = True) -> None:
+    def __init__(self, load_model: str = None, push_to_kaggle: bool = True) -> None:
         """
         load_model: path to the model to load. None if no model to load. 'best' to load the best model from wandb run.
         """
@@ -355,14 +348,16 @@ class KaggleLogger(LoadBestModel):
     @rank_zero_only
     def on_predict_end(self, trainer, pl_module):
         # load data
-        df = pd.DataFrame({"reference": self.pred_ref,
-                           "dms": self.pred_dms, "shape": self.pred_shape})
+        df = pd.DataFrame(
+            {"reference": self.pred_ref, "dms": self.pred_dms, "shape": self.pred_shape}
+        )
 
         # sort by reference
         sequence_ids = pd.read_csv(
             os.path.join(
-                os.path.dirname(__file__),
-                "../resources/test_sequences_ids.csv"))
+                os.path.dirname(__file__), "../resources/test_sequences_ids.csv"
+            )
+        )
         df = pd.merge(sequence_ids, df, on="reference")
         assert len(df) == len(
             sequence_ids
@@ -372,20 +367,17 @@ class KaggleLogger(LoadBestModel):
         dms = np.concatenate(df["dms"].values).round(4)
         shape = np.concatenate(df["shape"].values).round(4)
         pred = (
-            pd.DataFrame(
-                {
-                    "reactivity_DMS_MaP": dms,
-                    "reactivity_2A3_MaP": shape}) .reset_index() .rename(
-                columns={
-                    "index": "id"}))
+            pd.DataFrame({"reactivity_DMS_MaP": dms, "reactivity_2A3_MaP": shape})
+            .reset_index()
+            .rename(columns={"index": "id"})
+        )
 
         pred.to_csv("predictions.csv", index=False)
 
         # zip predictions, return 1 if successful
         import subprocess
 
-        use_zip = not subprocess.call(
-            ["zip", "predictions.zip", "predictions.csv"])
+        use_zip = not subprocess.call(["zip", "predictions.zip", "predictions.csv"])
 
         assert (
             len(pred) == 269796671
