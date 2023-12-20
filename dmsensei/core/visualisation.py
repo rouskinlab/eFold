@@ -109,10 +109,7 @@ def plot_signal(
         title = "{}: ".format(reference) + title
     ax.set_title(title)
 
-    img = wandb.Image(fig)
-    fig = plt.close(fig)
-
-    return img
+    return fig
 
 
 def plot_structure(pred, true, **kwargs):
@@ -128,10 +125,7 @@ def plot_structure(pred, true, **kwargs):
     plt.colorbar(im)
     fig.tight_layout()
     # plt.show()
-    img = wandb.Image(fig)
-    fig = plt.close(fig)
-
-    return img
+    return fig
 
 
 plot_factory = {

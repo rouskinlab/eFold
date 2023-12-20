@@ -21,7 +21,7 @@ from ..config import (
     DATA_TYPES_TEST_SETS,
     POSSIBLE_METRICS,
 )
-from .logger import Logger
+from .logger import Logger, LocalLogger
 
 
 class LoadBestModel(pl.Callback):
@@ -202,6 +202,7 @@ class WandbTestLogger(LoadBestModel):
         dm: DataModule,
         n_best_worst: int = 10,
         load_model: str = None,
+        local: bool = False,
     ):
         """
         load_model: path to the model to load. None if no model to load. 'best' to load the best model from wandb run.
@@ -211,6 +212,7 @@ class WandbTestLogger(LoadBestModel):
         self.stage = "test"
         self.n_best_worst = n_best_worst
         self.model_file = load_model
+        self.local = local
 
     @rank_zero_only
     def on_test_start(self, trainer, pl_module):
@@ -222,7 +224,10 @@ class WandbTestLogger(LoadBestModel):
     def on_test_batch_end(
         self, trainer, pl_module, outputs, batch: Batch, batch_idx, dataloader_idx=0
     ):
-        logger = Logger(pl_module, batch_size=self.batch_size)
+        if self.local:
+            logger = LocalLogger()
+        else:
+            logger = Logger(pl_module, batch_size=self.batch_size)
 
         # Compute metrics and log them to Wandb for each test set
         metrics = batch.compute_metrics()
@@ -245,7 +250,10 @@ class WandbTestLogger(LoadBestModel):
 
     @rank_zero_only
     def on_test_end(self, trainer, pl_module):
-        logger = Logger(pl_module, batch_size=self.batch_size)
+        if self.local:
+            logger = LocalLogger()
+        else:
+            logger = Logger(pl_module, batch_size=self.batch_size)
 
         for dataloader_idx, data_type in enumerate(DATA_TYPES_TEST_SETS):
             # Find the best and worst examples
