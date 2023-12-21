@@ -111,7 +111,7 @@ class DynamicPositionalEncoding(nn.Module):
     ):
         super().__init__()  
         self.params = params
-        self.positional_encoding = self.create_matrix(params['max_len']).float().to(device)
+        self.positional_encoding = nn.Parameter(self.create_matrix(params['max_len']).float(), requires_grad=False)
         self.lin1 = nn.Linear(1, 48)
         self.silu = nn.SiLU()
         self.lin2 = nn.Linear(48, 48)
