@@ -2,6 +2,9 @@ from torch import nn, tensor
 import torch    
 from ..config import device, seq2int, START_TOKEN, END_TOKEN, PADDING_TOKEN
 from ..core.model import Model
+from torch.nn import init
+
+global_gain = 0.02
 
 class Convolutional(nn.Module):
     def __init__(
@@ -40,8 +43,10 @@ class FeedForward(nn.Module):
         self.params = params
         self.layer_norm = nn.LayerNorm(params['embed_dim'])
         self.linear1 = nn.Linear(params['embed_dim'], params['hidden_dim'])
+        init.xavier_normal_(self.linear1.weight, gain=global_gain)
         self.gelu = torch.nn.GELU()
         self.linear2 = nn.Linear(params['hidden_dim'], params['embed_dim'])
+        init.xavier_normal_(self.linear2.weight, gain=global_gain)
         
     def forward(self, sequence):
         self.layer_norm(sequence)
@@ -60,8 +65,10 @@ class SqueezeAndExcitation(nn.Module):
         self.params = params
         self.adaptive_average_pooling = nn.AdaptiveAvgPool2d(1)
         self.fc1 = nn.Linear(params['num_heads'], params['num_heads'])
+        init.xavier_normal_(self.fc1.weight, gain=global_gain)
         self.relu = nn.ReLU()
         self.fc2 = nn.Linear(params['num_heads'], params['num_heads'])
+        init.xavier_normal_(self.fc2.weight, gain=global_gain)
         self.sigmoid = nn.Sigmoid()
         
     def forward(self, structure):
@@ -113,9 +120,12 @@ class DynamicPositionalEncoding(nn.Module):
         self.params = params
         self.positional_encoding = nn.Parameter(self.create_matrix(params['max_len']).float(), requires_grad=False)
         self.lin1 = nn.Linear(1, 48)
+        init.xavier_normal_(self.lin1.weight, gain=global_gain)
         self.silu = nn.SiLU()
         self.lin2 = nn.Linear(48, 48)
+        init.xavier_normal_(self.lin2.weight, gain=global_gain)
         self.lin3 = nn.Linear(48, params['num_heads'])
+        init.xavier_normal_(self.lin3.weight, gain=global_gain)
         
     def create_matrix(self, size):
         # Initialize an empty matrix filled with zeros
@@ -192,8 +202,10 @@ class Ribonanza(Model):
         
         # Layers
         self.table_embedding = nn.Embedding(self.ntokens, params['embed_dim'])
+        init.xavier_uniform_(self.table_embedding.weight, gain=global_gain)
         self.encoders_stack = nn.Sequential(*[Encoder(params) for _ in range(params['num_encoders'])])
         self.output_net = nn.Linear(params['embed_dim'], 2)
+        init.xavier_normal_(self.output_net.weight, gain=global_gain)
 
         # params
         self.params = params
