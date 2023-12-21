@@ -4,7 +4,7 @@ from ..config import device, seq2int, START_TOKEN, END_TOKEN, PADDING_TOKEN
 from ..core.model import Model
 from torch.nn import init
 
-global_gain = 0.02
+global_gain = 0.1
 
 class Convolutional(nn.Module):
     def __init__(
@@ -194,6 +194,7 @@ class Encoder(nn.Module):
 
 class Ribonanza(Model):
     ntokens = 7
+    data_type = ['dms', 'shape']
     def __init__(
         self,
         params,
