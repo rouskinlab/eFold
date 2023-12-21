@@ -64,15 +64,15 @@ class Model(pl.LightningModule):
         return self.lossBCE(pred[mask], true[mask])
 
     def loss_fn(self, batch: Batch):
-        count = batch.dt_count
+        count = {k:v for k,v in batch.dt_count.items() if k in self.data_type}
         losses = {}
-        if "dms" in count.keys() and 'dms' in self.data_type:
+        if "dms" in count.keys():
             losses["dms"] = self._loss_signal(batch, "dms")
-        if "shape" in count.keys() and 'dms' in self.data_type:
+        if "shape" in count.keys():
             losses["shape"] = self._loss_signal(batch, "shape")
-        if "structure" in count.keys() and 'dms' in self.data_type:
+        if "structure" in count.keys():
             losses["structure"] = self._loss_structure(batch)
-        loss = sum([losses[k] * count[k] for k in count.keys() if count in self.data_type]) / sum([v for k, v in count.items() if k in self.data_type])
+        loss = sum([losses[k] * count[k] for k in count.keys()]) / sum(count.values())
         return loss, losses
 
     def _clean_predictions(self, batch, predictions):
