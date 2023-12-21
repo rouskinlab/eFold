@@ -72,7 +72,7 @@ class Model(pl.LightningModule):
             losses["shape"] = self._loss_signal(batch, "shape")
         if "structure" in count.keys() and 'dms' in self.data_type:
             losses["structure"] = self._loss_structure(batch)
-        loss = sum([losses[k] * count[k] for k in count.keys() if count in self.data_type]) / sum([v for k, v in count.item() if k in self.data_type])
+        loss = sum([losses[k] * count[k] for k in count.keys() if count in self.data_type]) / sum([v for k, v in count.items() if k in self.data_type])
         return loss, losses
 
     def _clean_predictions(self, batch, predictions):
