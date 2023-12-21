@@ -157,7 +157,11 @@ class Batch:
         if index is not None:
             out = out[index]
             if hasattr(out, "__len__"):
-                out = out[: self.get("length")[index]]
+                l = self.get("length")[index]
+                if data_type == "structure":
+                    out = out[:l, :l]
+                else:
+                    out = out[:self.get("length")[index]]
 
         if to_numpy:
             if hasattr(out, "cpu"):
