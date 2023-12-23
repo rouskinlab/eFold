@@ -52,6 +52,7 @@ class WandbFitLogger(LoadBestModel):
     def __init__(
         self,
         dm: DataModule,
+        batch_size:int=None,
         load_model: str = None,
         log_plots_every_n_epoch: int = 100000000,  # deactivated for now
     ):
@@ -60,7 +61,7 @@ class WandbFitLogger(LoadBestModel):
         """
         self.stage = "fit"
         self.data_type = dm.data_type
-        self.batch_size = dm.batch_size
+        self.batch_size = dm.batch_size if batch_size is None else batch_size
         self.model_file = load_model
         self.dm = dm
         self.log_plots_every_n_epoch = log_plots_every_n_epoch
