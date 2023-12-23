@@ -23,7 +23,7 @@ def base_pairs_to_pairing_matrix(base_pairs, sequence_length, padding, pad_value
     if base_pairs is None:
         return pairing_matrix
     pairing_matrix[:sequence_length, :sequence_length] = 0.0
-    if len(base_pairs) > 0:
+    if len(base_pairs) > 0 and base_pairs != [[]]:
         pairing_matrix[base_pairs[:, 0], base_pairs[:, 1]] = 1.0
         pairing_matrix[base_pairs[:, 1], base_pairs[:, 0]] = 1.0
     return pairing_matrix
