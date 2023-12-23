@@ -82,7 +82,13 @@ class Batch:
                 if dp[dt] is None:
                     print(dp)
         dt_count = {
-            dt: len([1 for dp in batch_data if dp[dt]["true"] is not None])
+            dt: len(
+                [
+                    1
+                    for dp in batch_data
+                    if dt in dp and dp[dt] is not None and dp[dt]["true"] is not None
+                ]
+            )
             for dt in data_type
         }
         for dt in data_type:
@@ -146,6 +152,7 @@ class Batch:
         else:
             data_part, data_type = split_data_type(data_type)
             # could be data but wasn't requested
+            # print(data_type, data_part, self.data_types)
             if data_type not in self.data_types:
                 return None
 
