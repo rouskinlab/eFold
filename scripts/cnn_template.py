@@ -33,7 +33,7 @@ if __name__ == "__main__":
     # fit loop
     batch_size = 1
     dm = DataModule(
-        name=["zuber"],
+        name=["zuber", 'bpRNA','RNAstralign','archiveII'],
         data_type=["dms", "shape","structure"],
         force_download=False,
         batch_size=batch_size,
