@@ -31,26 +31,23 @@ if __name__ == "__main__":
         wandb_logger = WandbLogger(project=project)
 
     # fit loop
-    batch_size = 4
+    batch_size = 1
     dm = DataModule(
-        name=["gros_dataset_short"],
+        name=["zuber"],
         data_type=["dms", "shape","structure"],
         force_download=False,
         batch_size=batch_size,
         num_workers=1,
-        train_split=396824, # all but valid_split
-        valid_split=4096,
+        train_split=None, # all but valid_split
+        valid_split=40,
         predict_split=0,
-        ribo_validation = True,
         overfit_mode=False,
         shuffle_valid=False,
-        ribo_validation = True,
     )
 
     model = create_model(
         model="cnn",
-        data="multi",
-        quality=True,
+        data_type=["dms", "shape","structure"],
         ntoken=5,
         d_model=64,
         d_cnn=128,
