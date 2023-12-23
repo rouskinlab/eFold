@@ -59,7 +59,13 @@ class Batch:
         self.dt_count = dt_count
 
     @classmethod
-    def from_dataset_items(cls, batch_data: list, data_type: str, use_error: bool):
+    def from_dataset_items(
+        cls,
+        batch_data: list,
+        data_type: str,
+        use_error: bool,
+        structure_padding_value: float = UKN,
+    ):
         reference = [dp["reference"] for dp in batch_data]
         length = [dp["length"] for dp in batch_data]
         L = max(length)
@@ -82,7 +88,10 @@ class Batch:
                         true=torch.stack(
                             [
                                 base_pairs_to_pairing_matrix(
-                                    dp["structure"]["true"], l, padding=L
+                                    dp["structure"]["true"],
+                                    l,
+                                    padding=L,
+                                    pad_value=structure_padding_value,
                                 )
                                 for (dp, l) in zip(batch_data, length)
                             ]
@@ -148,7 +157,11 @@ class Batch:
         if index is not None:
             out = out[index]
             if hasattr(out, "__len__"):
-                out = out[: self.get("length")[index]]
+                l = self.get("length")[index]
+                if data_type == "structure":
+                    out = out[:l, :l]
+                else:
+                    out = out[:self.get("length")[index]]
 
         if to_numpy:
             if hasattr(out, "cpu"):
@@ -173,7 +186,9 @@ class Batch:
         )
 
     def count(self, data_type):
-        if not self.contains(data_type):
+        if data_type in ["reference", "sequence", "length"]:
+            return self.batch_size
+        if not data_type in self.dt_count or getattr(self, data_type) is None:
             return 0
         return self.dt_count[data_type]
 
