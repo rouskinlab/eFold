@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
     trainer = Trainer(
         accelerator=device,
-        devices=8,
+        devices=1,
         strategy=DDPStrategy(find_unused_parameters=True),
         precision="16-mixed",
         max_epochs=1000,

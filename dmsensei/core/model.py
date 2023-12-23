@@ -58,12 +58,13 @@ class Model(pl.LightningModule):
     def _loss_structure(self, batch: Batch):
         # Unsure if this is the correct loss function
         pred, true = batch.get_pairs("structure")
-        if true==None: return torch.tensor(0.0)
+        if true is None or pred is None:
+            return torch.tensor(0.0)
         mask = true != UKN
         return self.lossBCE(pred[mask], true[mask])
 
     def loss_fn(self, batch: Batch):
-        count = batch.dt_count
+        count = {k:v for k,v in batch.dt_count.items() if k in self.data_type_output}
         losses = {}
         if "dms" in count.keys():
             losses["dms"] = self._loss_signal(batch, "dms")
