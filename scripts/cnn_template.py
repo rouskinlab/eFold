@@ -33,7 +33,7 @@ if __name__ == "__main__":
     # fit loop
     batch_size = 1
     dm = DataModule(
-        name=["zuber", 'bpRNA','RNAstralign','archiveII'],
+        name=["zuber", 'bpRNA','RNAstralign','archiveII',"ribo500-blast"],
         data_type=["dms", "shape","structure"],
         force_download=False,
         batch_size=batch_size,
@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
     trainer = Trainer(
         accelerator=device,
-        devices=1,
+        devices=8,
         strategy=DDPStrategy(find_unused_parameters=True),
         precision="16-mixed",
         max_epochs=1000,
