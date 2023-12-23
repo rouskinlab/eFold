@@ -194,13 +194,13 @@ class Encoder(nn.Module):
 
 class Ribonanza(Model):
     ntokens = 7
-    data_type = ['dms', 'shape']
     def __init__(
         self,
         params,
     ):
         super().__init__(**params)  
-        
+        self.data_type_output = ["dms", "shape"]
+
         # Layers
         self.table_embedding = nn.Embedding(self.ntokens, params['embed_dim'])
         init.xavier_uniform_(self.table_embedding.weight, gain=global_gain)
