@@ -8,6 +8,7 @@ from ..core.model import Model
 from ..core.batch import Batch
 from einops import rearrange
 import torch.nn.functional as F
+from ..config import device
 
 dir_name = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(dir_name, ".."))
@@ -28,6 +29,7 @@ class CNN(Model):
         super().__init__(lr=lr, optimizer_fn=optimizer_fn, **kwargs)
 
         self.model_type = "CNN"
+        self.data_type_output = ["dms", "shape",'structure']
         self.d_model = d_model
         self.d_cnn = d_cnn
 
