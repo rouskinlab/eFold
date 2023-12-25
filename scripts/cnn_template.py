@@ -24,7 +24,7 @@ sys.path.append(os.path.abspath("."))
 
 # Train loop
 if __name__ == "__main__":
-    USE_WANDB = 0
+    USE_WANDB = 1
     print("Running on device: {}".format(device))
     if USE_WANDB:
         project = "Structure_prediction"
