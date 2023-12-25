@@ -58,9 +58,9 @@ class Dataset(TorchDataset):
             if self.structure is not None:
                 del self.structure[idx]
 
-    def __add__(self, other: Dataset) -> Dataset:
-        if self.name == other.name:
-            raise ValueError("Dataset are the same")
+    def __add__(self, other: "Dataset") -> "Dataset":
+        # if self.name == other.name:
+        #     raise ValueError("Dataset are the same")
         if self.structure_padding_value != other.structure_padding_value:
             raise ValueError("Structure padding value are not the same")
         return Dataset(

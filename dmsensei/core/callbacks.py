@@ -52,6 +52,7 @@ class WandbFitLogger(LoadBestModel):
     def __init__(
         self,
         dm: DataModule,
+        batch_size:int=None,
         load_model: str = None,
         log_plots_every_n_epoch: int = 100000000,  # deactivated for now
     ):
@@ -60,7 +61,7 @@ class WandbFitLogger(LoadBestModel):
         """
         self.stage = "fit"
         self.data_type = dm.data_type
-        self.batch_size = dm.batch_size
+        self.batch_size = dm.batch_size if batch_size is None else batch_size
         self.model_file = load_model
         self.dm = dm
         self.log_plots_every_n_epoch = log_plots_every_n_epoch
@@ -102,13 +103,13 @@ class WandbFitLogger(LoadBestModel):
         loss, losses = outputs
         # Dataloader_idx is 0 for the validation set
         # The other dataloader_idx are for complementary validation sets
-        logger.valid_loss(loss, is_test=dataloader_idx == 1)
-        logger.valid_loss_pack(losses, is_test=dataloader_idx == 1)
+        dataloader_name = "valid/"+self.dm.external_valid[dataloader_idx - 1] if dataloader_idx > 0 else "valid"
+        logger.valid_loss(loss, name=dataloader_name)
+        logger.valid_loss_pack(losses, name = dataloader_name)
 
         # Compute metrics and log them to Wandb.
         metrics = batch.compute_metrics()
-        stage = "valid" if dataloader_idx == 0 else "ribo-valid"
-        logger.error_metrics_pack(stage, metrics)
+        logger.error_metrics_pack(dataloader_name, metrics)
 
         # Save val_loss for evaluating if this model is the best model
         if dataloader_idx == 0:

@@ -8,17 +8,14 @@ from lightning.pytorch import Trainer
 from dmsensei.core.callbacks import WandbFitLogger, KaggleLogger
 from dmsensei.config import device
 from dmsensei import DataModule, create_model
-import envbash
 import torch
-
-envbash.load.load_envbash(".env")
+from lightning.pytorch.strategies import DDPStrategy
 
 if __name__ == "__main__":
     USE_WANDB = True
     print("Running on device: {}".format(device))
     if USE_WANDB:
         wandb_logger = WandbLogger(project="ribonanza-solution", name="first-run")
-
     
     params = {
         'embed_dim': 192,
@@ -59,8 +56,10 @@ if __name__ == "__main__":
 
     # train with both splits
     trainer = Trainer(
+        devices=8,
+        strategy=DDPStrategy(find_unused_parameters=True),
+        max_epochs=1000,
         accelerator=device,
-        max_epochs=3000,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
             LearningRateMonitor(logging_interval="epoch"),

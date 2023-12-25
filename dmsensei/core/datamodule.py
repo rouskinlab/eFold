@@ -19,7 +19,7 @@ class DataModule(pl.LightningDataModule):
         overfit_mode=False,
         shuffle_train=True,
         shuffle_valid=False,
-        ribo_validation=False,
+        external_valid=None,
         use_error=False,
         max_len=500,
         structure_padding_value=UKN,
@@ -51,7 +51,7 @@ class DataModule(pl.LightningDataModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.data_type = data_type
-        self.ribo_validation = ribo_validation
+        self.external_valid = external_valid
         self.splits = {
             "train": train_split,
             "valid": valid_split,
@@ -119,12 +119,13 @@ class DataModule(pl.LightningDataModule):
             self.train_set, self.val_set, _ = random_split(
                 self.all_datasets, self.size_sets
             )
-            if self.ribo_validation:
-                self.ribo_val_set = Dataset.from_local_or_download(
-                    name="ribo-valid",
-                    data_type=["dms", "shape", "structure"],
-                    **self.dataset_args,
-                )
+            if self.external_valid is not None:
+                self.external_val_set = []
+                for name in self.external_valid:
+                    self.external_val_set.append(Dataset.from_local_or_download(
+                        name=name,
+                        **self.dataset_args,
+                    ))
 
         if stage == "test":
             self.test_sets = self._select_test_dataset()
@@ -171,15 +172,16 @@ class DataModule(pl.LightningDataModule):
         ###################################
         # Add validation set here if needed
         ###################################
-        if self.ribo_validation:
-            val_dls.append(
-                DataLoader(
-                    self.ribo_val_set,
-                    shuffle=False,
-                    collate_fn=self.collate_fn,
-                    batch_size=self.batch_size,
+        if self.external_valid is not None:
+            for val_set in self.external_val_set:
+                val_dls.append(
+                    DataLoader(
+                        val_set,
+                        shuffle=self.shuffle["valid"],
+                        collate_fn=self.collate_fn,
+                        batch_size=self.batch_size,
+                    )
                 )
-            )
 
         return val_dls
 
