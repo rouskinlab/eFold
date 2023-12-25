@@ -66,14 +66,12 @@ class Logger:
     def train_loss(self, loss):
         self.log("train", "loss", loss.item() if hasattr(loss, "item") else loss)
 
-    def valid_loss(self, loss, is_test=False):
-        stage = "valid" if not is_test else "ribo-valid"
-        self.log(stage, "loss", loss.item() if hasattr(loss, "item") else loss)
+    def valid_loss(self, loss, name):
+        self.log(name, "loss", loss.item() if hasattr(loss, "item") else loss)
 
-    def valid_loss_pack(self, losses: dict, is_test=False):
+    def valid_loss_pack(self, losses: dict, name):
         for data_type, loss in losses.items():
-            stage = "valid" if not is_test else "ribo-valid"
-            self.log(stage, "loss_{}".format(data_type), loss.item())
+            self.log(name, "loss_{}".format(data_type), loss.item())
 
     def valid_plot(self, data_type, name, plot):
         plot = wandb.Image(plot)
