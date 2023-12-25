@@ -24,32 +24,26 @@ sys.path.append(os.path.abspath("."))
 
 # Train loop
 if __name__ == "__main__":
-    USE_WANDB = 1
+    USE_WANDB = 0
     print("Running on device: {}".format(device))
     if USE_WANDB:
         project = "Structure_prediction"
         wandb_logger = WandbLogger(project=project)
 
     # fit loop
-    batch_size = 4
+    batch_size = 1
     dm = DataModule(
-        name=["gros_dataset_short"],
+        name=["yack"],
         data_type=["dms", "shape","structure"],
         force_download=False,
         batch_size=batch_size,
         num_workers=1,
-        train_split=396824, # all but valid_split
-        valid_split=4096,
-        predict_split=0,
-        ribo_validation = True,
-        overfit_mode=False,
-        shuffle_valid=False,
-        ribo_validation = True,
+        train_split=None, # all but valid_split
+        valid_split=4096
     )
 
     model = create_model(
         model="cnn",
-        data="multi",
         quality=True,
         ntoken=5,
         d_model=64,
@@ -76,7 +70,7 @@ if __name__ == "__main__":
         precision="16-mixed",
         max_epochs=1000,
         log_every_n_steps=1,
-        accumulate_grad_batches=4,
+        accumulate_grad_batches=32,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
             LearningRateMonitor(logging_interval="epoch"),
