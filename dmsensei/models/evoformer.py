@@ -12,6 +12,7 @@ import numpy as np
 from ..core.batch import Batch
 from ..core.model import Model
 
+
 dir_name = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(dir_name, ".."))
 
@@ -50,7 +51,9 @@ class Evoformer(Model):
         self.evoformer = EvoFold(
             c_s=d_model,
             c_z=c_z,
-            no_heads_s=32,
+            #CHANGE
+            no_heads_s=8,
+            ######
             no_heads_z=4,
             num_blocks=num_blocks,
             dropout=dropout,
@@ -141,6 +144,14 @@ class EvoBlock(nn.Module):
         self.seq_attention = Attention(
             c_s, no_heads_s, c_s / no_heads_s, gated=True)
 
+        print('---------')
+        print(no_heads_s)
+        print(int(c_s/no_heads_s))
+        print('---------')
+        #self.seq_attention = RelPositionMultiHeadAttention(num_heads = no_heads_s, head_size = int(c_s/no_heads_s), output_size = c_s)
+        self.pos = PositionalEncoding(self.c_s, dropout)
+        self.ln = nn.LayerNorm(self.c_s, eps=1e-12, elementwise_affine=True)
+
         self.resNet = ResLayer(
             dim_in=c_z, dim_out=c_z, n_blocks=2, kernel_size=3, dropout=dropout
         )
@@ -176,6 +187,15 @@ class EvoBlock(nn.Module):
         # self.row_drop = Dropout(dropout * 2, 2)
         # self.col_drop = Dropout(dropout * 2, 1)
 
+        self.FF1 = FFMod(c_s, dropout=dropout)
+        self.FF2 = FFMod(c_s, dropout=dropout)
+        self.convMod = ConvModule(input_dim=c_s, dropout=dropout)
+
+        self.ln_1 = nn.LayerNorm(c_s)
+        self.ln_2 = nn.LayerNorm(c_s)
+        self.ln_3 = nn.LayerNorm(c_s)
+        self.ln_4 = nn.LayerNorm(c_s)
+
         self._initZeros()
 
     def _initZeros(self):
@@ -191,8 +211,8 @@ class EvoBlock(nn.Module):
         torch.nn.init.zeros_(self.sequence_to_pair.o_proj.weight)
         torch.nn.init.zeros_(self.sequence_to_pair.o_proj.bias)
         torch.nn.init.zeros_(self.pair_to_sequence.linear.weight)
-        torch.nn.init.zeros_(self.seq_attention.o_proj.weight)
-        torch.nn.init.zeros_(self.seq_attention.o_proj.bias)
+        #torch.nn.init.zeros_(self.seq_attention.o_proj.weight)
+        #torch.nn.init.zeros_(self.seq_attention.o_proj.bias)
         torch.nn.init.zeros_(self.mlp_seq.mlp[-2].weight)
         torch.nn.init.zeros_(self.mlp_seq.mlp[-2].bias)
         torch.nn.init.zeros_(self.mlp_pair.mlp[-2].weight)
@@ -224,8 +244,26 @@ class EvoBlock(nn.Module):
 
         # Self attention with bias + mlp.
         y = self.layernorm(sequence_state)
-        y, _ = self.seq_attention(y, bias=bias)
+        pe = self.pos(y)
+        y = self.ln(y)
+        y, _ = self.seq_attention(y,bias=bias)
+        #y, _ = self.seq_attention([y,y,y,pe], bias=bias)
         sequence_state = sequence_state + self.drop(y)
+        # FF + Local conv + FF
+        '''
+        sequence_state_ff = self.FF1(sequence_state)
+        sequence_state = sequence_state + sequence_state_ff
+        
+        sequence_stae = self.ln_2(sequence_state)
+        sequence_state_con = self.convMod(sequence_state)
+        sequence_state = sequence_state + sequence_state_con
+
+        sequence_state = self.ln_3(sequence_state)
+        sequence_state_ff = self.FF2(sequence_state)
+        sequence_state = sequence_state + sequence_state_ff
+
+        sequence_state = self.ln_4(sequence_state)
+        '''
         sequence_state = self.mlp_seq(sequence_state)
 
         # Update pairwise state
@@ -261,7 +299,7 @@ class EvoFold(nn.Module):
         self,
         c_s=1024,
         c_z=128,
-        no_heads_s=32,
+        no_heads_s=8,
         no_heads_z=4,
         num_blocks=10,
         position_bins=32,
@@ -604,3 +642,328 @@ def conv3x3(
         bias=False,
         dilation=dilation,
     )
+
+class PositionalEncoding(nn.Module):
+    def __init__(
+            self,
+            d_model: int,
+            dropout: float = 0.1,
+            max_len: int = 5000):
+        super().__init__()
+        self.dropout = nn.Dropout(p=dropout)
+
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2)
+                             * (-np.log(10000.0) / d_model))
+        pe = torch.zeros(max_len, d_model)
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        self.register_buffer("pe", pe)
+
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Args:
+            x: Tensor, shape [seq_len, batch_size, embedding_dim]
+        """
+        pe = self.pe[: x.shape[1]]
+        # x = torch.concatenate((x, torch.tile(self.pe[:x.shape[1]], (x.shape[0], 1, 1))), 2)
+        return pe
+    
+class MultiHeadAttention(nn.Module):
+    def __init__(
+        self,
+        num_heads,
+        head_size,
+        output_size=None,
+        dropout=0.0,
+        use_projection_bias=True,
+        return_attn_coef=True,
+        **kwargs,
+    ):
+        super(MultiHeadAttention, self).__init__(**kwargs)
+
+        if output_size is not None and output_size < 1:
+            raise ValueError("output_size must be a positive number")
+
+        self.head_size = head_size
+        self.num_heads = num_heads
+        self.output_size = output_size
+        self.use_projection_bias = use_projection_bias
+        self.return_attn_coef = return_attn_coef
+
+        self.dropout = nn.Dropout(dropout)
+        self._dropout_rate = dropout
+
+        input_max = (self.num_heads * self.head_size) ** -0.5
+        ### DOUBLE CHECK THIS CODE:
+        self.query = nn.Linear(num_heads * head_size, num_heads * head_size, bias=False)
+        self.key = nn.Linear(num_heads * head_size, num_heads * head_size, bias=False)
+        self.value = nn.Linear(num_heads * head_size, num_heads * head_size, bias=False)
+        ###########################
+        
+        self.projection_kernel = nn.Parameter(
+            torch.rand(num_heads, head_size, output_size) * 2 - 1
+        )
+
+        if use_projection_bias:
+            self.projection_bias = nn.Parameter(
+                torch.rand(output_size) * 2 - 1
+            )
+        else:
+            self.projection_bias = None
+
+    def call_qkv(self, query, key, value, training=False):
+        # Verify shapes
+        if key.size(-2) != value.size(-2):
+            raise ValueError(
+                "the number of elements in 'key' must be equal to "
+                "the same as the number of elements in 'value'"
+            )
+
+        # Linear transformations
+        query = self.query(query)
+        B, T, E = query.size()
+        query = query.view(B, T, self.num_heads, self.head_size)
+
+        key = self.key(key)
+        B, T, E = key.size()
+        key = key.view(B, T, self.num_heads, self.head_size)
+
+        value = self.value(value)
+        B, T, E = value.size()
+        value = value.view(B, T, self.num_heads, self.head_size)
+
+        return query, key, value
+
+    def call_attention(self, query, key, value, logits, bias = None, training=False, mask=None):
+        # Mask = attention mask with shape [B, Tquery, Tkey] with 1 for positions we want to attend, 0 for masked
+        if mask is not None:
+            if len(mask.size()) < 2:
+                raise ValueError("'mask' must have at least 2 dimensions")
+            if query.size(-3) != mask.size(-2):
+                raise ValueError(
+                    "mask's second to last dimension must be equal to "
+                    "the number of elements in 'query'"
+                )
+            if key.size(-3) != mask.size(-1):
+                raise ValueError(
+                    "mask's last dimension must be equal to the number of elements in 'key'"
+                )
+
+        # Apply mask
+        if mask is not None:
+            mask = mask.float()
+
+            # Possibly expand on the head dimension so broadcasting works
+            if len(mask.size()) != len(logits.size()):
+                mask = mask.unsqueeze(-3)
+
+            logits += -1e9 * (1.0 - mask)
+        
+        if bias is not None:
+            logits = logits + rearrange(bias, "... lq lk h -> ... h lq lk")
+
+        attn_coef = F.softmax(logits, dim=-1)
+
+        # Attention dropout
+        attn_coef_dropout = self.dropout(attn_coef)
+
+        # Attention * value
+        multihead_output = torch.einsum("...HNM,...MHI->...NHI", attn_coef_dropout, value)
+
+        # Run the outputs through another linear projection layer. Recombining heads
+        # is automatically done.
+        output = torch.einsum("...NHI,HIO->...NO", multihead_output, self.projection_kernel)
+
+        if self.projection_bias is not None:
+            output += self.projection_bias
+
+        return output, attn_coef
+
+    def forward(self, inputs, training=False, mask=None, **kwargs):
+        query, key, value = inputs
+
+        query, key, value = self.call_qkv(query, key, value, training=training)
+
+        # Scale dot-product, doing the division to either query or key
+        # instead of their product saves some computation
+        depth = torch.tensor(self.head_size, dtype=torch.float32)
+        query /= torch.sqrt(depth)
+
+        # Calculate dot product attention
+        logits = torch.einsum("...NHO,...MHO->...HNM", query, key)
+
+        output, attn_coef = self.call_attention(query, key, value, logits,
+                                                training=training, mask=mask)
+
+        if self.return_attn_coef:
+            return output, attn_coef
+        else:
+            return output
+
+class RelPositionMultiHeadAttention(MultiHeadAttention):
+    def __init__(self, kernel_sizes=None, strides=None, **kwargs):
+        super(RelPositionMultiHeadAttention, self).__init__(**kwargs)
+
+    
+        num_pos_features = self.num_heads * self.head_size
+        input_max = (self.num_heads * self.head_size) ** -0.5
+        self.pos_kernel = nn.Parameter(
+            torch.rand(self.num_heads, num_pos_features, self.head_size) * 2 - 1
+        )
+        self.pos_bias_u = nn.Parameter(torch.zeros(self.num_heads, self.head_size))
+        self.pos_bias_v = nn.Parameter(torch.zeros(self.num_heads, self.head_size))
+        
+
+    @staticmethod
+    def relative_shift(x):
+        x_shape = x.size()
+        x = F.pad(x, (1,0))
+
+        x = x.view(x_shape[0], x_shape[1], x_shape[3] + 1, x_shape[2])
+        x = x[:, :, 1:, :].view(x_shape)
+        return x
+
+    def forward(self, inputs, bias=None, training=False, mask=None, **kwargs):
+        query, key, value, pos = inputs
+
+        query, key, value = self.call_qkv(query, key, value, training=training)
+
+        pos = torch.einsum("...MI,HIO->...MHO", pos, self.pos_kernel)
+
+        query_with_u = query + self.pos_bias_u
+        query_with_v = query + self.pos_bias_v
+
+        logits_with_u = torch.einsum("...NHO,...MHO->...HNM", query_with_u, key)
+        logits_with_v = torch.einsum("...NHO,...MHO->...HNM", query_with_v, pos)
+
+        logits_with_v = self.relative_shift(logits_with_v)
+
+        logits = logits_with_u + logits_with_v[:, :, :, :logits_with_u.size(3)]
+
+        depth = torch.tensor(self.head_size, dtype=torch.float32)
+        logits /= torch.sqrt(depth)
+
+        output, attn_coef = self.call_attention(query, key, value, logits,
+                                                training=training, mask=mask, bias=bias)
+
+        if self.return_attn_coef:
+            return output, attn_coef
+        else:
+            return output
+
+class GLU(nn.Module):
+    def __init__(self, name="glu"):
+        super(GLU, self).__init__()
+
+    def forward(self, x):
+        return x[:, :x.size(1)//2] * torch.sigmoid(x[:, x.size(1)//2:])
+
+class ConvModule(nn.Module):
+    def __init__(
+        self,
+        input_dim,
+        kernel_size=31,
+        dropout=0.0,
+        depth_multiplier=1,
+        conv_expansion_rate=2,
+        conv_use_glu=False,
+        adaptive_scale=False,
+        name="conv_module",
+        **kwargs,
+    ):
+        super(ConvModule, self).__init__()
+
+        self.adaptive_scale = adaptive_scale
+        if not adaptive_scale:
+            print("No scaling, use preLN")
+            self.ln = nn.LayerNorm(input_dim, elementwise_affine=True)
+        else:
+            print("Use scaling, no preLN")
+            self.scale = nn.Parameter(torch.ones(input_dim))
+            self.bias = nn.Parameter(torch.zeros(input_dim))
+        
+        pw1_max = input_dim ** -0.5
+        dw_max = kernel_size ** -0.5
+        pw2_max = input_dim ** -0.5
+        
+        self.pw_conv_1 = nn.Conv1d(
+            in_channels=input_dim,
+            out_channels=conv_expansion_rate * input_dim,
+            kernel_size=1,
+            stride=1,
+            padding=0,
+            bias=True
+        )
+        
+        if conv_use_glu:
+            print("Using GLU for Conv")
+            self.act1 = GLU()
+        else:
+            print("Replace GLU with swish for Conv")
+            self.act1 = nn.SiLU()
+        self.act1=GLU()
+
+        self.dw_conv = nn.Conv1d(
+            in_channels=input_dim,
+            out_channels=conv_expansion_rate * input_dim,
+            kernel_size=5,
+            stride=1,
+            padding=(5// 2),
+            groups=depth_multiplier,
+            bias=True
+        )
+        
+        self.bn = nn.BatchNorm1d(conv_expansion_rate * input_dim, momentum=0.985)
+        self.act2 = nn.SiLU()
+        
+        self.pw_conv_2 = nn.Conv1d(
+            in_channels=conv_expansion_rate * input_dim,
+            out_channels=input_dim,
+            kernel_size=1,
+            stride=1,
+            padding=0,
+            bias=True
+        )
+
+        self.do = nn.Dropout(dropout)
+        self.res_add = nn.quantized.FloatFunctional()
+
+    def forward(self, inputs, training=False, pad_mask=None, **kwargs):
+        if not self.adaptive_scale:
+            outputs = self.ln(inputs)
+        #else:
+            #scale = self.scale.view(1, 1, -1)
+            #bias = self.bias.view(1, 1, -1)
+            #outputs = inputs * scale + bias
+            
+        
+        B, T, E = outputs.size()
+        outputs = outputs.view(B, E, T)
+        outputs = self.pw_conv_1(outputs)
+        outputs = self.act1(outputs)
+        outputs = self.dw_conv(outputs)
+        outputs = self.bn(outputs)
+        outputs = self.act2(outputs)
+        outputs = self.pw_conv_2(outputs)
+        outputs = outputs.view(B, T, E)
+        outputs = self.do(outputs)
+        
+        return outputs
+    
+class FFMod(nn.Module):
+    def __init__(self, emb_dim, dropout=0.0, expand=2):
+        super(FFMod, self).__init__()
+        self.lin = nn.Linear(emb_dim, emb_dim*expand)
+        self.act = nn.SiLU()
+        self.drop = nn.Dropout(dropout)
+        self.lin_2 = nn.Linear(emb_dim*expand, emb_dim)
+    
+    def forward(self, x):
+        
+        x=self.lin(x)
+        x = self.act(x)
+        x=self.drop(x)
+        x=self.lin_2(x)
+
+        return self.drop(x)
