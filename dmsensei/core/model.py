@@ -41,7 +41,8 @@ class Model(pl.LightningModule):
             "shape",
         ], "This function only works for dms and shape data"
         pred, true = batch.get_pairs(data_type)
-        if true==None: return torch.tensor(0.0)
+        if true==None: 
+            return torch.tensor(0.0, requires_grad=True).to(device)
         mask = true != UKN
         # print(batch.get("error_{}".format(data_type)))
         # error = batch.get("error_{}".format(data_type))
@@ -53,15 +54,23 @@ class Model(pl.LightningModule):
         #         full=True,
         #         eps=5e-2,
         #     )/8
-        return torch.sqrt(F.mse_loss(pred[mask], true[mask]))
+        if len(pred[mask]) == 0:
+            return torch.tensor(0.0, requires_grad=True).to(device)
+        loss = torch.sqrt(F.mse_loss(pred[mask], true[mask]))
+        assert not torch.isnan(loss), "Loss is NaN for {}".format(data_type)
+        return loss
 
     def _loss_structure(self, batch: Batch):
         # Unsure if this is the correct loss function
         pred, true = batch.get_pairs("structure")
         if true is None or pred is None:
-            return torch.tensor(0.0).to(device)
+            return torch.tensor(0.0, requires_grad=True).to(device)
         mask = true != UKN
-        return self.lossBCE(pred[mask], true[mask])
+        if len(pred[mask]) == 0:
+            return torch.tensor(0.0, requires_grad=True).to(device)
+        loss = self.lossBCE(pred[mask], true[mask])
+        assert not torch.isnan(loss), "Loss is NaN for structure"
+        return loss
 
     def loss_fn(self, batch: Batch):
         count = {k:v for k,v in batch.dt_count.items() if k in self.data_type_output}
@@ -72,7 +81,10 @@ class Model(pl.LightningModule):
             losses["shape"] = self._loss_signal(batch, "shape")
         if "structure" in count.keys():
             losses["structure"] = self._loss_structure(batch)
+        assert len(losses) > 0, "No data types to train on"
+        assert len(count) == len(losses), "Not all data types have a loss function"
         loss = sum([losses[k] * count[k] for k in count.keys()]) / sum(count.values())
+        assert not torch.isnan(loss), "Loss is NaN"
         return loss, losses
 
     def _clean_predictions(self, batch, predictions):
