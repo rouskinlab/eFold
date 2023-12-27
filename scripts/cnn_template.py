@@ -33,13 +33,14 @@ if __name__ == "__main__":
     # fit loop
     batch_size = 1
     dm = DataModule(
-        name=["yack"],
+        name=["yack_train"],
         data_type=["dms", 'shape', 'structure'],
         force_download=False,
         batch_size=1,
-        max_len=177,
+        max_len=200,
         structure_padding_value=0,
         train_split=2048,
+        external_valid=['yack_valid','test_valid']
     )
     dm.setup('fit')
 
@@ -66,14 +67,14 @@ if __name__ == "__main__":
     trainer = Trainer(
         accelerator=device,
         devices=8,
-        strategy=DDPStrategy(find_unused_parameters=True),
+        strategy=DDPStrategy(),
         precision="16-mixed",
         max_epochs=1000,
         log_every_n_steps=1,
         accumulate_grad_batches=32,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
-            LearningRateMonitor(logging_interval="epoch"),
+            # LearningRateMonitor(logging_interval="epoch"),
             # PredictionLogger(data="dms"),
             # ModelChecker(log_every_nstep=10000, model=model),
             WandbFitLogger(dm=dm, load_model=None),

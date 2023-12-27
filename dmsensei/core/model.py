@@ -41,34 +41,14 @@ class Model(pl.LightningModule):
             "shape",
         ], "This function only works for dms and shape data"
         pred, true = batch.get_pairs(data_type)
-        if true==None: 
-            return torch.tensor(0.0, requires_grad=True).to(device)
-        mask = true != UKN
-        # print(batch.get("error_{}".format(data_type)))
-        # error = batch.get("error_{}".format(data_type))
-        # if self.weight_data and
-        #     return F.gaussian_nll_loss(
-        #         pred[mask],
-        #         true[mask],
-        #         batch.get("error_{}".format(data_type))[mask],
-        #         full=True,
-        #         eps=5e-2,
-        #     )/8
-        if len(pred[mask]) == 0:
-            return torch.tensor(0.0, requires_grad=True).to(device)
-        loss = torch.sqrt(F.mse_loss(pred[mask], true[mask]))
+        loss = torch.sqrt(F.mse_loss(pred.where(true!=UKN, 0.), true.where(true!=UKN, 0.)))
         assert not torch.isnan(loss), "Loss is NaN for {}".format(data_type)
         return loss
 
     def _loss_structure(self, batch: Batch):
         # Unsure if this is the correct loss function
         pred, true = batch.get_pairs("structure")
-        if true is None or pred is None:
-            return torch.tensor(0.0, requires_grad=True).to(device)
-        mask = true != UKN
-        if len(pred[mask]) == 0:
-            return torch.tensor(0.0, requires_grad=True).to(device)
-        loss = self.lossBCE(pred[mask], true[mask])
+        loss = self.lossBCE(pred.where(true!=UKN, 0.), true.where(true!=UKN, 0.))
         assert not torch.isnan(loss), "Loss is NaN for structure"
         return loss
 
@@ -83,7 +63,8 @@ class Model(pl.LightningModule):
             losses["structure"] = self._loss_structure(batch)
         assert len(losses) > 0, "No data types to train on"
         assert len(count) == len(losses), "Not all data types have a loss function"
-        loss = sum([losses[k] * count[k] for k in count.keys()]) / sum(count.values())
+        # loss = sum([losses[k] * count[k] for k in count.keys()]) / sum(count.values())
+        loss = sum([losses[k] for k in count.keys()])
         assert not torch.isnan(loss), "Loss is NaN"
         return loss, losses
 
