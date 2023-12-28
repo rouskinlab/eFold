@@ -1,4 +1,5 @@
 import os
+from lightning import LightningModule, Trainer
 import lightning.pytorch as pl
 import torch
 import numpy as np
@@ -52,7 +53,7 @@ class WandbFitLogger(LoadBestModel):
     def __init__(
         self,
         dm: DataModule,
-        batch_size:int=None,
+        batch_size: int = None,
         load_model: str = None,
         log_plots_every_n_epoch: int = 100000000,  # deactivated for now
     ):
@@ -89,31 +90,9 @@ class WandbFitLogger(LoadBestModel):
         pass
 
     def on_validation_batch_end(
-        self,
-        trainer,
-        pl_module,
-        outputs,
-        batch: Batch,
-        batch_idx,
-        dataloader_idx=0,
+        self, trainer, pl_module, outputs, batch: Batch, batch_idx, dataloader_idx=0
     ):
-        ### LOG ###
-        # Log loss to Wandb
-        logger = Logger(pl_module, self.batch_size)
-        loss, losses = outputs
-        # Dataloader_idx is 0 for the validation set
-        # The other dataloader_idx are for complementary validation sets
-        logger.valid_loss(loss, is_test=dataloader_idx == 1)
-        logger.valid_loss_pack(losses, is_test=dataloader_idx == 1)
-
-        # Compute metrics and log them to Wandb.
-        metrics = batch.compute_metrics()
-        stage = "valid" if dataloader_idx == 0 else "ribo-valid"
-        logger.error_metrics_pack(stage, metrics)
-
-        # Save val_loss for evaluating if this model is the best model
-        if dataloader_idx == 0:
-            self.val_losses.append(loss)
+        return
 
         # ### END LOG ###
 
