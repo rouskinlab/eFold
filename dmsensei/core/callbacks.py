@@ -89,58 +89,10 @@ class WandbFitLogger(LoadBestModel):
     def on_train_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
         pass
 
-    # def on_validation_start(self, trainer: Trainer, pl_module: LightningModule) -> None:
-    #     self.metrics_pack_stack = []
-    #     for _ in range(1 + len(self.dm.external_valid)):
-    #         temp = {}
-    #         for data_type in pl_module.data_type_output:
-    #             temp[data_type] = {}
-    #             for metric in POSSIBLE_METRICS[data_type]:
-    #                 temp[data_type][metric] = []
-    #         self.metrics_pack_stack.append(temp)
-
-    def on_validation_epoch_end(self, trainer, pl_module, dataloader_idx=0) -> None:
-        name = (
-            "/" + self.dm.external_valid[dataloader_idx - 1] if dataloader_idx else ""
-        )
-        print(name)
-        for dt, metrics in pl_module.metrics_pack.items():
-            for name, metric in metrics.items():
-                if metric.update_count:
-                    pl_module.log(
-                        f"valid{name}/{dt}/{name}",
-                        metric,
-                        logger=True,
-                        on_epoch=True,
-                        sync_dist=True,
-                    )
-                    metric.reset()
-
     def on_validation_batch_end(
         self, trainer, pl_module, outputs, batch: Batch, batch_idx, dataloader_idx=0
     ):
         return
-        ### LOG ###
-        # Log loss to Wandb
-        logger = Logger(pl_module, self.batch_size)
-        loss, losses = outputs
-        # Dataloader_idx is 0 for the validation set
-        # The other dataloader_idx are for complementary validation sets
-        dataloader_name = (
-            "valid/" + self.dm.external_valid[dataloader_idx - 1]
-            if dataloader_idx > 0
-            else "valid"
-        )
-        logger.valid_loss(loss, name=dataloader_name)
-        logger.valid_loss_pack(losses, name=dataloader_name)
-
-        # Compute metrics and log them to Wandb.
-        metrics = batch.compute_metrics()
-        logger.error_metrics_pack(dataloader_name, metrics)
-
-        # # Save val_loss for evaluating if this model is the best model
-        # if dataloader_idx == 0:
-        #     self.val_losses.append(loss)
 
         # ### END LOG ###
 

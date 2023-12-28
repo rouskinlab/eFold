@@ -22,6 +22,8 @@ class Model(pl.LightningModule):
         self.weight_data = weight_data
         self.save_hyperparameters()
         self.lossBCE = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([300])).to(device)
+        
+        # Metrics
         self.shape_R2 = R2Score(**METRIC_ARGS)
         self.shape_r2 = PearsonCorrCoef(**METRIC_ARGS)
         self.shape_mae = MeanAbsoluteError(**METRIC_ARGS)
@@ -73,25 +75,14 @@ class Model(pl.LightningModule):
             "shape",
         ], "This function only works for dms and shape data"
         pred, true = batch.get_pairs(data_type)
-        # pred = pred.clone(); true = true.clone()
-        # mask = true == UKN
         mask = torch.zeros_like(true)
         mask[true!=UKN] = 1
-        
-        # true[mask] = true[mask] * torch.tensor(0.0, requires_grad=True)
-        # pred[mask] = pred[mask] * torch.tensor(0.0, requires_grad=True)
-        # loss = torch.sqrt(F.mse_loss(pred, true))
         loss = F.mse_loss(pred*mask, true*mask)
         assert not torch.isnan(loss), "Loss is NaN for {}".format(data_type)
         return loss
 
     def _loss_structure(self, batch: Batch):
-        # Unsure if this is the correct loss function
         pred, true = batch.get_pairs("structure")
-        # pred = pred.clone(); true = true.clone()
-        # mask = true == UKN
-        # true[mask] = true[mask] * torch.tensor(0.0, requires_grad=True)
-        # pred[mask] = pred[mask] * torch.tensor(0.0, requires_grad=True)
         loss = self.lossBCE(pred, true)
         assert not torch.isnan(loss), "Loss is NaN for structure"
         return loss
@@ -107,7 +98,6 @@ class Model(pl.LightningModule):
             losses["structure"] = self._loss_structure(batch)
         assert len(losses) > 0, "No data types to train on"
         assert len(count) == len(losses), "Not all data types have a loss function"
-        # loss = sum([losses[k] * count[k] for k in count.keys()]) / sum(count.values())
         loss = sum([losses[k] for k in count.keys()])
         assert not torch.isnan(loss), "Loss is NaN"
         return loss, losses
