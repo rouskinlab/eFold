@@ -124,6 +124,7 @@ class DataModule(pl.LightningDataModule):
                 for name in self.external_valid:
                     self.external_val_set.append(Dataset.from_local_or_download(
                         name=name,
+                        data_type=self.data_type,
                         **self.dataset_args,
                     ))
 
@@ -182,7 +183,6 @@ class DataModule(pl.LightningDataModule):
                         batch_size=self.batch_size,
                     )
                 )
-
         return val_dls
 
     def test_dataloader(self):

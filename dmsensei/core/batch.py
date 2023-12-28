@@ -221,11 +221,11 @@ class Batch:
 
     def compute_metrics(self) -> Dict[str, Dict[str, float]]:
         out = {}
-        for data_type in self.data_types:
+        for data_type in self.data_types: #TODO
             if (
-                not self.count(data_type)
-                or data_type == "sequence"
-                or not self.contains(f"pred_{data_type}")
+                # not self.count(data_type)
+                data_type == "sequence"
+                # or not self.contains(f"pred_{data_type}")
             ):
                 continue
             out[data_type] = {}
@@ -237,5 +237,11 @@ class Batch:
                     if score is not None:
                         scores.append(score)
                 if len(scores):
-                    out[data_type][metric] = torch.nanmean(torch.tensor(scores)).item()
+                    out[data_type][metric] = torch.nanmean(torch.tensor(scores)).item() 
+                else:
+                    out[data_type][metric] = torch.nan #TODO
+                
         return out
+    
+    def __del__(self):
+        del self

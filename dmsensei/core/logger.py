@@ -3,7 +3,7 @@ from ..config import *
 import lightning.pytorch as pl
 import os
 import matplotlib.pyplot as plt
-
+import torchmetrics
 
 class LocalLogger:
     def __init__(self, path: str = "local_testing_output", overwrite: bool = False):
@@ -40,6 +40,10 @@ class Logger:
     def __init__(self, pl_module: pl.LightningModule, batch_size) -> None:
         self._model = pl_module
         self._batch_size = batch_size
+        # self.nanmean = torchmetrics.MeanMetric(nan_strategy='ignore')
+    
+    def nanmean(self, tensor):
+        return torch.nanmean(tensor)
 
     def log(self, stage, metric, value, data_type=None):
         if value is None:
@@ -49,9 +53,10 @@ class Logger:
             value=float(value),
             sync_dist=True,
             # on_step=True,
-            # on_epoch=True,
+            on_epoch=True,
             batch_size=self._batch_size,
             add_dataloader_idx=False,
+            reduce_fx=self.nanmean,
         )
 
     def best_score(self, average_score, data_type):

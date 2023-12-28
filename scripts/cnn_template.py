@@ -33,14 +33,15 @@ if __name__ == "__main__":
     # fit loop
     batch_size = 1
     dm = DataModule(
-        name=["yack_train"],
-        data_type=["dms", 'shape', 'structure'],
+        name=["yack_valid"],
+        data_type=["dms", 'shape', 'structure'], #
         force_download=False,
         batch_size=1,
-        max_len=200,
+        max_len=1024,
         structure_padding_value=0,
-        train_split=2048,
-        external_valid=['yack_valid','test_valid']
+        train_split=None,
+        external_valid=['test_valid'],
+        shuffle_train=False
     )
     dm.setup('fit')
 
@@ -53,7 +54,7 @@ if __name__ == "__main__":
         dropout=0,
         lr=1e-4,
         weight_decay=0,
-        gamma=0.995,
+        # gamma=0.995,
         wandb=USE_WANDB,
     )
 

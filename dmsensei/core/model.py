@@ -41,14 +41,26 @@ class Model(pl.LightningModule):
             "shape",
         ], "This function only works for dms and shape data"
         pred, true = batch.get_pairs(data_type)
-        loss = torch.sqrt(F.mse_loss(pred.where(true!=UKN, 0.), true.where(true!=UKN, 0.)))
+        # pred = pred.clone(); true = true.clone()
+        # mask = true == UKN
+        mask = torch.zeros_like(true)
+        mask[true!=UKN] = 1
+        
+        # true[mask] = true[mask] * torch.tensor(0.0, requires_grad=True)
+        # pred[mask] = pred[mask] * torch.tensor(0.0, requires_grad=True)
+        # loss = torch.sqrt(F.mse_loss(pred, true))
+        loss = F.mse_loss(pred*mask, true*mask)
         assert not torch.isnan(loss), "Loss is NaN for {}".format(data_type)
         return loss
 
     def _loss_structure(self, batch: Batch):
         # Unsure if this is the correct loss function
         pred, true = batch.get_pairs("structure")
-        loss = self.lossBCE(pred.where(true!=UKN, 0.), true.where(true!=UKN, 0.))
+        # pred = pred.clone(); true = true.clone()
+        # mask = true == UKN
+        # true[mask] = true[mask] * torch.tensor(0.0, requires_grad=True)
+        # pred[mask] = pred[mask] * torch.tensor(0.0, requires_grad=True)
+        loss = self.lossBCE(pred, true)
         assert not torch.isnan(loss), "Loss is NaN for structure"
         return loss
 
@@ -95,3 +107,6 @@ class Model(pl.LightningModule):
         predictions = self.forward(batch)
         predictions = self._clean_predictions(batch, predictions)
         batch.integrate_prediction(predictions)
+
+    def teardown(self, batch:Batch):
+        del batch
