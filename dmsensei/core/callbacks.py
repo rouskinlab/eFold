@@ -1,4 +1,5 @@
 import os
+from lightning import LightningModule, Trainer
 import lightning.pytorch as pl
 import torch
 import numpy as np
@@ -52,7 +53,7 @@ class WandbFitLogger(LoadBestModel):
     def __init__(
         self,
         dm: DataModule,
-        batch_size:int=None,
+        batch_size: int = None,
         load_model: str = None,
         log_plots_every_n_epoch: int = 100000000,  # deactivated for now
     ):
@@ -89,31 +90,9 @@ class WandbFitLogger(LoadBestModel):
         pass
 
     def on_validation_batch_end(
-        self,
-        trainer,
-        pl_module,
-        outputs,
-        batch: Batch,
-        batch_idx,
-        dataloader_idx=0,
+        self, trainer, pl_module, outputs, batch: Batch, batch_idx, dataloader_idx=0
     ):
-        ### LOG ###
-        # Log loss to Wandb
-        logger = Logger(pl_module, self.batch_size)
-        loss, losses = outputs
-        # Dataloader_idx is 0 for the validation set
-        # The other dataloader_idx are for complementary validation sets
-        logger.valid_loss(loss, is_test=dataloader_idx == 1)
-        logger.valid_loss_pack(losses, is_test=dataloader_idx == 1)
-
-        # Compute metrics and log them to Wandb.
-        metrics = batch.compute_metrics()
-        stage = "valid" if dataloader_idx == 0 else "ribo-valid"
-        logger.error_metrics_pack(stage, metrics)
-
-        # Save val_loss for evaluating if this model is the best model
-        if dataloader_idx == 0:
-            self.val_losses.append(loss)
+        return
 
         # ### END LOG ###
 
@@ -171,30 +150,30 @@ class WandbFitLogger(LoadBestModel):
 
         #### END PLOT ####
 
-    @rank_zero_only
-    def on_validation_end(self, trainer: Trainer, pl_module, dataloader_idx=0):
-        if dataloader_idx:
-            return
+    # @rank_zero_only
+    # def on_validation_end(self, trainer: Trainer, pl_module, dataloader_idx=0):
+    #     if dataloader_idx:
+    #         return
 
-        # Save best model
-        if wandb.run is None:
-            return
+    #     # Save best model
+    #     if wandb.run is None:
+    #         return
 
-        this_epoch_loss = torch.mean(torch.tensor(self.val_losses)).item()
-        if this_epoch_loss < self.best_loss:
-            # save the best model per integer MAE
-            self.best_loss = this_epoch_loss
-            name = "{}_loss{}.pt".format(
-                wandb.run.name,
-                str(np.floor(100 * this_epoch_loss)).replace(".", "-"),
-            )
-            loader = Loader(path="models/" + name)
-            # logs what MAE it corresponds to
-            loader.dump(pl_module).write_in_log(
-                trainer.current_epoch, np.round(100 * this_epoch_loss, 3)
-            )
+        # this_epoch_loss = torch.mean(torch.tensor(self.val_losses)).item()
+        # if this_epoch_loss < self.best_loss:
+        #     # save the best model per integer MAE
+        #     self.best_loss = this_epoch_loss
+        #     name = "{}_loss{}.pt".format(
+        #         wandb.run.name,
+        #         str(np.floor(100 * this_epoch_loss)).replace(".", "-"),
+        #     )
+        #     loader = Loader(path="models/" + name)
+        #     # logs what MAE it corresponds to
+        #     loader.dump(pl_module).write_in_log(
+        #         trainer.current_epoch, np.round(100 * this_epoch_loss, 3)
+        #     )
 
-        self.val_losses = []
+        # self.val_losses = []
 
 
 class WandbTestLogger(LoadBestModel):
