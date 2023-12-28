@@ -63,11 +63,8 @@ class CNN(Model):
         )
 
         self.output_structure = ResLayer(
-            dim_in=d_cnn // 8,
-            dim_out=1,
-            n_blocks=3,
-            kernel_size=3,
-            dropout=dropout)
+            dim_in=d_cnn // 8, dim_out=1, n_blocks=3, kernel_size=3, dropout=dropout
+        )
 
         self.seq_attention1 = Attention(d_model, n_heads, d_model // n_heads)
         self.seq_attention2 = Attention(d_model, n_heads, d_model // n_heads)
@@ -107,16 +104,13 @@ class CNN(Model):
         x = self.activ(self.encoder_adapter(src))  # (N, L, d_cnn/2)
 
         # Outer concatenation
-        matrix = x.unsqueeze(1).repeat(
-            1, x.shape[1], 1, 1)  # (N, L, L, d_cnn/2)
+        matrix = x.unsqueeze(1).repeat(1, x.shape[1], 1, 1)  # (N, L, L, d_cnn/2)
         matrix = torch.cat(
             (matrix, matrix.permute(0, 2, 1, 3)), dim=-1
         )  # (N, L, L, d_cnn)
 
         # Resnet layers
-        matrix = self.res_layers(
-            matrix.permute(
-                0, 3, 1, 2))  # (N, d_cnn//8, L, L)
+        matrix = self.res_layers(matrix.permute(0, 3, 1, 2))  # (N, d_cnn//8, L, L)
 
         # Output structure
         structure = self.output_structure(matrix).squeeze(1)  # (N, L, L)
@@ -140,17 +134,12 @@ class CNN(Model):
 
 
 class PositionalEncoding(nn.Module):
-    def __init__(
-            self,
-            d_model: int,
-            dropout: float = 0.1,
-            max_len: int = 5000):
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
 
         position = torch.arange(max_len).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2)
-                             * (-np.log(10000.0) / d_model))
+        div_term = torch.exp(torch.arange(0, d_model, 2) * (-np.log(10000.0) / d_model))
         pe = torch.zeros(max_len, d_model)
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
@@ -195,10 +184,7 @@ class Attention(nn.Module):
           sequence projection (B x L x embed_dim), attention maps (B x L x L x num_heads)
         """
 
-        t = rearrange(
-            self.proj(x),
-            "... l (h c) -> ... h l c",
-            h=self.num_heads)
+        t = rearrange(self.proj(x), "... l (h c) -> ... h l c", h=self.num_heads)
         q, k, v = t.chunk(3, dim=-1)
 
         q = self.rescale_factor * q
