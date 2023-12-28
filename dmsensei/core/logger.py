@@ -56,7 +56,6 @@ class Logger:
             on_epoch=True,
             batch_size=self._batch_size,
             add_dataloader_idx=False,
-            reduce_fx=self.nanmean,
         )
 
     def best_score(self, average_score, data_type):

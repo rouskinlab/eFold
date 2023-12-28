@@ -183,6 +183,8 @@ class DataModule(pl.LightningDataModule):
                         batch_size=self.batch_size,
                     )
                 )
+        for dl, name in zip(val_dls, ['train_subset'] + self.external_val_set):
+            dl.name = name
         return val_dls
 
     def test_dataloader(self):
