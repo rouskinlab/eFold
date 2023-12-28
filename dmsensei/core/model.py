@@ -124,7 +124,7 @@ class Model(pl.LightningModule):
         for dt, metrics in self.metrics_pack.items():
             for name, metric in metrics.items():
                 if metric.update_count:
-                    self.log(f"valid/{val_dataloader}/{dt}/{name}", metric, logger=True, on_epoch=True, sync_dist=True, add_dataloader_idx=False)
+                    self.log(f"valid/{val_dataloader}/{dt}/{name}", metric, logger=True, on_epoch=True, add_dataloader_idx=False)
         return loss, losses
     
     def test_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
