@@ -75,10 +75,10 @@ if __name__ == "__main__":
         accumulate_grad_batches=32,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
-            # LearningRateMonitor(logging_interval="epoch"),
+            LearningRateMonitor(logging_interval="epoch"),
             # PredictionLogger(data="dms"),
             # ModelChecker(log_every_nstep=10000, model=model),
-            # WandbFitLogger(dm=dm, load_model=None),
+            WandbFitLogger(dm=dm, load_model=None),
             # WandbTestLogger(dm=dm, n_best_worst=10, load_model='best'), # 'best', None or path to model
         ]
         if USE_WANDB
