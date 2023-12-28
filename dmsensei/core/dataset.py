@@ -168,7 +168,7 @@ class Dataset(TorchDataset):
                 shape = shape[idx_sorted]
             if structure is not None:
                 structure = structure[idx_sorted]
-                
+
         return cls(
             name=name,
             data_type=data_type,

@@ -5,6 +5,7 @@ from .dataset import Dataset
 from ..config import TEST_SETS, UKN
 from .sampler import BySequenceLengthSampler
 
+
 class DataModule(pl.LightningDataModule):
     def __init__(
         self,
@@ -24,7 +25,7 @@ class DataModule(pl.LightningDataModule):
         max_len=500,
         structure_padding_value=UKN,
         tqdm=True,
-        buckets = None,
+        buckets=None,
         **kwargs,
     ):
         """DataModule for the Rouskin lab datasets.
@@ -72,7 +73,7 @@ class DataModule(pl.LightningDataModule):
             "tqdm": tqdm,
             "max_len": max_len,
         }
-        self.buckets = buckets  
+        self.buckets = buckets
 
         # we need to know the max sequence length for padding
         self.overfit_mode = overfit_mode
@@ -125,12 +126,14 @@ class DataModule(pl.LightningDataModule):
             if self.external_valid is not None:
                 self.external_val_set = []
                 for name in self.external_valid:
-                    self.external_val_set.append(Dataset.from_local_or_download(
-                        name=name,
-                        data_type=self.data_type,
-                        sort_by_length=True,
-                        **self.dataset_args,
-                    ))
+                    self.external_val_set.append(
+                        Dataset.from_local_or_download(
+                            name=name,
+                            data_type=self.data_type,
+                            sort_by_length=True,
+                            **self.dataset_args,
+                        )
+                    )
 
         if stage == "test":
             self.test_sets = self._select_test_dataset()
@@ -156,7 +159,7 @@ class DataModule(pl.LightningDataModule):
             for data_type, datasets in TEST_SETS.items()
             for name in datasets
         ]
-        
+
     def _get_sampler(self, dataset):
         if self.buckets is not None:
             return BySequenceLengthSampler(

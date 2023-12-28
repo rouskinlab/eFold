@@ -159,14 +159,11 @@ class WandbFitLogger(LoadBestModel):
         if wandb.run is None:
             return
 
-        name = "{}_epoch{}.pt".format(
-            wandb.run.name,
-            trainer.current_epoch
-        )
+        name = "{}_epoch{}.pt".format(wandb.run.name, trainer.current_epoch)
         loader = Loader(path="models/" + name)
         # logs what MAE it corresponds to
         loader.dump(pl_module)
-        
+
 
 class WandbTestLogger(LoadBestModel):
     def __init__(
