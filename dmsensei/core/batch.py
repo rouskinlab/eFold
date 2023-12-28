@@ -77,10 +77,6 @@ class Batch:
         batch_size = len(reference)
 
         data = {}
-        for dp in batch_data:
-            for dt in data_type:
-                if dp[dt] is None:
-                    print(dp)
         dt_count = {
             dt: len(
                 [
@@ -128,11 +124,6 @@ class Batch:
                     device
                 )
 
-        for dt in data_type:
-            if data[dt] is None:
-                print(dt, data[dt])
-                break
-
         return cls(
             reference=reference,
             sequence=sequence,
@@ -151,8 +142,8 @@ class Batch:
             data_part = None
         else:
             data_part, data_type = split_data_type(data_type)
-            # could be data but wasn't requested
-            # print(data_type, data_part, self.data_types)
+            
+            # could be in the dataset but wasn't requested in the dm init
             if data_type not in self.data_types:
                 return None
 
