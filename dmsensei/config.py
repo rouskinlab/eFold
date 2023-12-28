@@ -1,11 +1,11 @@
 from torch import float32, cuda, backends
 import torch
 
-seq2int = {'X': 0, 'A': 1, 'C': 2, 'G': 3, 'U': 4, 'S': 5, 'E': 6}
+seq2int = {'X': 0, 'A': 1, 'C': 2, 'G': 3, 'U': 4}#, 'S': 5, 'E': 6}
 int2seq = {v:k for k,v in seq2int.items()}
 
-START_TOKEN = seq2int['S']
-END_TOKEN = seq2int['E']
+START_TOKEN = None #seq2int['S']
+END_TOKEN = None #seq2int['E']
 PADDING_TOKEN = seq2int['X']
 
 DEFAULT_FORMAT = float32

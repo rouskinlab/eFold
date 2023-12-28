@@ -31,26 +31,22 @@ if __name__ == "__main__":
         wandb_logger = WandbLogger(project=project)
 
     # fit loop
-    batch_size = 4
+    batch_size = 1
     dm = DataModule(
-        name=["gros_dataset_short"],
-        data_type=["dms", "shape","structure"],
+        name=["yack_train"],
+        data_type=["dms", 'shape', 'structure'], #
         force_download=False,
-        batch_size=batch_size,
-        num_workers=1,
-        train_split=396824, # all but valid_split
-        valid_split=4096,
-        predict_split=0,
-        ribo_validation = True,
-        overfit_mode=False,
-        shuffle_valid=False,
-        ribo_validation = True,
+        batch_size=1,
+        max_len=1024,
+        structure_padding_value=0,
+        train_split=10000,
+        external_valid=['yack_valid', 'test_valid'],
+        shuffle_train=False
     )
+    dm.setup('fit')
 
     model = create_model(
         model="cnn",
-        data="multi",
-        quality=True,
         ntoken=5,
         d_model=64,
         d_cnn=128,
@@ -58,7 +54,7 @@ if __name__ == "__main__":
         dropout=0,
         lr=1e-4,
         weight_decay=0,
-        gamma=0.995,
+        # gamma=0.995,
         wandb=USE_WANDB,
     )
 
@@ -72,11 +68,11 @@ if __name__ == "__main__":
     trainer = Trainer(
         accelerator=device,
         devices=8,
-        strategy=DDPStrategy(find_unused_parameters=True),
+        strategy=DDPStrategy(),
         precision="16-mixed",
         max_epochs=1000,
         log_every_n_steps=1,
-        accumulate_grad_batches=4,
+        accumulate_grad_batches=32,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
             LearningRateMonitor(logging_interval="epoch"),
