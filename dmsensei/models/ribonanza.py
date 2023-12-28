@@ -80,6 +80,9 @@ class SqueezeAndExcitation(nn.Module):
         # [batch_size, num_heads, seq_len, seq_len] x [batch_size, num_heads, 1, 1]
         return structure * weights.unsqueeze(-1).unsqueeze(-1)
 
+
+from torch.nn.functional import multi_head_attention_forward
+
     
 class SelfAttention(nn.Module):
     def __init__(
@@ -94,17 +97,14 @@ class SelfAttention(nn.Module):
     def forward(self, sequence, structure):
         # define Q, K, V
         # [batch_size, seq_len, embed_dim] -> [batch_size, num_heads, seq_len, dim_per_head]
-        Q = V = sequence.reshape(sequence.shape[0], sequence.shape[1], self.params['num_heads'], self.params['dim_per_head']).permute(0, 2, 1, 3)
-        # K transpose: [batch_size, num_heads, dim_per_head, seq_len]
-        Kt = Q.permute(0, 1, 3, 2)
+        Q = V = K = sequence.reshape(sequence.shape[0], sequence.shape[1], self.params['num_heads'], self.params['dim_per_head']).permute(0, 2, 1, 3)
         
         # blocks of attention map
-        attention_values = torch.matmul(Q, Kt)
         bpp_features = self.conv(structure)
-        relative_positional_bias = self.pos_encoding(sequence)
+        relative_positional_bias = self.pos_encoding(sequence)     
         
         # attention map: [batch_size, num_heads, seq_len, seq_len] 
-        attention_map =  torch.softmax(attention_values + bpp_features + relative_positional_bias, dim=-1)
+        attention_map = K @ Q.transpose(-1, -2) / (self.params['dim_per_head'] ** 0.5) + relative_positional_bias + bpp_features
         
         # output: [batch_size, seq_len, embed_dim]
         output = (attention_map @ V).reshape(*sequence.shape)
@@ -198,8 +198,10 @@ class Ribonanza(Model):
     def __init__(
         self,
         params,
+        lr = 1e-3,
+        optimizer_fn = torch.optim.Adam,
     ):
-        super().__init__(**params)  
+        super().__init__(**params, lr=lr, optimizer_fn=optimizer_fn)
         
         # Layers
         self.table_embedding = nn.Embedding(self.ntokens, params['embed_dim'])
