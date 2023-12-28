@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from .batch import Batch
 from torchmetrics import R2Score, PearsonCorrCoef, MeanAbsoluteError, F1Score
 
-METRIC_ARGS = dict(sync_on_compute=False)
+METRIC_ARGS = dict(dist_sync_on_step=True)
 
 class Model(pl.LightningModule):
     def __init__(self, lr: float, optimizer_fn, weight_data: bool = False, **kwargs):
