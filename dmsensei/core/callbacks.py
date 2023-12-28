@@ -180,22 +180,14 @@ class WandbFitLogger(LoadBestModel):
         if wandb.run is None:
             return
 
-        this_epoch_loss = torch.mean(torch.tensor(self.val_losses)).item()
-        if this_epoch_loss < self.best_loss:
-            # save the best model per integer MAE
-            self.best_loss = this_epoch_loss
-            name = "{}_loss{}.pt".format(
-                wandb.run.name,
-                str(np.floor(100 * this_epoch_loss)).replace(".", "-"),
-            )
-            loader = Loader(path="models/" + name)
-            # logs what MAE it corresponds to
-            loader.dump(pl_module).write_in_log(
-                trainer.current_epoch, np.round(100 * this_epoch_loss, 3)
-            )
-
-        self.val_losses = []
-
+        name = "{}_epoch{}.pt".format(
+            wandb.run.name,
+            trainer.current_epoch
+        )
+        loader = Loader(path="models/" + name)
+        # logs what MAE it corresponds to
+        loader.dump(pl_module)
+        
 
 class WandbTestLogger(LoadBestModel):
     def __init__(
