@@ -7,6 +7,7 @@ from .metrics import metric_factory
 from typing import Dict
 from .datatype import data_type_factory
 from .util import split_data_type
+from torch import cuda, backends
 
 
 def _pad(arr, L, data_type, accept_none=False):
@@ -45,6 +46,7 @@ class Batch:
         dms=None,
         shape=None,
         structure=None,
+        device = 'cpu'
     ):
         self.reference = reference
         self.sequence = sequence
@@ -57,6 +59,7 @@ class Batch:
         self.batch_size = batch_size
         self.data_types = data_types
         self.dt_count = dt_count
+        self.device = device
 
     @classmethod
     def from_dataset_items(
@@ -73,7 +76,7 @@ class Batch:
         # move the conversion to the dataset
         sequence = torch.stack(
             [_pad(sequence_to_int(dp["sequence"]), L, "sequence") for dp in batch_data]
-        ).to(device)
+        )
         batch_size = len(reference)
 
         data = {}
@@ -100,7 +103,7 @@ class Batch:
                             )
                             for (dp, l) in zip(batch_data, length)
                         ]
-                    ).to(device),
+                    ),
                     error=None,
                     pred=None,
                 )
@@ -108,7 +111,7 @@ class Batch:
                 true, error = [], []
                 for dp in batch_data:
                     true.append(_pad(dp[dt]["true"], L, dt, accept_none=True))
-                true = torch.stack(true).to(device)
+                true = torch.stack(true)
 
                 # use error if there's a single non-None error and if the true signal is not None
                 if use_error and len(
@@ -116,7 +119,7 @@ class Batch:
                 ):
                     for dp in batch_data:
                         error.append(_pad(dp[dt]["error"], L, dt, accept_none=True))
-                    error = torch.stack(error).to(device)
+                    error = torch.stack(error)
                 else:
                     error = [None] * batch_size
 
@@ -237,3 +240,27 @@ class Batch:
 
     def __del__(self):
         del self
+    
+    @property
+    def device(self):
+        return self._device
+
+    @device.getter
+    def device(self):
+        return self._device
+
+    @device.setter
+    def device(self, device):
+        # assert device exists
+        if device == 'mps' and not backends.mps.is_available():
+            raise ValueError("MPS is not available on this device.")
+        if device == 'cuda' and not cuda.is_available():
+            raise ValueError("CUDA is not available on this device.")
+        for attr in ['dms', 'shape', 'structure', 'sequence']:
+            if getattr(self, attr) is not None:
+                setattr(self, attr, getattr(self, attr).to(device))
+        self._device = device
+
+    def to(self, device):
+        self.device = device
+        return self
