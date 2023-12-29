@@ -33,17 +33,16 @@ if __name__ == "__main__":
     # fit loop
     batch_size = 1
     dm = DataModule(
-        name=["yack_train"],
+        name=["yack_valid"],
+        shuffle_train='ddp',
         data_type=["dms", "shape", "structure"],  #
         force_download=False,
         batch_size=1,
         max_len=1024,
         structure_padding_value=0,
-        train_split=10000,
+        train_split=1024,
         external_valid=["yack_valid", "test_valid"],
-        shuffle_train=False,
     )
-    dm.setup("fit")
 
     model = create_model(
         model="cnn",
@@ -67,51 +66,23 @@ if __name__ == "__main__":
 
     trainer = Trainer(
         accelerator=device,
-        devices=8,
+        devices=2,
         strategy=DDPStrategy(),
         precision="16-mixed",
         max_epochs=1000,
         log_every_n_steps=1,
         accumulate_grad_batches=32,
+        use_distributed_sampler=False,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
             LearningRateMonitor(logging_interval="epoch"),
-            # PredictionLogger(data="dms"),
-            # ModelChecker(log_every_nstep=10000, model=model),
-            WandbFitLogger(dm=dm, load_model=None),
-            # WandbTestLogger(dm=dm, n_best_worst=10, load_model='best'), # 'best', None or path to model
-        ]
+   ]
         if USE_WANDB
         else [],
         enable_checkpointing=False,
     )
 
     trainer.fit(model, datamodule=dm)
-    # trainer.test(model, datamodule=dm)
-
-    # # Predict loop
-    # dm = DataModule(
-    #     name=["ribo-test"],
-    #     data_type=["dms", "shape"],
-    #     force_download=False,
-    #     batch_size=128,
-    #     num_workers=0,
-    #     train_split=0,
-    #     valid_split=0,
-    #     predict_split=1.,
-    #     overfit_mode=False,
-    #     shuffle_valid=False,
-    # )
-
-    # trainer = Trainer(
-    #     accelerator=device,
-    #     callbacks=[KaggleLogger(
-    #         push_to_kaggle=True,
-    #         load_model='best' # 'best', None or path to model
-    #         )]
-    # )
-
-    # trainer.predict(model, datamodule=dm)
 
     if USE_WANDB:
         wandb.finish()

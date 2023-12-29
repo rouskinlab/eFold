@@ -1,18 +1,19 @@
-from torch.utils.data import DataLoader, random_split, Subset
+from torch.utils.data import random_split, Subset
 import lightning.pytorch as pl
 from typing import Union, List
 from .dataset import Dataset
 from ..config import TEST_SETS, UKN
 from .sampler import sampler_factory
+from .dataloader import DataLoader
 import numpy as np
 import datetime
+
 
 class DataModule(pl.LightningDataModule):
     def __init__(
         self,
         name: Union[str, list],
         batch_size: int,
-        devices: int = 1,
         data_type: List[str] = ["dms", "shape", "structure"],
         force_download=False,
         num_workers: int = 1,
@@ -42,7 +43,7 @@ class DataModule(pl.LightningDataModule):
             zero_padding_to: pad sequences to this length. If None, sequences are not padded.
             overfit_mode: if True, the train set is used for validation and testing. Useful for debugging. Default is False.
             sampler: 'bucket' or 'random'. If 'bucket', the data is sampled by bucketing sequences of similar lengths. If 'random', the data is sampled randomly. Default is 'bucket'.
-            shuffle_train: 'random', 'bucket', 'seed' or 'sorted'. 
+            shuffle_train: 'random', 'sorted' or 'ddp'.
         """
         # Save arguments
         super().__init__(**kwargs)
@@ -53,7 +54,6 @@ class DataModule(pl.LightningDataModule):
             self.name = name
 
         self.batch_size = batch_size
-        self.devices = devices
         self.num_workers = num_workers
         self.data_type = data_type
         self.external_valid = external_valid
@@ -103,6 +103,7 @@ class DataModule(pl.LightningDataModule):
                     Dataset.from_local_or_download(
                         name=name,
                         data_type=self.data_type,
+                        sort_by_length=self.shuffle["train"] == 'sorted',
                         **self.dataset_args,
                     )
                     for name in self.name
@@ -114,13 +115,14 @@ class DataModule(pl.LightningDataModule):
             if self.splits["train"] == None or self.splits["train"] == 1.0:
                 self.train_set = self.all_datasets
             else:
+                num_datapoints = round(len(self.all_datasets) * self.splits["train"]) \
+                                        if isinstance(self.splits["train"], float) \
+                                        else self.splits["train"]
+                assert num_datapoints > 0, "train_split must be greater than 0"
+                assert num_datapoints <= len(self.all_datasets), "train_split must be less than the number of datapoints"
                 self.train_set = Subset(
                     self.all_datasets,
-                    range(
-                        round(len(self.all_datasets) * self.splits["train"])
-                        if isinstance(self.splits["train"], float)
-                        else self.splits["train"],
-                    ),
+                    range(0, num_datapoints),
                 )
             if self.external_valid is not None:
                 self.external_val_set = []
@@ -160,17 +162,22 @@ class DataModule(pl.LightningDataModule):
         ]
 
     def train_dataloader(self):
+        if self.trainer is None:
+            raise ValueError(
+                "When using shuffle_train='ddp', the trainer must be passed to the datamodule"
+            )
         return DataLoader(
             self.train_set,
             shuffle=self.shuffle["train"] == 'random', 
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
+            to_device=self.shuffle["train"] == 'ddp',
             sampler=sampler_factory(
                 dataset=self.train_set,
                 shuffle=self.shuffle["train"],
-                batch_size=self.batch_size * self.devices,
+                num_replicas=self.trainer.num_devices,
                 seed=datetime.datetime.now().hour,
-                bucket_boundaries=self.buckets,
+                rank=self.trainer.local_rank,
             )
         )
 
@@ -213,4 +220,5 @@ class DataModule(pl.LightningDataModule):
     def teardown(self, stage: str):
         # Used to clean-up when the run is finished
         pass
+            
 
