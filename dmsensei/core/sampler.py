@@ -1,22 +1,40 @@
-from torch.utils.data import Sampler
+from torch.utils.data import Sampler, Subset
 import numpy as np
 from random import shuffle
+from torch.utils.data import Dataset
+from typing import Union
 
+class NoShuffleSampler(Sampler):
+    def __init__(self, dataset: Union[Dataset, Subset]):
+        self.data_source = dataset
+
+    def __iter__(self):
+        return iter(range(len(self.data_source)))
+
+    def __len__(self):
+        return len(self.data_source)
+    
 
 class BySequenceLengthSampler(Sampler):
     def __init__(
         self,
-        dataset,
+        dataset: Union[Dataset, Subset],
         bucket_boundaries,
-        batch_size=64,
+        batch_size,
     ):
         ind_n_len = []
-        for i, p in enumerate(dataset.length):
+        length = dataset.dataset.length if isinstance(dataset, Subset) else dataset.length
+        for i, p in enumerate(length):
             ind_n_len.append((i, p))
         self.ind_n_len = ind_n_len
         self.bucket_boundaries = bucket_boundaries
         self.batch_size = batch_size
         self.data_source = dataset
+        
+        # filter out bucket boundaries that are larger than the largest sequence / smaller than the smallest sequence
+        self.bucket_boundaries = [
+            b for b in self.bucket_boundaries if b < max(length) and b > min(length)
+        ]
 
     def __iter__(self):
         data_buckets = dict()
@@ -34,13 +52,17 @@ class BySequenceLengthSampler(Sampler):
         iter_list = []
         for k in data_buckets.keys():
             np.random.shuffle(data_buckets[k])
+            n_batch = int(len(data_buckets[k]) / self.batch_size)
+            if n_batch == 0 and len(data_buckets[k]) > 0:
+                n_batch = 1
             iter_list += np.array_split(
-                data_buckets[k], int(data_buckets[k].shape[0] / self.batch_size)
+                data_buckets[k], n_batch
             )
         shuffle(iter_list)  # shuffle all the batches so they arent ordered by bucket
-        # size
-        for i in iter_list:
-            yield i.tolist()  # as it was stored in an array
+        
+        for l in iter_list:
+            for i in l:
+                yield i 
 
     def __len__(self):
         return len(self.data_source)

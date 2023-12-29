@@ -112,7 +112,7 @@ class Model(pl.LightningModule):
         loss, losses = self.loss_fn(batch)
         self.update_metrics(batch)
         val_dataloader = (
-            self.trainer.datamodule.external_valid[dataloader_idx - 1]
+            self.trainer.datamodule.external_valid[dataloader_idx]
             if dataloader_idx
             else "train_subset"
         )
