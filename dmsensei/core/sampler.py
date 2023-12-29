@@ -15,6 +15,20 @@ class NoShuffleSampler(Sampler):
         return len(self.data_source)
     
 
+class SeedBasedSampler(Sampler):
+    def __init__(self, dataset: Union[Dataset, Subset], seed):
+        self.data_source = dataset
+        self.seed = seed
+        self.sorted_indices = np.argsort(np.array(dataset.dataset.length)[dataset.indices] if isinstance(dataset, Subset) else dataset.length)
+
+    def __iter__(self):
+        np.random.seed(self.seed)
+        return iter(np.random.permutation(self.sorted_indices))
+
+    def __len__(self):
+        return len(self.data_source)
+    
+
 class BySequenceLengthSampler(Sampler):
     def __init__(
         self,
@@ -76,3 +90,20 @@ class BySequenceLengthSampler(Sampler):
         )
         bucket_id = np.min(np.where(conditions_c))
         return bucket_id
+
+
+def sampler_factory(
+    dataset: Union[Dataset, Subset],
+    shuffle: str,
+    seed: int = None,
+    bucket_boundaries = None,
+    batch_size: int = None,
+):
+    if shuffle == 'random':
+        return None
+    elif shuffle == 'bucket':
+        return BySequenceLengthSampler(dataset, bucket_boundaries, batch_size)
+    elif shuffle == 'seed':
+        return SeedBasedSampler(dataset, seed)
+    else:
+        raise ValueError(f"Invalid shuffle value: {shuffle}")

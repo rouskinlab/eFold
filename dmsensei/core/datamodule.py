@@ -3,8 +3,9 @@ import lightning.pytorch as pl
 from typing import Union, List
 from .dataset import Dataset
 from ..config import TEST_SETS, UKN
-from .sampler import BySequenceLengthSampler, NoShuffleSampler
+from .sampler import sampler_factory
 import numpy as np
+import datetime
 
 class DataModule(pl.LightningDataModule):
     def __init__(
@@ -17,7 +18,7 @@ class DataModule(pl.LightningDataModule):
         num_workers: int = 1,
         train_split: float = 1.,
         predict_split: float = 0,
-        shuffle_train=True,
+        shuffle_train='random',
         shuffle_valid=False,
         external_valid=None,
         use_error=False,
@@ -41,6 +42,7 @@ class DataModule(pl.LightningDataModule):
             zero_padding_to: pad sequences to this length. If None, sequences are not padded.
             overfit_mode: if True, the train set is used for validation and testing. Useful for debugging. Default is False.
             sampler: 'bucket' or 'random'. If 'bucket', the data is sampled by bucketing sequences of similar lengths. If 'random', the data is sampled randomly. Default is 'bucket'.
+            shuffle_train: 'random', 'bucket', 'seed' or 'sorted'. 
         """
         # Save arguments
         super().__init__(**kwargs)
@@ -106,8 +108,6 @@ class DataModule(pl.LightningDataModule):
                     for name in self.name
                 ]
             )
-            if not self.shuffle["train"]:
-                self.all_datasets.sort()
             self.collate_fn = self.all_datasets.collate_fn
 
         if stage == "fit":
@@ -159,23 +159,19 @@ class DataModule(pl.LightningDataModule):
             for name in datasets
         ]
 
-    def _get_sampler(self, dataset):
-        if self.buckets is not None:
-            return BySequenceLengthSampler(
-                dataset,
-                bucket_boundaries=self.buckets,
-                batch_size=self.batch_size * self.devices,
-            )
-        else:
-            return None
-
     def train_dataloader(self):
         return DataLoader(
             self.train_set,
-            shuffle=self.shuffle["train"],
+            shuffle=self.shuffle["train"] == 'random', 
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
-            sampler=self._get_sampler(self.train_set),
+            sampler=sampler_factory(
+                dataset=self.train_set,
+                shuffle=self.shuffle["train"],
+                batch_size=self.batch_size * self.devices,
+                seed=datetime.datetime.now().hour,
+                bucket_boundaries=self.buckets,
+            )
         )
 
     def val_dataloader(self):
@@ -192,7 +188,6 @@ class DataModule(pl.LightningDataModule):
                         shuffle=self.shuffle["valid"],
                         collate_fn=self.collate_fn,
                         batch_size=self.batch_size,
-                        sampler=NoShuffleSampler(val_set) if not self.shuffle['valid'] else None,
                     )
                 )
         return val_dls 
