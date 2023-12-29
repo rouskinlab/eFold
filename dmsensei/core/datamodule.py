@@ -171,7 +171,7 @@ class DataModule(pl.LightningDataModule):
             shuffle=self.shuffle["train"] == 'random', 
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
-            to_device=self.shuffle["train"] == 'ddp',
+            to_device=self.shuffle["train"] != 'ddp',
             sampler=sampler_factory(
                 dataset=self.train_set,
                 shuffle=self.shuffle["train"],
