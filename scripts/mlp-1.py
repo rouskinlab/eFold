@@ -32,11 +32,8 @@ if __name__ == "__main__":
     wandb_logger = WandbLogger(
         project="dms mlp",
         name="mlp - 5L - lr {} - batch {} - wd {} - embed {} - model {} - dropout".format(
-            LR,
-            BATCH_SIZE,
-            WD,
-            EMBED,
-            MODEL),
+            LR, BATCH_SIZE, WD, EMBED, MODEL
+        ),
     )
 
     MAX_LEN = 1024

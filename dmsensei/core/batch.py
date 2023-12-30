@@ -142,7 +142,7 @@ class Batch:
             data_part = None
         else:
             data_part, data_type = split_data_type(data_type)
-            
+
             # could be in the dataset but wasn't requested in the dm init
             if data_type not in self.data_types:
                 return None
@@ -212,10 +212,11 @@ class Batch:
 
     def compute_metrics(self) -> Dict[str, Dict[str, float]]:
         out = {}
-        for data_type in self.data_types: #TODO
+        for data_type in self.data_types:  # TODO
             if (
                 # not self.count(data_type)
-                data_type == "sequence"
+                data_type
+                == "sequence"
                 # or not self.contains(f"pred_{data_type}")
             ):
                 continue
@@ -228,11 +229,11 @@ class Batch:
                     if score is not None:
                         scores.append(score)
                 if len(scores):
-                    out[data_type][metric] = torch.nanmean(torch.tensor(scores)).item() 
+                    out[data_type][metric] = torch.nanmean(torch.tensor(scores)).item()
                 else:
-                    out[data_type][metric] = torch.nan #TODO
-                
+                    out[data_type][metric] = torch.nan  # TODO
+
         return out
-    
+
     def __del__(self):
         del self

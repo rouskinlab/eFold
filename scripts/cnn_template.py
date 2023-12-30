@@ -1,5 +1,6 @@
 import os
 import sys
+
 sys.path.append(os.path.abspath("."))
 
 from dmsensei.core.callbacks import WandbFitLogger, KaggleLogger  # , WandbTestLogger
@@ -19,7 +20,6 @@ import os
 # envbash.load.load_envbash('.env')
 
 
-
 sys.path.append(os.path.abspath("."))
 
 # Train loop
@@ -34,16 +34,16 @@ if __name__ == "__main__":
     batch_size = 1
     dm = DataModule(
         name=["yack_train"],
-        data_type=["dms", 'shape', 'structure'], #
+        data_type=["dms", "shape", "structure"],  #
         force_download=False,
         batch_size=1,
         max_len=1024,
         structure_padding_value=0,
         train_split=10000,
-        external_valid=['yack_valid', 'test_valid'],
-        shuffle_train=False
+        external_valid=["yack_valid", "test_valid"],
+        shuffle_train=False,
     )
-    dm.setup('fit')
+    dm.setup("fit")
 
     model = create_model(
         model="cnn",

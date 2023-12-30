@@ -6,7 +6,7 @@ from .ribonanza import Ribonanza
 
 def create_model(model: str, *args, **kwargs):
     if model == "transformer":
-            return Transformer(*args, **kwargs)
+        return Transformer(*args, **kwargs)
     if model == "evoformer":
         return Evoformer(*args, **kwargs)
     if model == "cnn":

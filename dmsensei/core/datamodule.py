@@ -3,6 +3,7 @@ import lightning.pytorch as pl
 from typing import Union, List
 from .dataset import Dataset
 from ..config import TEST_SETS, UKN
+from .sampler import BySequenceLengthSampler
 
 
 class DataModule(pl.LightningDataModule):
@@ -24,6 +25,7 @@ class DataModule(pl.LightningDataModule):
         max_len=500,
         structure_padding_value=UKN,
         tqdm=True,
+        buckets=None,
         **kwargs,
     ):
         """DataModule for the Rouskin lab datasets.
@@ -39,6 +41,7 @@ class DataModule(pl.LightningDataModule):
             predict_split: percentage of the dataset to use for prediction or number of samples to use for prediction
             zero_padding_to: pad sequences to this length. If None, sequences are not padded.
             overfit_mode: if True, the train set is used for validation and testing. Useful for debugging. Default is False.
+            sampler: 'bucket' or 'random'. If 'bucket', the data is sampled by bucketing sequences of similar lengths. If 'random', the data is sampled randomly. Default is 'bucket'.
         """
         # Save arguments
         super().__init__(**kwargs)
@@ -70,6 +73,7 @@ class DataModule(pl.LightningDataModule):
             "tqdm": tqdm,
             "max_len": max_len,
         }
+        self.buckets = buckets
 
         # we need to know the max sequence length for padding
         self.overfit_mode = overfit_mode
@@ -122,11 +126,14 @@ class DataModule(pl.LightningDataModule):
             if self.external_valid is not None:
                 self.external_val_set = []
                 for name in self.external_valid:
-                    self.external_val_set.append(Dataset.from_local_or_download(
-                        name=name,
-                        data_type=self.data_type,
-                        **self.dataset_args,
-                    ))
+                    self.external_val_set.append(
+                        Dataset.from_local_or_download(
+                            name=name,
+                            data_type=self.data_type,
+                            sort_by_length=True,
+                            **self.dataset_args,
+                        )
+                    )
 
         if stage == "test":
             self.test_sets = self._select_test_dataset()
@@ -153,12 +160,23 @@ class DataModule(pl.LightningDataModule):
             for name in datasets
         ]
 
+    def _get_sampler(self, dataset):
+        if self.buckets is not None:
+            return BySequenceLengthSampler(
+                dataset,
+                bucket_boundaries=self.buckets,
+                batch_size=self.batch_size,
+            )
+        else:
+            return None
+
     def train_dataloader(self):
         return DataLoader(
             self.train_set,
             shuffle=self.shuffle["train"],
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
+            sampler=self._get_sampler(self.train_set),
         )
 
     def val_dataloader(self):

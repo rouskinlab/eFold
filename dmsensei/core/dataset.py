@@ -92,6 +92,7 @@ class Dataset(TorchDataset):
         use_error: bool = False,
         max_len=500,
         structure_padding_value: float = UKN,
+        sort_by_length: bool = False,
         tqdm=True,
     ):
         path = Path(name=name)
@@ -155,6 +156,18 @@ class Dataset(TorchDataset):
             path.dump_structure(structure)
 
         print("Done!                            ")
+
+        if sort_by_length:
+            idx_sorted = np.argsort(length)
+            refs = refs[idx_sorted]
+            length = length[idx_sorted]
+            sequence = sequence[idx_sorted]
+            if dms is not None:
+                dms = dms[idx_sorted]
+            if shape is not None:
+                shape = shape[idx_sorted]
+            if structure is not None:
+                structure = structure[idx_sorted]
 
         return cls(
             name=name,

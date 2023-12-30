@@ -5,6 +5,7 @@ import os
 import matplotlib.pyplot as plt
 import torchmetrics
 
+
 class LocalLogger:
     def __init__(self, path: str = "local_testing_output", overwrite: bool = False):
         self.path = path
@@ -34,4 +35,3 @@ class Logger:
         wandb.log(
             {"/".join(["test", dataloader, data_type, name]): img},
         )
-

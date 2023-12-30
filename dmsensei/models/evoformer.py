@@ -22,7 +22,7 @@ class Evoformer(Model):
         ntoken: int,
         d_model: int,
         c_z: int,
-        d_cnn: int, 
+        d_cnn: int,
         num_blocks: int,
         no_recycles: int,
         dropout: float = 0,
@@ -75,34 +75,32 @@ class Evoformer(Model):
         self.output_structure = nn.Sequential(
             ResLayer(
                 dim_in=d_cnn,
-                dim_out=d_cnn//2,
+                dim_out=d_cnn // 2,
                 n_blocks=4,
                 kernel_size=3,
                 dropout=dropout,
             ),
             ResLayer(
-                dim_in=d_cnn//2,
-                dim_out=1,
-                n_blocks=4,
-                kernel_size=3,
-                dropout=dropout)
+                dim_in=d_cnn // 2, dim_out=1, n_blocks=4, kernel_size=3, dropout=dropout
+            ),
         )
-
 
     def forward(self, batch: Batch) -> Tensor:
         # Encoding of RNA sequence
         src = batch.get("sequence")
-        s = self.encoder(src)   # (N, L, d_model)
+        s = self.encoder(src)  # (N, L, d_model)
 
-        z = self.activ(self.encoder_adapter(s)) # (N, L, c_z / 2)
+        z = self.activ(self.encoder_adapter(s))  # (N, L, c_z / 2)
         # Outer concatenation
-        z = z.unsqueeze(1).repeat(1, z.shape[1], 1, 1) # (N, L, L, c_z / 2)
-        z = torch.cat((z, z.permute(0, 2, 1, 3)), dim=-1) # (N, L, L, c_z)
+        z = z.unsqueeze(1).repeat(1, z.shape[1], 1, 1)  # (N, L, L, c_z / 2)
+        z = torch.cat((z, z.permute(0, 2, 1, 3)), dim=-1)  # (N, L, L, c_z)
 
         s, z = self.evoformer(s, z)
 
-        structure = self.structure_adapter(z) # (N, L, L, d_cnn)
-        structure = self.output_structure(structure.permute(0, 3, 1, 2)).squeeze(1) # (N, L, L)
+        structure = self.structure_adapter(z)  # (N, L, L, d_cnn)
+        structure = self.output_structure(structure.permute(0, 3, 1, 2)).squeeze(
+            1
+        )  # (N, L, L)
 
         return {
             "dms": self.output_net_DMS(s).squeeze(axis=2),
@@ -138,8 +136,7 @@ class EvoBlock(nn.Module):
         # bias attention heads
         self.pair_to_sequence = PairToSequence(c_z, no_heads_s)
 
-        self.seq_attention = Attention(
-            c_s, no_heads_s, c_s / no_heads_s, gated=True)
+        self.seq_attention = Attention(c_s, no_heads_s, c_s / no_heads_s, gated=True)
 
         self.resNet = ResLayer(
             dim_in=c_z, dim_out=c_z, n_blocks=2, kernel_size=3, dropout=dropout
@@ -231,10 +228,9 @@ class EvoBlock(nn.Module):
         # Update pairwise state
         pairwise_state = pairwise_state + self.sequence_to_pair(sequence_state)
 
-        pairwise_state = self.resNet(
-            pairwise_state.permute(
-                0, 3, 1, 2)).permute(
-            0, 2, 3, 1)
+        pairwise_state = self.resNet(pairwise_state.permute(0, 3, 1, 2)).permute(
+            0, 2, 3, 1
+        )
 
         # # Axial attention
         # pairwise_state = pairwise_state + self.row_drop(
@@ -279,8 +275,7 @@ class EvoFold(nn.Module):
         # First 'recycle' is just the standard forward pass through the model.
         self.itters = no_recycles + 1
 
-        self.pairwise_positional_embedding = RelativePosition(
-            position_bins, c_z)
+        self.pairwise_positional_embedding = RelativePosition(position_bins, c_z)
 
         self.blocks = nn.ModuleList(
             [
@@ -468,10 +463,7 @@ class Attention(nn.Module):
           sequence projection (B x L x embed_dim), attention maps (B x L x L x num_heads)
         """
 
-        t = rearrange(
-            self.proj(x),
-            "... l (h c) -> ... h l c",
-            h=self.num_heads)
+        t = rearrange(self.proj(x), "... l (h c) -> ... h l c", h=self.num_heads)
         q, k, v = t.chunk(3, dim=-1)
 
         q = self.rescale_factor * q
