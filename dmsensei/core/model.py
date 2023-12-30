@@ -78,8 +78,12 @@ class Model(pl.LightningModule):
         mask = torch.zeros_like(true)
         mask[true!=UKN] = 1
         loss = F.mse_loss(pred*mask, true*mask)
+        
+        non_zeros = (mask==1).sum()/mask.numel()
+        if non_zeros != 0: loss /= non_zeros
+
         assert not torch.isnan(loss), "Loss is NaN for {}".format(data_type)
-        return loss
+        return 2*loss
 
     def _loss_structure(self, batch: Batch):
         pred, true = batch.get_pairs("structure")

@@ -84,7 +84,7 @@ class WandbFitLogger(LoadBestModel):
         # Log the train loss
         loss = outputs["loss"]
         logger = Logger(pl_module, self.batch_size)
-        logger.train_loss(loss.item())
+        # logger.train_loss(loss.item())
 
     def on_train_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
         pass
