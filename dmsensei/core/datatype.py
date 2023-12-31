@@ -64,6 +64,13 @@ class DataTypeDataset(DataType):
             del self.error[idx]
         if self.pred is not None:
             del self.pred[idx]
+            
+    def sort(self, idx_sorted):
+        self.true = [self.true[i] for i in idx_sorted]
+        if self.error is not None:
+            self.error = [self.error[i] for i in idx_sorted]
+        if self.pred is not None:
+            self.pred = [self.pred[i] for i in idx_sorted]
 
     @classmethod
     def from_data_json(cls, data_json: dict, L: int, refs: list):

@@ -20,13 +20,14 @@ class Dataset(TorchDataset):
         data_type: List[str],
         refs: np.ndarray,
         length: np.ndarray,
-        sequence: torch.Tensor,
+        sequence: np.ndarray,
         max_len: int,
         structure_padding_value: float,
         use_error: bool,
         dms: DMSDataset = None,
         shape: SHAPEDataset = None,
         structure: StructureDataset = None,
+        sort_by_length: bool = False,
     ) -> None:
         super().__init__()
         self.name = name
@@ -41,6 +42,9 @@ class Dataset(TorchDataset):
         self.structure_padding_value = structure_padding_value
         self.L = max(self.length)
         self._remove_long_sequences(max_len)
+        
+        if sort_by_length:
+            self.sort()
 
     def _remove_long_sequences(self, max_len):
         # remove long sequences
@@ -69,9 +73,9 @@ class Dataset(TorchDataset):
             use_error=self.use_error or other.use_error,
             max_len=None,
             structure_padding_value=self.structure_padding_value,
-            refs=np.concatenate([self.refs, other.refs]),
-            length=np.concatenate([self.length, other.length]),
-            sequence=self.sequence + other.sequence,
+            refs=np.concatenate([self.refs, other.refs]).tolist(),
+            length=np.concatenate([self.length, other.length]).tolist(),
+            sequence=np.concatenate([self.sequence, other.sequence]).tolist(),
             dms=self.dms + other.dms
             if self.dms is not None and other.dms is not None
             else None,
@@ -157,18 +161,6 @@ class Dataset(TorchDataset):
 
         print("Done!                            ")
 
-        if sort_by_length:
-            idx_sorted = np.argsort(length)
-            refs = refs[idx_sorted]
-            length = length[idx_sorted]
-            sequence = sequence[idx_sorted]
-            if dms is not None:
-                dms = dms[idx_sorted]
-            if shape is not None:
-                shape = shape[idx_sorted]
-            if structure is not None:
-                structure = structure[idx_sorted]
-
         return cls(
             name=name,
             data_type=data_type,
@@ -181,7 +173,20 @@ class Dataset(TorchDataset):
             structure=structure,
             max_len=max_len,
             structure_padding_value=structure_padding_value,
+            sort_by_length=sort_by_length,
         )
+
+    def sort(self):
+        idx_sorted = np.argsort(self.length)
+        self.refs = [self.refs[i] for i in idx_sorted]
+        self.length = [self.length[i] for i in idx_sorted]
+        self.sequence = [self.sequence[i] for i in idx_sorted]
+        if self.dms is not None:
+            self.dms.sort(idx_sorted)
+        if self.shape is not None:
+            self.shape.sort(idx_sorted)
+        if self.structure is not None:
+            self.structure.sort(idx_sorted)
 
     def __len__(self) -> int:
         return len(self.sequence)

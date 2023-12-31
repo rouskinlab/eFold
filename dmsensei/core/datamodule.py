@@ -1,25 +1,26 @@
-from torch.utils.data import DataLoader, random_split, Subset
+from torch.utils.data import random_split, Subset
 import lightning.pytorch as pl
 from typing import Union, List
 from .dataset import Dataset
 from ..config import TEST_SETS, UKN
-from .sampler import BySequenceLengthSampler
+from .sampler import sampler_factory
+from .dataloader import DataLoader
+import numpy as np
+import datetime
 
 
 class DataModule(pl.LightningDataModule):
     def __init__(
         self,
         name: Union[str, list],
+        batch_size: int,
         data_type: List[str] = ["dms", "shape", "structure"],
         force_download=False,
-        batch_size: int = 32,
         num_workers: int = 1,
-        train_split: float = 0,
-        valid_split: float = 0,
+        train_split: float = 1.,
         predict_split: float = 0,
-        overfit_mode=False,
-        shuffle_train=True,
-        shuffle_valid=False,
+        shuffle_train='random',
+        shuffle_valid='random',
         external_valid=None,
         use_error=False,
         max_len=500,
@@ -42,6 +43,7 @@ class DataModule(pl.LightningDataModule):
             zero_padding_to: pad sequences to this length. If None, sequences are not padded.
             overfit_mode: if True, the train set is used for validation and testing. Useful for debugging. Default is False.
             sampler: 'bucket' or 'random'. If 'bucket', the data is sampled by bucketing sequences of similar lengths. If 'random', the data is sampled randomly. Default is 'bucket'.
+            shuffle_train: 'random', 'sorted' or 'ddp'.
         """
         # Save arguments
         super().__init__(**kwargs)
@@ -57,7 +59,6 @@ class DataModule(pl.LightningDataModule):
         self.external_valid = external_valid
         self.splits = {
             "train": train_split,
-            "valid": valid_split,
             "predict": predict_split,
         }
         self.shuffle = {
@@ -75,12 +76,7 @@ class DataModule(pl.LightningDataModule):
         }
         self.buckets = buckets
 
-        # we need to know the max sequence length for padding
-        self.overfit_mode = overfit_mode
-
         # Log hyperparameters
-        if hasattr(self, "size_sets"):
-            train_split, valid_split, _ = self.size_sets
         self.save_hyperparameters(ignore=["force_download"])
 
     def _use_multiple_datasets(self, name):
@@ -107,6 +103,7 @@ class DataModule(pl.LightningDataModule):
                     Dataset.from_local_or_download(
                         name=name,
                         data_type=self.data_type,
+                        sort_by_length=self.shuffle["train"] == 'sorted',
                         **self.dataset_args,
                     )
                     for name in self.name
@@ -115,14 +112,18 @@ class DataModule(pl.LightningDataModule):
             self.collate_fn = self.all_datasets.collate_fn
 
         if stage == "fit":
-            self.size_sets = _compute_size_sets(
-                len(self.all_datasets),
-                train_split=self.splits["train"],
-                valid_split=self.splits["valid"],
-            )
-            self.train_set, self.val_set, _ = random_split(
-                self.all_datasets, self.size_sets
-            )
+            if self.splits["train"] == None or self.splits["train"] == 1.0:
+                self.train_set = self.all_datasets
+            else:
+                num_datapoints = round(len(self.all_datasets) * self.splits["train"]) \
+                                        if isinstance(self.splits["train"], float) \
+                                        else self.splits["train"]
+                assert num_datapoints > 0, "train_split must be greater than 0"
+                assert num_datapoints <= len(self.all_datasets), "train_split must be less than the number of datapoints"
+                self.train_set = Subset(
+                    self.all_datasets,
+                    range(0, num_datapoints),
+                )
             if self.external_valid is not None:
                 self.external_val_set = []
                 for name in self.external_valid:
@@ -160,34 +161,28 @@ class DataModule(pl.LightningDataModule):
             for name in datasets
         ]
 
-    def _get_sampler(self, dataset):
-        if self.buckets is not None:
-            return BySequenceLengthSampler(
-                dataset,
-                bucket_boundaries=self.buckets,
-                batch_size=self.batch_size,
-            )
-        else:
-            return None
-
     def train_dataloader(self):
+        if self.trainer is None:
+            raise ValueError(
+                "When using shuffle_train='ddp', the trainer must be passed to the datamodule"
+            )
         return DataLoader(
             self.train_set,
-            shuffle=self.shuffle["train"],
+            shuffle=self.shuffle["train"] == 'random', 
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
-            sampler=self._get_sampler(self.train_set),
+            to_device=self.shuffle["train"] != 'ddp' and self.shuffle['train'],
+            sampler=sampler_factory(
+                dataset=self.train_set,
+                shuffle=self.shuffle["train"],
+                num_replicas=self.trainer.num_devices,
+                seed=datetime.datetime.now().hour,
+                rank=self.trainer.local_rank,
+            )
         )
 
     def val_dataloader(self):
-        valid = DataLoader(
-            self.val_set if not self.overfit_mode else self.train_set,
-            shuffle=self.shuffle["valid"],
-            collate_fn=self.collate_fn,
-            batch_size=self.batch_size,
-        )
-
-        val_dls = [valid]
+        val_dls = []
         ###################################
         # Add validation set here if needed
         ###################################
@@ -196,12 +191,20 @@ class DataModule(pl.LightningDataModule):
                 val_dls.append(
                     DataLoader(
                         val_set,
-                        shuffle=self.shuffle["valid"],
+                        shuffle=self.shuffle["valid"] == 'random',
                         collate_fn=self.collate_fn,
                         batch_size=self.batch_size,
+                        to_device=self.shuffle["valid"] != 'ddp' and self.shuffle['valid'],
+                        sampler=sampler_factory(
+                            dataset=val_set,
+                            shuffle=self.shuffle["valid"],
+                            num_replicas=self.trainer.num_devices,
+                            seed=datetime.datetime.now().hour,
+                            rank=self.trainer.local_rank,
+                            )
                     )
                 )
-        return val_dls
+        return val_dls 
 
     def test_dataloader(self):
         return [
@@ -224,48 +227,5 @@ class DataModule(pl.LightningDataModule):
     def teardown(self, stage: str):
         # Used to clean-up when the run is finished
         pass
+            
 
-
-def _compute_size_sets(len_data, train_split, valid_split):
-    """Returns the size of the train and validation sets given the split percentages and the length of the dataset.
-
-    Args:
-        len_data: int
-        train_split: float between 0 and 1, or integer, or None. If None, the train split is computed as 1 - valid_split. Default is None.
-        valid_split: float between 0 and 1, or integer, or None. Default is 4000.
-
-    Returns:
-        train_set_size: int
-        valid_set_size: int
-        buffer_size: int
-
-    Raises:
-        AssertionError: if the split percentages do not sum to 1 or less, or if the train split is less than 0.
-
-    Examples:
-    >>> _compute_size_sets(100, 40, 0.2)
-    (40, 20, 40)
-    >>> _compute_size_sets(100, 40, 20)
-    (40, 20, 40)
-    >>> _compute_size_sets(100, None, 10)
-    (90, 10, 0)
-    >>> _compute_size_sets(100, 0.4, 0.2)
-    (40, 20, 40)
-    >>> _compute_size_sets(100, 0.4, 20)
-    (40, 20, 40)
-    """
-
-    if valid_split <= 1 and isinstance(valid_split, float):
-        valid_split = int(valid_split * len_data)
-
-    if train_split is None:
-        train_split = len_data - valid_split
-
-    elif train_split <= 1 and isinstance(train_split, float):
-        train_split = len_data - int((1 - train_split) * len_data)
-
-    assert (
-        train_split + valid_split <= len_data
-    ), "The sum of the splits must be less than the length of the dataset"
-
-    return train_split, valid_split, len_data - train_split - valid_split
