@@ -20,7 +20,7 @@ class DataModule(pl.LightningDataModule):
         train_split: float = 1.,
         predict_split: float = 0,
         shuffle_train='random',
-        shuffle_valid=False,
+        shuffle_valid='random',
         external_valid=None,
         use_error=False,
         max_len=500,

@@ -3,7 +3,6 @@ from torch import tensor
 import torch.nn.functional as F
 from .embeddings import base_pairs_to_pairing_matrix, sequence_to_int
 from ..config import device, POSSIBLE_METRICS, UKN
-from .metrics import metric_factory
 from typing import Dict
 from .datatype import data_type_factory
 from .util import split_data_type
@@ -213,30 +212,8 @@ class Batch:
     def __len__(self):
         return self.count("sequence")
 
-    def compute_metrics(self) -> Dict[str, Dict[str, float]]:
-        out = {}
-        for data_type in self.data_types:  # TODO
-            if (
-                # not self.count(data_type)
-                data_type
-                == "sequence"
-                # or not self.contains(f"pred_{data_type}")
-            ):
-                continue
-            out[data_type] = {}
-            pred, true = self.get_pairs(data_type)
-            for metric in POSSIBLE_METRICS[data_type]:
-                scores = []
-                for p, t in zip(pred, true):
-                    score = metric_factory[metric](pred=p, true=t)
-                    if score is not None:
-                        scores.append(score)
-                if len(scores):
-                    out[data_type][metric] = torch.nanmean(torch.tensor(scores)).item()
-                else:
-                    out[data_type][metric] = torch.nan  # TODO
 
-        return out
+    #     return out
 
     def __del__(self):
         del self

@@ -5,6 +5,8 @@ from ..config import device, UKN
 import torch.nn.functional as F
 from .batch import Batch
 from torchmetrics import R2Score, PearsonCorrCoef, MeanAbsoluteError, F1Score
+from .metrics import MetricsStack
+from .datamodule import DataModule
 
 METRIC_ARGS = dict(dist_sync_on_step=True)
 
@@ -25,27 +27,7 @@ class Model(pl.LightningModule):
         self.lossBCE = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([300])).to(device)
 
         # Metrics
-        self.shape_R2 = R2Score(**METRIC_ARGS)
-        self.shape_r2 = PearsonCorrCoef(**METRIC_ARGS)
-        self.shape_mae = MeanAbsoluteError(**METRIC_ARGS)
-        self.dms_R2 = R2Score(**METRIC_ARGS)
-        self.dms_r2 = PearsonCorrCoef(**METRIC_ARGS)
-        self.dms_mae = MeanAbsoluteError(**METRIC_ARGS)
-        self.structure_f1 = F1Score("binary", **METRIC_ARGS)
-        self.metrics_pack = dict(
-            shape=dict(R2=self.shape_R2, r2=self.shape_r2, mae=self.shape_mae),
-            dms=dict(R2=self.dms_R2, r2=self.dms_r2, mae=self.dms_mae),
-            structure=dict(f1=self.structure_f1),
-        )
-
-    def update_metrics(self, batch: Batch):
-        for dt, metrics in self.metrics_pack.items():
-            pred, true = batch.get_pairs(dt)
-            mask = true != UKN
-            if not len(mask):
-                continue
-            for metric in metrics.values():
-                metric.update(pred[mask], true[mask])
+        self.metrics_stack = None
 
     def configure_optimizers(self):
         optimizer = self.optimizer_fn(
@@ -106,27 +88,35 @@ class Model(pl.LightningModule):
         self.log(f"train/loss", loss, logger=True, sync_dist=True)
         return loss
 
+    def on_validation_start(self):
+        val_dl_names = self.trainer.datamodule.external_valid
+        self.metrics_stack = [
+            MetricsStack(name=name, data_type=self.data_type_output)
+            for name in val_dl_names
+        ]
+
     def validation_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
         predictions = self.forward(batch)
         batch.integrate_prediction(predictions)
         loss, losses = self.loss_fn(batch)
-        self.update_metrics(batch)
-        val_dataloader = (
-            self.trainer.datamodule.external_valid[dataloader_idx]
-            if dataloader_idx
-            else "train_subset"
-        )
-        for dt, metrics in self.metrics_pack.items():
-            for name, metric in metrics.items():
-                if metric.update_count:
+        self.metrics_stack[dataloader_idx].update(batch)
+        return loss, losses
+
+    def on_validation_epoch_end(self) -> None:
+        # aggregate the stack and log it
+        for metrics_dl in self.metrics_stack:
+            metrics_pack = metrics_dl.compute()
+            for dt, metrics in metrics_pack.items():
+                for name, metric in metrics.items():
+                    # to replace with a gather_all?
                     self.log(
-                        f"valid/{val_dataloader}/{dt}/{name}",
+                        f"valid/{metrics_dl.name}/{dt}/{name}",
                         metric,
                         logger=True,
-                        on_epoch=True,
                         add_dataloader_idx=False,
+                        sync_dist=True,
                     )
-        return loss, losses
+        self.metrics_stack = None
 
     def test_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
         predictions = self.forward(batch)

@@ -1,6 +1,9 @@
 import torch
-from ..config import UKN
+from ..config import UKN, POSSIBLE_METRICS
 import torch
+from .batch import Batch
+import numpy as np
+from typing import TypedDict
 
 
 # wrapper for metrics
@@ -8,7 +11,7 @@ def mask_and_flatten(func):
     def wrapped(pred, true):
         mask = true != UKN
         if torch.sum(mask) == 0:
-            return None
+            return np.nan
         pred = pred[mask]
         true = true[mask]
         return func(pred, true)
@@ -120,3 +123,35 @@ metric_factory = {
     "pearson": pearson_coefficient,
     "mae": mae_score,
 }
+
+
+class MetricsStack:
+    def __init__(self, name, data_type=["dms", "shape", "structure"]):
+        self.name = name
+        self.data_type = data_type
+        self.dms = dict(mae=[], pearson=[], r2=[])
+        self.shape = dict(mae=[], pearson=[], r2=[])
+        self.structure = dict(f1=[])
+
+    def update(self, batch: Batch):
+        for dt in self.data_type:
+            pred, true = batch.get_pairs(dt)
+            for metric in POSSIBLE_METRICS[dt]:
+                self._add_metric(dt, metric, metric_factory[metric](pred, true))
+
+    def compute(self) -> dict:
+        out = {}
+        for dt in self.data_type:
+            out[dt] = {}
+            for metric in POSSIBLE_METRICS[dt]:
+                out[dt][metric] = self._get_nanmean(dt, metric)
+        return out
+
+    def _get_nanmean(self, data_type, metric):
+        return np.nanmean(self._get_list(data_type, metric))
+
+    def _get_list(self, data_type, metric):
+        return getattr(self, data_type)[metric]
+
+    def _add_metric(self, data_type, metric, value):
+        self._get_list(data_type, metric).append(value)
