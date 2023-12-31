@@ -171,7 +171,7 @@ class DataModule(pl.LightningDataModule):
             shuffle=self.shuffle["train"] == 'random', 
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
-            to_device=self.shuffle["train"] != 'ddp',
+            to_device=self.shuffle["train"] != 'ddp' and self.shuffle['train'],
             sampler=sampler_factory(
                 dataset=self.train_set,
                 shuffle=self.shuffle["train"],
@@ -188,13 +188,20 @@ class DataModule(pl.LightningDataModule):
         ###################################
         if self.external_valid is not None:
             for val_set in self.external_val_set:
-                val_set.sort()
                 val_dls.append(
                     DataLoader(
                         val_set,
-                        shuffle=self.shuffle["valid"],
+                        shuffle=self.shuffle["valid"] == 'random',
                         collate_fn=self.collate_fn,
                         batch_size=self.batch_size,
+                        to_device=self.shuffle["valid"] != 'ddp' and self.shuffle['valid'],
+                        sampler=sampler_factory(
+                            dataset=val_set,
+                            shuffle=self.shuffle["valid"],
+                            num_replicas=self.trainer.num_devices,
+                            seed=datetime.datetime.now().hour,
+                            rank=self.trainer.local_rank,
+                            )
                     )
                 )
         return val_dls 

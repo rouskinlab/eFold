@@ -35,6 +35,7 @@ if __name__ == "__main__":
     dm = DataModule(
         name=["yack_valid"],
         shuffle_train='ddp',
+        shuffle_valid='ddp',
         data_type=["dms", "shape", "structure"],  #
         force_download=False,
         batch_size=1,
@@ -66,7 +67,7 @@ if __name__ == "__main__":
 
     trainer = Trainer(
         accelerator=device,
-        devices=2,
+        devices=8,
         strategy=DDPStrategy(),
         precision="16-mixed",
         max_epochs=1000,
