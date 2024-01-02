@@ -27,13 +27,12 @@ if __name__ == "__main__":
     USE_WANDB = 1
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        project = "Structure_prediction"
+        project = "Triple-head_tuning"
         wandb_logger = WandbLogger(project=project)
 
     # fit loop
-    batch_size = 1
     dm = DataModule(
-        name=["yack_valid"],
+        name=["yack_train"],
         shuffle_train='ddp',
         shuffle_valid='ddp',
         data_type=["dms", "shape", "structure"],  #
@@ -41,8 +40,8 @@ if __name__ == "__main__":
         batch_size=1,
         max_len=1024,
         structure_padding_value=0,
-        train_split=1024,
-        external_valid=["yack_valid", "test_valid"],
+        train_split=None,
+        external_valid=["yack_valid", "utr", "pri_miRNA", "human_mRNA"],
     )
 
     model = create_model(
@@ -54,7 +53,7 @@ if __name__ == "__main__":
         dropout=0,
         lr=1e-4,
         weight_decay=0,
-        # gamma=0.995,
+        gamma=0.995,
         wandb=USE_WANDB,
     )
 

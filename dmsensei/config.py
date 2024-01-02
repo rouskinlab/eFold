@@ -21,10 +21,10 @@ device = (
 )
 
 TEST_SETS = {
-    "structure": [],  # ["CT_files_pdbee"], #TODO #16 add structure test sets
+    "structure": ["PDB", "lncRNA", "viral_fragments"], 
     "sequence": [],
-    "dms": ["sarah_supermodel"],  # "utr", "SARS2", "pri-miRNA"],
-    "shape": [],  # 'ribonanza_LQ']
+    "dms": ["lncRNA", "viral_fragments"],  
+    "shape": [],  
 }
 
 
