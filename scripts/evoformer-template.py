@@ -10,7 +10,7 @@ import pandas as pd
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import LearningRateMonitor
-from dmsensei.core.callbacks import WandbFitLogger, KaggleLogger  # , WandbTestLogger
+from dmsensei.core.callbacks import ModelCheckpoint  # , WandbTestLogger
 from dmsensei.config import device
 from dmsensei import DataModule, create_model
 import sys
@@ -72,11 +72,7 @@ if __name__ == "__main__":
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
             LearningRateMonitor(logging_interval="epoch"),
-            # PredictionLogger(data="dms"),
-            # ModelChecker(log_every_nstep=10000, model=model),
-            WandbFitLogger(dm=dm, load_model=None),
-            # 'best', None or path to model
-            # WandbTestLogger(dm=dm, n_best_worst=10, load_model="best"),
+            ModelCheckpoint(every_n_epoch=1),
         ]
         if USE_WANDB
         else [],
