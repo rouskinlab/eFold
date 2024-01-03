@@ -154,5 +154,3 @@ class Model(pl.LightningModule):
         predictions = self._clean_predictions(batch, predictions)
         batch.integrate_prediction(predictions)
 
-    def teardown(self, batch: Batch):
-        del batch
