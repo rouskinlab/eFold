@@ -32,7 +32,7 @@ if __name__ == "__main__":
 
     # fit loop
     dm = DataModule(
-        name=["yack_train"],
+        name=["yack_train"], # finetune: "utr", "pri_miRNA", "archiveII"
         shuffle_train='ddp',
         shuffle_valid='ddp',
         data_type=["dms", "shape", "structure"],  #
@@ -41,7 +41,7 @@ if __name__ == "__main__":
         max_len=1024,
         structure_padding_value=0,
         train_split=None,
-        external_valid=["yack_valid", "utr", "pri_miRNA", "human_mRNA"],
+        external_valid=["yack_valid", "utr", "pri_miRNA", "human_mRNA"], # finetune: "yack_valid", "human_mRNA"
     )
 
     model = create_model(
@@ -82,7 +82,8 @@ if __name__ == "__main__":
         enable_checkpointing=False,
     )
 
-    trainer.fit(model, datamodule=dm)
+    # trainer.fit(model, datamodule=dm)
+    trainer.test(model, datamodule=dm)
 
     if USE_WANDB:
         wandb.finish()
