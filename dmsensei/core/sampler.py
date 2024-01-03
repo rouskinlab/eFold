@@ -155,15 +155,15 @@ class DDPSampler(Sampler):
 
 def sampler_factory(
     dataset: Union[Dataset, Subset],
-    shuffle: str,
+    strategy: str,
     seed:int = os.environ.get('PL_GLOBAL_SEED', 0),
     num_replicas: Optional[int] = None,
     rank: Optional[int] = None,
 ):
-    if shuffle in ['random', 'sorted']:
+    if strategy in ['random', 'sorted']:
         return None
-    elif shuffle == 'ddp':
+    elif strategy == 'ddp':
         return DDPSampler(dataset, num_replicas=num_replicas, rank=rank, shuffle=True, seed=seed)
     else:
-        raise ValueError(f"Invalid shuffle value: {shuffle}")
+        raise ValueError(f"Invalid strategy value: {shuffle}")
   

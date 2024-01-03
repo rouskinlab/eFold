@@ -33,8 +33,8 @@ if __name__ == "__main__":
     # fit loop
     dm = DataModule(
         name=["yack_train"], # finetune: "utr", "pri_miRNA", "archiveII"
-        shuffle_train='ddp',
-        shuffle_valid='ddp',
+        strategy='random', #random, sorted or ddp
+        shuffle_train=False,
         data_type=["dms", "shape", "structure"],  #
         force_download=False,
         batch_size=1,
@@ -72,7 +72,6 @@ if __name__ == "__main__":
         max_epochs=1000,
         log_every_n_steps=1,
         accumulate_grad_batches=32,
-        use_distributed_sampler=False,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
             ModelCheckpoint(every_n_epoch=1),
@@ -83,7 +82,7 @@ if __name__ == "__main__":
         enable_checkpointing=False,
     )
 
-    # trainer.fit(model, datamodule=dm)
+    trainer.fit(model, datamodule=dm)
     trainer.test(model, datamodule=dm)
 
     if USE_WANDB:

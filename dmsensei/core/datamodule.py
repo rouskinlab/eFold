@@ -19,8 +19,9 @@ class DataModule(pl.LightningDataModule):
         num_workers: int = 1,
         train_split: float = 1.,
         predict_split: float = 0,
-        shuffle_train='random',
-        shuffle_valid='random',
+        strategy = 'random',
+        shuffle_train=True,
+        shuffle_valid=False,
         external_valid=None,
         use_error=False,
         max_len=500,
@@ -43,7 +44,7 @@ class DataModule(pl.LightningDataModule):
             zero_padding_to: pad sequences to this length. If None, sequences are not padded.
             overfit_mode: if True, the train set is used for validation and testing. Useful for debugging. Default is False.
             sampler: 'bucket' or 'random'. If 'bucket', the data is sampled by bucketing sequences of similar lengths. If 'random', the data is sampled randomly. Default is 'bucket'.
-            shuffle_train: 'random', 'sorted' or 'ddp'.
+            strategy: 'random', 'ddp' or 'sorted'
         """
         # Save arguments
         super().__init__(**kwargs)
@@ -54,6 +55,7 @@ class DataModule(pl.LightningDataModule):
             self.name = name
 
         self.batch_size = batch_size
+        self.strategy = strategy
         self.num_workers = num_workers
         self.data_type = data_type
         self.external_valid = external_valid
@@ -61,6 +63,8 @@ class DataModule(pl.LightningDataModule):
             "train": train_split,
             "predict": predict_split,
         }
+        if strategy in ['ddp', 'sorted']:
+            assert shuffle_valid == shuffle_train == False, "You can't shuffle in ddp or sorted mode. Set shuffle_train and shuffle_valid to 0 or use strategy='random'."
         self.shuffle = {
             "train": shuffle_train,
             "valid": shuffle_valid,
@@ -103,7 +107,7 @@ class DataModule(pl.LightningDataModule):
                     Dataset.from_local_or_download(
                         name=name,
                         data_type=self.data_type,
-                        sort_by_length=self.shuffle["train"] == 'sorted',
+                        sort_by_length=self.strategy == 'sorted',
                         **self.dataset_args,
                     )
                     for name in self.name
@@ -164,17 +168,17 @@ class DataModule(pl.LightningDataModule):
     def train_dataloader(self):
         if self.trainer is None:
             raise ValueError(
-                "When using shuffle_train='ddp', the trainer must be passed to the datamodule"
+                "When using strategy='ddp', the trainer must be passed to the datamodule"
             )
         return DataLoader(
             self.train_set,
-            shuffle=self.shuffle["train"] == 'random', 
+            shuffle=self.shuffle["train"], 
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
-            to_device=self.shuffle["train"] != 'ddp' and self.shuffle['train'],
+            to_device=self.strategy != 'ddp',
             sampler=sampler_factory(
                 dataset=self.train_set,
-                shuffle=self.shuffle["train"],
+                strategy=self.strategy,
                 num_replicas=self.trainer.num_devices,
                 seed=datetime.datetime.now().hour,
                 rank=self.trainer.local_rank,
@@ -191,13 +195,13 @@ class DataModule(pl.LightningDataModule):
                 val_dls.append(
                     DataLoader(
                         val_set,
-                        shuffle=self.shuffle["valid"] == 'random',
+                        shuffle=self.shuffle['valid'],
                         collate_fn=self.collate_fn,
                         batch_size=self.batch_size,
-                        to_device=self.shuffle["valid"] != 'ddp' and self.shuffle['valid'],
+                        to_device=self.strategy != 'ddp',
                         sampler=sampler_factory(
                             dataset=val_set,
-                            shuffle=self.shuffle["valid"],
+                            strategy=self.strategy,
                             num_replicas=self.trainer.num_devices,
                             seed=datetime.datetime.now().hour,
                             rank=self.trainer.local_rank,
