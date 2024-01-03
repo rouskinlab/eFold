@@ -3,7 +3,7 @@ import sys
 
 sys.path.append(os.path.abspath("."))
 
-from dmsensei.core.callbacks import WandbFitLogger, KaggleLogger  # , WandbTestLogger
+from dmsensei.core.callbacks import ModelCheckpoint
 from lightning.pytorch.strategies import DDPStrategy
 import wandb
 from lightning.pytorch.loggers import WandbLogger
@@ -33,8 +33,8 @@ if __name__ == "__main__":
     # fit loop
     dm = DataModule(
         name=["yack_train"],
-        shuffle_train='ddp',
-        shuffle_valid='ddp',
+        shuffle_train="ddp",
+        shuffle_valid="ddp",
         data_type=["dms", "shape", "structure"],  #
         force_download=False,
         batch_size=1,
@@ -75,8 +75,8 @@ if __name__ == "__main__":
         use_distributed_sampler=False,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
-            LearningRateMonitor(logging_interval="epoch"),
-   ]
+            ModelCheckpoint(every_n_epoch=1),
+        ]
         if USE_WANDB
         else [],
         enable_checkpointing=False,
