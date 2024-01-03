@@ -168,7 +168,7 @@ class DataModule(pl.LightningDataModule):
             )
         return DataLoader(
             self.train_set,
-            shuffle=True,
+            shuffle=self.shuffle["train"] == 'random', 
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
             to_device=self.shuffle["train"] != 'ddp' and self.shuffle['train'],
@@ -191,7 +191,7 @@ class DataModule(pl.LightningDataModule):
                 val_dls.append(
                     DataLoader(
                         val_set,
-                        shuffle=True,
+                        shuffle=self.shuffle["valid"] == 'random',
                         collate_fn=self.collate_fn,
                         batch_size=self.batch_size,
                         to_device=self.shuffle["valid"] != 'ddp' and self.shuffle['valid'],
