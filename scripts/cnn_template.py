@@ -25,6 +25,7 @@ sys.path.append(os.path.abspath("."))
 # Train loop
 if __name__ == "__main__":
     USE_WANDB = 1
+    STRATEGY = "ddp"
     print("Running on device: {}".format(device))
     if USE_WANDB:
         project = "Triple-head_tuning"
@@ -33,7 +34,7 @@ if __name__ == "__main__":
     # fit loop
     dm = DataModule(
         name=["yack_train"], # finetune: "utr", "pri_miRNA", "archiveII"
-        strategy='random', #random, sorted or ddp
+        strategy=STRATEGY, #random, sorted or ddp
         shuffle_train=False,
         data_type=["dms", "shape", "structure"],  #
         force_download=False,
@@ -80,6 +81,7 @@ if __name__ == "__main__":
         if USE_WANDB
         else [],
         enable_checkpointing=False,
+        use_distributed_sampler=STRATEGY == "ddp",
     )
 
     trainer.fit(model, datamodule=dm)
