@@ -81,7 +81,7 @@ if __name__ == "__main__":
         if USE_WANDB
         else [],
         enable_checkpointing=False,
-        use_distributed_sampler=STRATEGY == "ddp",
+        use_distributed_sampler=STRATEGY != "ddp",
     )
 
     trainer.fit(model, datamodule=dm)

@@ -22,6 +22,8 @@ sys.path.append(os.path.abspath("."))
 # Train loop
 if __name__ == "__main__":
     USE_WANDB = 1
+    STRATEGY = "ddp"
+
     print("Running on device: {}".format(device))
     if USE_WANDB:
         project = "Evoformer-final-tests"
@@ -31,8 +33,8 @@ if __name__ == "__main__":
     batch_size = 1
     dm = DataModule(
         name=["yack_train"],
-        shuffle_train='ddp',
-        shuffle_valid='ddp',
+        strategy=STRATEGY,
+        shuffle_train=False,
         data_type=["dms", "shape", "structure"],  #
         force_download=False,
         batch_size=1,
@@ -44,8 +46,6 @@ if __name__ == "__main__":
 
     model = create_model(
         model="evoformer",
-        data="multi",
-        quality=False,
         ntoken=5,
         d_model=64,
         c_z=32,
@@ -70,7 +70,7 @@ if __name__ == "__main__":
         max_epochs=1000,
         log_every_n_steps=1,
         accumulate_grad_batches=32,
-        use_distributed_sampler=False,
+        use_distributed_sampler=STRATEGY != "ddp",
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
             LearningRateMonitor(logging_interval="epoch"),
