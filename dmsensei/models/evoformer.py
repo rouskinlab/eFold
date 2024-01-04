@@ -142,10 +142,10 @@ class EvoBlock(nn.Module):
 
         #self.seq_attention = Attention(c_s, no_heads_s, c_s / no_heads_s, gated=True)
 
-        print('---------')
-        print(no_heads_s)
-        print(int(c_s/no_heads_s))
-        print('---------')
+        # print('---------')
+        # print(no_heads_s)
+        # print(int(c_s/no_heads_s))
+        # print('---------')
         self.seq_attention = RelPositionMultiHeadAttention(num_heads = no_heads_s, head_size = int(c_s/no_heads_s), output_size = c_s)
         self.pos = PositionalEncoding(self.c_s, dropout)
         self.ln = nn.LayerNorm(self.c_s, eps=1e-12, elementwise_affine=True)
@@ -189,8 +189,8 @@ class EvoBlock(nn.Module):
         self.FF2 = FFMod(c_s, dropout=dropout)
         self.convMod = ConvModule(input_dim=c_s, dropout=dropout)
 
-        self.ln_1 = nn.LayerNorm(c_s)
-        self.ln_2 = nn.LayerNorm(c_s)
+        # self.ln_1 = nn.LayerNorm(c_s)
+        # self.ln_2 = nn.LayerNorm(c_s)
         self.ln_3 = nn.LayerNorm(c_s)
         self.ln_4 = nn.LayerNorm(c_s)
 
@@ -252,7 +252,7 @@ class EvoBlock(nn.Module):
         sequence_state_ff = self.FF1(sequence_state)
         sequence_state = sequence_state + sequence_state_ff
         
-        sequence_stae = self.ln_2(sequence_state)
+        # sequence_stae = self.ln_2(sequence_state)
         sequence_state_con = self.convMod(sequence_state)
         sequence_state = sequence_state + sequence_state_con
 

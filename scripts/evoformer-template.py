@@ -65,7 +65,7 @@ if __name__ == "__main__":
     trainer = Trainer(
         accelerator=device,
         devices=8,
-        strategy=DDPStrategy(find_unused_parameters=True),
+        strategy=DDPStrategy(),
         precision="16-mixed",
         max_epochs=1000,
         log_every_n_steps=1,
@@ -82,6 +82,7 @@ if __name__ == "__main__":
     )
 
     trainer.fit(model, datamodule=dm)
+    # trainer.test(model, datamodule=dm)
 
     if USE_WANDB:
         wandb.finish()
