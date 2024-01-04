@@ -125,13 +125,29 @@ metric_factory = {
 }
 
 
+class RunningMean:
+    def __init__(self):
+        self.val = np.nan
+        self.count = 0
+
+    def update(self, value):
+        assert isinstance(value, (int, float)), "Value must be a number"
+        if np.isnan(value) or np.isinf(value) or value is None:
+            return
+        self.val = (self.val * self.count + value) / (self.count + 1)
+        self.count += 1
+
+    def read(self):
+        return self.val
+
+
 class MetricsStack:
     def __init__(self, name, data_type=["dms", "shape", "structure"]):
         self.name = name
         self.data_type = data_type
-        self.dms = dict(mae=[], pearson=[], r2=[])
-        self.shape = dict(mae=[], pearson=[], r2=[])
-        self.structure = dict(f1=[])
+        self.dms = dict(mae=RunningMean(), pearson=RunningMean(), r2=RunningMean())
+        self.shape = dict(mae=RunningMean(), pearson=RunningMean(), r2=RunningMean())
+        self.structure = dict(f1=RunningMean())
 
     def update(self, batch: Batch):
         for dt in self.data_type:
@@ -144,14 +160,11 @@ class MetricsStack:
         for dt in self.data_type:
             out[dt] = {}
             for metric in POSSIBLE_METRICS[dt]:
-                out[dt][metric] = self._get_nanmean(dt, metric)
+                out[dt][metric] = self._read_metric(dt, metric)
         return out
 
-    def _get_nanmean(self, data_type, metric):
-        return np.nanmean(self._get_list(data_type, metric))
-
-    def _get_list(self, data_type, metric):
-        return getattr(self, data_type)[metric]
+    def _read_metric(self, data_type, metric):
+        return getattr(self, data_type)[metric].read()
 
     def _add_metric(self, data_type, metric, value):
-        self._get_list(data_type, metric).append(value)
+        getattr(self, data_type)[metric].update(value)
