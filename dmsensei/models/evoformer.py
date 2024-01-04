@@ -39,6 +39,7 @@ class Evoformer(Model):
         )
 
         self.model_type = "Evoformer"
+        self.data_type_output = ["dms", "shape", "structure"]
         self.lr = lr
         self.gamma = gamma
         self.train_losses = []
@@ -139,13 +140,13 @@ class EvoBlock(nn.Module):
         # bias attention heads
         self.pair_to_sequence = PairToSequence(c_z, no_heads_s)
 
-        self.seq_attention = Attention(c_s, no_heads_s, c_s / no_heads_s, gated=True)
+        #self.seq_attention = Attention(c_s, no_heads_s, c_s / no_heads_s, gated=True)
 
         print('---------')
         print(no_heads_s)
         print(int(c_s/no_heads_s))
         print('---------')
-        #self.seq_attention = RelPositionMultiHeadAttention(num_heads = no_heads_s, head_size = int(c_s/no_heads_s), output_size = c_s)
+        self.seq_attention = RelPositionMultiHeadAttention(num_heads = no_heads_s, head_size = int(c_s/no_heads_s), output_size = c_s)
         self.pos = PositionalEncoding(self.c_s, dropout)
         self.ln = nn.LayerNorm(self.c_s, eps=1e-12, elementwise_affine=True)
 
@@ -243,11 +244,11 @@ class EvoBlock(nn.Module):
         y = self.layernorm(sequence_state)
         pe = self.pos(y)
         y = self.ln(y)
-        y, _ = self.seq_attention(y,bias=bias)
-        #y, _ = self.seq_attention([y,y,y,pe], bias=bias)
+        #y, _ = self.seq_attention(y,bias=bias)
+        y, _ = self.seq_attention([y,y,y,pe], bias=bias)
         sequence_state = sequence_state + self.drop(y)
         # FF + Local conv + FF
-        '''
+        
         sequence_state_ff = self.FF1(sequence_state)
         sequence_state = sequence_state + sequence_state_ff
         
@@ -260,7 +261,7 @@ class EvoBlock(nn.Module):
         sequence_state = sequence_state + sequence_state_ff
 
         sequence_state = self.ln_4(sequence_state)
-        '''
+        
         sequence_state = self.mlp_seq(sequence_state)
 
         # Update pairwise state

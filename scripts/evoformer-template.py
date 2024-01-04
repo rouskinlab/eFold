@@ -24,22 +24,22 @@ if __name__ == "__main__":
     USE_WANDB = 1
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        project = "Evoformer-structure"
+        project = "Evoformer-final-tests"
         wandb_logger = WandbLogger(project=project)
 
     # fit loop
-    batch_size = 8
+    batch_size = 1
     dm = DataModule(
-        name=["ribo-kaggleGU"],
-        data_type=["dms", "shape", "structure"],
+        name=["yack_train"],
+        shuffle_train='ddp',
+        shuffle_valid='ddp',
+        data_type=["dms", "shape", "structure"],  #
         force_download=False,
-        batch_size=batch_size,
-        num_workers=1,
-        train_split=40960,  # 298281,  # all but valid_split
-        valid_split=4096,
-        predict_split=0,
-        overfit_mode=True,
-        shuffle_valid=False,
+        batch_size=1,
+        max_len=1024,
+        structure_padding_value=0,
+        train_split=None,
+        external_valid=["yack_valid", "utr", "pri_miRNA", "human_mRNA"],
     )
 
     model = create_model(
@@ -65,51 +65,22 @@ if __name__ == "__main__":
     trainer = Trainer(
         accelerator=device,
         devices=8,
-        strategy=DDPStrategy(find_unused_parameters=False),
+        strategy=DDPStrategy(find_unused_parameters=True),
+        precision="16-mixed",
         max_epochs=1000,
         log_every_n_steps=1,
-        accumulate_grad_batches=4,
+        accumulate_grad_batches=32,
+        use_distributed_sampler=False,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
             LearningRateMonitor(logging_interval="epoch"),
-            # PredictionLogger(data="dms"),
-            # ModelChecker(log_every_nstep=10000, model=model),
-            WandbFitLogger(dm=dm, load_model=None),
-            # 'best', None or path to model
-            # WandbTestLogger(dm=dm, n_best_worst=10, load_model="best"),
-        ]
+   ]
         if USE_WANDB
         else [],
         enable_checkpointing=False,
     )
 
     trainer.fit(model, datamodule=dm)
-    # trainer.test(model, datamodule=dm)
-
-    # # Predict loop
-    # dm = DataModule(
-    #     name=["ribo-test"],
-    #     data_type=["dms", "shape"],
-    #     force_download=False,
-    #     batch_size=128,
-    #     num_workers=0,
-    #     train_split=0,
-    #     valid_split=0,
-    #     predict_split=1.0,
-    #     overfit_mode=False,
-    #     shuffle_valid=False,
-    # )
-
-    # trainer = Trainer(
-    #     accelerator=device,
-    #     callbacks=[
-    #         KaggleLogger(
-    #             push_to_kaggle=True, load_model="best"  # 'best', None or path to model
-    #         )
-    #     ],
-    # )
-
-    # trainer.predict(model, datamodule=dm)
 
     if USE_WANDB:
         wandb.finish()
