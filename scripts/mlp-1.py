@@ -4,10 +4,9 @@ from lightning.pytorch.loggers import WandbLogger
 import os
 import sys
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
-from dmsensei.core.callbacks import PredictionLogger
+from dmsensei.core.callbacks import ModelCheckpoint
 import pandas as pd
 from lightning.pytorch import Trainer
-from dmsensei.core.callbacks import PredictionLogger, ModelChecker
 from dmsensei.config import device
 from dmsensei import DataModule, create_model, metrics
 
@@ -74,9 +73,8 @@ if __name__ == "__main__":
         log_every_n_steps=1,
         logger=wandb_logger,
         accelerator=device,
-        callbacks=[  # EarlyStopping(monitor="valid/loss", mode='min', patience=5),
-            PredictionLogger(data="dms"),
-            ModelChecker(model=model, log_every_nstep=1000),
+        callbacks=[
+            ModelCheckpoint(every_n_epoch=1),
         ],
         enable_checkpointing=False,
     )

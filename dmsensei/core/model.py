@@ -10,6 +10,18 @@ from .datamodule import DataModule
 
 METRIC_ARGS = dict(dist_sync_on_step=True)
 
+def loss_pearson(pred, target, eps=1e-10):
+            pearson =  ((pred-pred.mean())*(target-target.mean())).mean() /(pred.std()*target.std() +eps) 
+            return 1-pearson**2
+
+def corrcoef(target, pred):
+    # np.corrcoef in torch from @mdo
+    # https://forum.numer.ai/t/custom-loss-functions-for-xgboost-using-pytorch/960
+    pred_n = pred - pred.mean()
+    target_n = target - target.mean()
+    pred_n = pred_n / pred_n.norm()
+    target_n = target_n / target_n.norm()
+    return 1- ((pred_n * target_n).sum())**2
 
 class Model(pl.LightningModule):
     def __init__(self, lr: float, optimizer_fn, weight_data: bool = False, **kwargs):
@@ -48,15 +60,25 @@ class Model(pl.LightningModule):
             "shape",
         ], "This function only works for dms and shape data"
         pred, true = batch.get_pairs(data_type)
+        ## vv Pearson loss vv ##
+        # if (true==UKN).sum() == true.numel():
+        #     loss = F.mse_loss(0*true, 0*pred)
+        # else:
+        #     mask = true != UKN
+        #     loss = corrcoef(pred[mask], true[mask])
+        ## ^^ Pearson loss ^^ ##
+
+        ## vv MSE loss vv ##
         mask = torch.zeros_like(true)
         mask[true!=UKN] = 1
         loss = F.mse_loss(pred*mask, true*mask)
         
         non_zeros = (mask==1).sum()/mask.numel()
         if non_zeros != 0: loss /= non_zeros
-
+        ## ^^ MSE loss ^^ ##
+        
         assert not torch.isnan(loss), "Loss is NaN for {}".format(data_type)
-        return 2*loss
+        return loss
 
     def _loss_structure(self, batch: Batch):
         pred, true = batch.get_pairs("structure")
@@ -132,5 +154,3 @@ class Model(pl.LightningModule):
         predictions = self._clean_predictions(batch, predictions)
         batch.integrate_prediction(predictions)
 
-    def teardown(self, batch: Batch):
-        del batch
