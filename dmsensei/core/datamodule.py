@@ -16,10 +16,10 @@ class DataModule(pl.LightningDataModule):
         batch_size: int,
         data_type: List[str] = ["dms", "shape", "structure"],
         force_download=False,
-        num_workers: int = 1,
-        train_split: float = 1.,
+        num_workers: int = 0,
+        train_split: float = 1.0,
         predict_split: float = 0,
-        strategy = 'random',
+        strategy="random",
         shuffle_train=True,
         shuffle_valid=False,
         external_valid=None,
@@ -63,8 +63,10 @@ class DataModule(pl.LightningDataModule):
             "train": train_split,
             "predict": predict_split,
         }
-        if strategy in ['ddp', 'sorted']:
-            assert shuffle_valid == shuffle_train == False, "You can't shuffle in ddp or sorted mode. Set shuffle_train and shuffle_valid to 0 or use strategy='random'."
+        if strategy in ["ddp", "sorted"]:
+            assert (
+                shuffle_valid == shuffle_train == False
+            ), "You can't shuffle in ddp or sorted mode. Set shuffle_train and shuffle_valid to 0 or use strategy='random'."
         self.shuffle = {
             "train": shuffle_train,
             "valid": shuffle_valid,
@@ -107,7 +109,7 @@ class DataModule(pl.LightningDataModule):
                     Dataset.from_local_or_download(
                         name=name,
                         data_type=self.data_type,
-                        sort_by_length=self.strategy == 'sorted',
+                        sort_by_length=self.strategy == "sorted",
                         **self.dataset_args,
                     )
                     for name in self.name
@@ -119,11 +121,15 @@ class DataModule(pl.LightningDataModule):
             if self.splits["train"] == None or self.splits["train"] == 1.0:
                 self.train_set = self.all_datasets
             else:
-                num_datapoints = round(len(self.all_datasets) * self.splits["train"]) \
-                                        if isinstance(self.splits["train"], float) \
-                                        else self.splits["train"]
+                num_datapoints = (
+                    round(len(self.all_datasets) * self.splits["train"])
+                    if isinstance(self.splits["train"], float)
+                    else self.splits["train"]
+                )
                 assert num_datapoints > 0, "train_split must be greater than 0"
-                assert num_datapoints <= len(self.all_datasets), "train_split must be less than the number of datapoints"
+                assert num_datapoints <= len(
+                    self.all_datasets
+                ), "train_split must be less than the number of datapoints"
                 self.train_set = Subset(
                     self.all_datasets,
                     range(0, num_datapoints),
@@ -172,17 +178,18 @@ class DataModule(pl.LightningDataModule):
             )
         return DataLoader(
             self.train_set,
-            shuffle=self.shuffle["train"], 
+            shuffle=self.shuffle["train"],
+            num_workers=self.num_workers,
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
-            to_device=self.strategy != 'ddp',
+            to_device=self.strategy != "ddp",
             sampler=sampler_factory(
                 dataset=self.train_set,
                 strategy=self.strategy,
                 num_replicas=self.trainer.num_devices,
                 seed=datetime.datetime.now().hour,
                 rank=self.trainer.local_rank,
-            )
+            ),
         )
 
     def val_dataloader(self):
@@ -195,25 +202,26 @@ class DataModule(pl.LightningDataModule):
                 val_dls.append(
                     DataLoader(
                         val_set,
-                        shuffle=self.shuffle['valid'],
+                        shuffle=self.shuffle["valid"],
                         collate_fn=self.collate_fn,
                         batch_size=self.batch_size,
-                        to_device=self.strategy != 'ddp',
+                        to_device=self.strategy != "ddp",
                         sampler=sampler_factory(
                             dataset=val_set,
                             strategy=self.strategy,
                             num_replicas=self.trainer.num_devices,
                             seed=datetime.datetime.now().hour,
                             rank=self.trainer.local_rank,
-                            )
+                        ),
                     )
                 )
-        return val_dls 
+        return val_dls
 
     def test_dataloader(self):
         return [
             DataLoader(
                 test_set,
+                num_workers=self.num_workers,
                 collate_fn=test_set.collate_fn,
                 batch_size=self.batch_size,
             )
@@ -223,6 +231,7 @@ class DataModule(pl.LightningDataModule):
     def predict_dataloader(self):
         return DataLoader(
             self.predict_set,
+            num_workers=self.num_workers,
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
             shuffle=False,
@@ -231,5 +240,3 @@ class DataModule(pl.LightningDataModule):
     def teardown(self, stage: str):
         # Used to clean-up when the run is finished
         pass
-            
-
