@@ -1,4 +1,6 @@
+from typing import Any
 import lightning.pytorch as pl
+from lightning.pytorch.utilities.types import STEP_OUTPUT
 import torch.nn as nn
 import torch
 from ..config import device, UKN
@@ -7,6 +9,7 @@ from .batch import Batch
 from torchmetrics import R2Score, PearsonCorrCoef, MeanAbsoluteError, F1Score
 from .metrics import MetricsStack
 from .datamodule import DataModule
+import time
 
 METRIC_ARGS = dict(dist_sync_on_step=True)
 
@@ -40,6 +43,7 @@ class Model(pl.LightningModule):
 
         # Metrics
         self.metrics_stack = None
+        self.tic = None
 
     def configure_optimizers(self):
         optimizer = self.optimizer_fn(
@@ -87,7 +91,7 @@ class Model(pl.LightningModule):
         return loss
 
     def loss_fn(self, batch: Batch):
-        count = {k: v for k, v in batch.dt_count.items() if k in self.data_type_output}
+        count = {k: v for k, v in batch.dt_count.items() if k in self.data_type_output and k == 'structure'} #TODO
         losses = {}
         if "dms" in count.keys():
             losses["dms"] = self._loss_signal(batch, "dms")
@@ -97,7 +101,11 @@ class Model(pl.LightningModule):
             losses["structure"] = self._loss_structure(batch)
         assert len(losses) > 0, "No data types to train on"
         assert len(count) == len(losses), "Not all data types have a loss function"
-        loss = sum([losses[k] for k in count.keys()])
+        loss = 0
+        for data_type, loss_value in losses.items():
+            loss += loss_value * count[data_type]
+        loss /= sum(count.values())
+        
         assert not torch.isnan(loss), "Loss is NaN"
         return loss, losses
 
@@ -111,7 +119,13 @@ class Model(pl.LightningModule):
         predictions = self.forward(batch)
         batch.integrate_prediction(predictions)
         loss = self.loss_fn(batch)[0]
-        self.log(f"train/loss", loss, logger=True, sync_dist=True)
+        self.log(f"train/loss", loss, sync_dist=True)
+        if self.tic is None:
+            self.tic = time.time()
+        else: 
+            toc = time.time() 
+            self.log(f"train/time_per_batch_ms", 1000*(toc-self.tic), sync_dist=True)
+            self.tic = toc
         return loss
 
     def on_validation_start(self):
@@ -120,6 +134,12 @@ class Model(pl.LightningModule):
             MetricsStack(name=name, data_type=self.data_type_output)
             for name in val_dl_names
         ]
+
+    def on_train_batch_end(self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int) -> None:
+        del outputs
+        del batch
+        if batch_idx % 100 == 0:
+            torch.cuda.empty_cache()
 
     def validation_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
         predictions = self.forward(batch)
@@ -138,7 +158,6 @@ class Model(pl.LightningModule):
                     self.log(
                         f"valid/{metrics_dl.name}/{dt}/{name}",
                         metric,
-                        logger=True,
                         add_dataloader_idx=False,
                         sync_dist=True,
                     )

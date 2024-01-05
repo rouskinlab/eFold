@@ -122,9 +122,7 @@ class Batch:
                 else:
                     error = [None] * batch_size
 
-                data[dt] = data_type_factory["batch"][dt](true=true, error=error).to(
-                    device
-                )
+                data[dt] = data_type_factory["batch"][dt](true=true, error=error)
 
         return cls(
             reference=reference,
@@ -216,6 +214,16 @@ class Batch:
     #     return out
 
     def __del__(self):
+        del self.dms
+        del self.shape
+        del self.structure
+        del self.reference
+        del self.sequence
+        del self.length
+        del self.L
+        del self.batch_size
+        del self.data_types
+        del self.dt_count
         del self
     
     @property
