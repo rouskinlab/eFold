@@ -61,6 +61,20 @@ class Evoformer(Model):
             no_recycles=no_recycles,
         )
 
+        # self.output_net_DMS = nn.Sequential(
+        #     nn.LayerNorm(d_model),
+        #     nn.Linear(d_model, d_model),
+        #     nn.ReLU(),
+        #     nn.Linear(d_model, 1),
+        # )
+
+        # self.output_net_SHAPE = nn.Sequential(
+        #     nn.LayerNorm(d_model),
+        #     nn.Linear(d_model, d_model),
+        #     nn.ReLU(),
+        #     nn.Linear(d_model, 1),
+        # )
+
         self.structure_adapter = nn.Linear(c_z, d_cnn)
         self.output_structure = nn.Sequential(
             ResLayer(
@@ -93,7 +107,10 @@ class Evoformer(Model):
         )  # (N, L, L)
 
         return {
-            "structure": (structure + structure.permute(0, 2, 1)) / 2,
+            # "dms": self.output_net_DMS(s).squeeze(axis=2),
+            # "shape": self.output_net_SHAPE(s).squeeze(axis=2),
+            "structure": (structure + structure.permute(0, 2, 1))
+            / 2,
         }
 
 
