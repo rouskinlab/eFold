@@ -13,9 +13,13 @@ import time
 
 METRIC_ARGS = dict(dist_sync_on_step=True)
 
+
 def loss_pearson(pred, target, eps=1e-10):
-            pearson =  ((pred-pred.mean())*(target-target.mean())).mean() /(pred.std()*target.std() +eps) 
-            return 1-pearson**2
+    pearson = ((pred - pred.mean()) * (target - target.mean())).mean() / (
+        pred.std() * target.std() + eps
+    )
+    return 1 - pearson**2
+
 
 def corrcoef(target, pred):
     # np.corrcoef in torch from @mdo
@@ -24,7 +28,8 @@ def corrcoef(target, pred):
     target_n = target - target.mean()
     pred_n = pred_n / pred_n.norm()
     target_n = target_n / target_n.norm()
-    return 1- ((pred_n * target_n).sum())**2
+    return 1 - ((pred_n * target_n).sum()) ** 2
+
 
 class Model(pl.LightningModule):
     def __init__(self, lr: float, optimizer_fn, weight_data: bool = False, **kwargs):
@@ -74,13 +79,14 @@ class Model(pl.LightningModule):
 
         ## vv MSE loss vv ##
         mask = torch.zeros_like(true)
-        mask[true!=UKN] = 1
-        loss = F.mse_loss(pred*mask, true*mask)
-        
-        non_zeros = (mask==1).sum()/mask.numel()
-        if non_zeros != 0: loss /= non_zeros
+        mask[true != UKN] = 1
+        loss = F.mse_loss(pred * mask, true * mask)
+
+        non_zeros = (mask == 1).sum() / mask.numel()
+        if non_zeros != 0:
+            loss /= non_zeros
         ## ^^ MSE loss ^^ ##
-        
+
         assert not torch.isnan(loss), "Loss is NaN for {}".format(data_type)
         return loss
 
@@ -91,7 +97,7 @@ class Model(pl.LightningModule):
         return loss
 
     def loss_fn(self, batch: Batch):
-        count = {k: v for k, v in batch.dt_count.items() if k in self.data_type_output and k == 'structure'} #TODO
+        count = {k: v for k, v in batch.dt_count.items() if k in self.data_type_output}
         losses = {}
         if "dms" in count.keys():
             losses["dms"] = self._loss_signal(batch, "dms")
@@ -105,7 +111,7 @@ class Model(pl.LightningModule):
         for data_type, loss_value in losses.items():
             loss += loss_value * count[data_type]
         loss /= sum(count.values())
-        
+
         assert not torch.isnan(loss), "Loss is NaN"
         return loss, losses
 
@@ -120,12 +126,6 @@ class Model(pl.LightningModule):
         batch.integrate_prediction(predictions)
         loss = self.loss_fn(batch)[0]
         self.log(f"train/loss", loss, sync_dist=True)
-        if self.tic is None:
-            self.tic = time.time()
-        else: 
-            toc = time.time() 
-            self.log(f"train/time_per_batch_ms", 1000*(toc-self.tic), sync_dist=True)
-            self.tic = toc
         return loss
 
     def on_validation_start(self):
@@ -135,7 +135,9 @@ class Model(pl.LightningModule):
             for name in val_dl_names
         ]
 
-    def on_train_batch_end(self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int) -> None:
+    def on_train_batch_end(
+        self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int
+    ) -> None:
         del outputs
         del batch
         if batch_idx % 100 == 0:
@@ -172,4 +174,3 @@ class Model(pl.LightningModule):
         predictions = self.forward(batch)
         predictions = self._clean_predictions(batch, predictions)
         batch.integrate_prediction(predictions)
-
