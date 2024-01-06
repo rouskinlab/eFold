@@ -39,7 +39,7 @@ class Evoformer(Model):
         )
 
         self.model_type = "Evoformer"
-        self.data_type_output = ["dms", "shape", "structure"]
+        self.data_type_output = ["structure"]
         self.lr = lr
         self.gamma = gamma
         self.train_losses = []
@@ -52,7 +52,7 @@ class Evoformer(Model):
         self.evoformer = EvoFold(
             c_s=d_model,
             c_z=c_z,
-            #CHANGE
+            # CHANGE
             no_heads_s=8,
             ######
             no_heads_z=4,
@@ -61,19 +61,19 @@ class Evoformer(Model):
             no_recycles=no_recycles,
         )
 
-        self.output_net_DMS = nn.Sequential(
-            nn.LayerNorm(d_model),
-            nn.Linear(d_model, d_model),
-            nn.ReLU(),
-            nn.Linear(d_model, 1),
-        )
+        # self.output_net_DMS = nn.Sequential(
+        #     nn.LayerNorm(d_model),
+        #     nn.Linear(d_model, d_model),
+        #     nn.ReLU(),
+        #     nn.Linear(d_model, 1),
+        # )
 
-        self.output_net_SHAPE = nn.Sequential(
-            nn.LayerNorm(d_model),
-            nn.Linear(d_model, d_model),
-            nn.ReLU(),
-            nn.Linear(d_model, 1),
-        )
+        # self.output_net_SHAPE = nn.Sequential(
+        #     nn.LayerNorm(d_model),
+        #     nn.Linear(d_model, d_model),
+        #     nn.ReLU(),
+        #     nn.Linear(d_model, 1),
+        # )
 
         self.structure_adapter = nn.Linear(c_z, d_cnn)
         self.output_structure = nn.Sequential(
@@ -107,9 +107,10 @@ class Evoformer(Model):
         )  # (N, L, L)
 
         return {
-            "dms": self.output_net_DMS(s).squeeze(axis=2),
-            "shape": self.output_net_SHAPE(s).squeeze(axis=2),
-            "structure": (structure + structure.permute(0, 2, 1)) / 2,
+            # "dms": self.output_net_DMS(s).squeeze(axis=2),
+            # "shape": self.output_net_SHAPE(s).squeeze(axis=2),
+            "structure": (structure + structure.permute(0, 2, 1))
+            / 2,
         }
 
 
@@ -140,13 +141,15 @@ class EvoBlock(nn.Module):
         # bias attention heads
         self.pair_to_sequence = PairToSequence(c_z, no_heads_s)
 
-        #self.seq_attention = Attention(c_s, no_heads_s, c_s / no_heads_s, gated=True)
+        # self.seq_attention = Attention(c_s, no_heads_s, c_s / no_heads_s, gated=True)
 
         # print('---------')
         # print(no_heads_s)
         # print(int(c_s/no_heads_s))
         # print('---------')
-        self.seq_attention = RelPositionMultiHeadAttention(num_heads = no_heads_s, head_size = int(c_s/no_heads_s), output_size = c_s)
+        self.seq_attention = RelPositionMultiHeadAttention(
+            num_heads=no_heads_s, head_size=int(c_s / no_heads_s), output_size=c_s
+        )
         self.pos = PositionalEncoding(self.c_s, dropout)
         self.ln = nn.LayerNorm(self.c_s, eps=1e-12, elementwise_affine=True)
 
@@ -209,8 +212,8 @@ class EvoBlock(nn.Module):
         torch.nn.init.zeros_(self.sequence_to_pair.o_proj.weight)
         torch.nn.init.zeros_(self.sequence_to_pair.o_proj.bias)
         torch.nn.init.zeros_(self.pair_to_sequence.linear.weight)
-        #torch.nn.init.zeros_(self.seq_attention.o_proj.weight)
-        #torch.nn.init.zeros_(self.seq_attention.o_proj.bias)
+        # torch.nn.init.zeros_(self.seq_attention.o_proj.weight)
+        # torch.nn.init.zeros_(self.seq_attention.o_proj.bias)
         torch.nn.init.zeros_(self.mlp_seq.mlp[-2].weight)
         torch.nn.init.zeros_(self.mlp_seq.mlp[-2].bias)
         torch.nn.init.zeros_(self.mlp_pair.mlp[-2].weight)
@@ -244,14 +247,14 @@ class EvoBlock(nn.Module):
         y = self.layernorm(sequence_state)
         pe = self.pos(y)
         y = self.ln(y)
-        #y, _ = self.seq_attention(y,bias=bias)
-        y, _ = self.seq_attention([y,y,y,pe], bias=bias)
+        # y, _ = self.seq_attention(y,bias=bias)
+        y, _ = self.seq_attention([y, y, y, pe], bias=bias)
         sequence_state = sequence_state + self.drop(y)
         # FF + Local conv + FF
-        
+
         sequence_state_ff = self.FF1(sequence_state)
         sequence_state = sequence_state + sequence_state_ff
-        
+
         # sequence_stae = self.ln_2(sequence_state)
         sequence_state_con = self.convMod(sequence_state)
         sequence_state = sequence_state + sequence_state_con
@@ -261,7 +264,7 @@ class EvoBlock(nn.Module):
         sequence_state = sequence_state + sequence_state_ff
 
         sequence_state = self.ln_4(sequence_state)
-        
+
         sequence_state = self.mlp_seq(sequence_state)
 
         # Update pairwise state
@@ -636,18 +639,14 @@ def conv3x3(
         dilation=dilation,
     )
 
+
 class PositionalEncoding(nn.Module):
-    def __init__(
-            self,
-            d_model: int,
-            dropout: float = 0.1,
-            max_len: int = 5000):
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
 
         position = torch.arange(max_len).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2)
-                             * (-np.log(10000.0) / d_model))
+        div_term = torch.exp(torch.arange(0, d_model, 2) * (-np.log(10000.0) / d_model))
         pe = torch.zeros(max_len, d_model)
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
@@ -661,7 +660,8 @@ class PositionalEncoding(nn.Module):
         pe = self.pe[: x.shape[1]]
         # x = torch.concatenate((x, torch.tile(self.pe[:x.shape[1]], (x.shape[0], 1, 1))), 2)
         return pe
-    
+
+
 class MultiHeadAttention(nn.Module):
     def __init__(
         self,
@@ -693,15 +693,13 @@ class MultiHeadAttention(nn.Module):
         self.key = nn.Linear(num_heads * head_size, num_heads * head_size, bias=False)
         self.value = nn.Linear(num_heads * head_size, num_heads * head_size, bias=False)
         ###########################
-        
+
         self.projection_kernel = nn.Parameter(
             torch.rand(num_heads, head_size, output_size) * 2 - 1
         )
 
         if use_projection_bias:
-            self.projection_bias = nn.Parameter(
-                torch.rand(output_size) * 2 - 1
-            )
+            self.projection_bias = nn.Parameter(torch.rand(output_size) * 2 - 1)
         else:
             self.projection_bias = None
 
@@ -728,7 +726,9 @@ class MultiHeadAttention(nn.Module):
 
         return query, key, value
 
-    def call_attention(self, query, key, value, logits, bias = None, training=False, mask=None):
+    def call_attention(
+        self, query, key, value, logits, bias=None, training=False, mask=None
+    ):
         # Mask = attention mask with shape [B, Tquery, Tkey] with 1 for positions we want to attend, 0 for masked
         if mask is not None:
             if len(mask.size()) < 2:
@@ -752,7 +752,7 @@ class MultiHeadAttention(nn.Module):
                 mask = mask.unsqueeze(-3)
 
             logits += -1e9 * (1.0 - mask)
-        
+
         if bias is not None:
             logits = logits + rearrange(bias, "... lq lk h -> ... h lq lk")
 
@@ -762,11 +762,15 @@ class MultiHeadAttention(nn.Module):
         attn_coef_dropout = self.dropout(attn_coef)
 
         # Attention * value
-        multihead_output = torch.einsum("...HNM,...MHI->...NHI", attn_coef_dropout, value)
+        multihead_output = torch.einsum(
+            "...HNM,...MHI->...NHI", attn_coef_dropout, value
+        )
 
         # Run the outputs through another linear projection layer. Recombining heads
         # is automatically done.
-        output = torch.einsum("...NHI,HIO->...NO", multihead_output, self.projection_kernel)
+        output = torch.einsum(
+            "...NHI,HIO->...NO", multihead_output, self.projection_kernel
+        )
 
         if self.projection_bias is not None:
             output += self.projection_bias
@@ -786,19 +790,20 @@ class MultiHeadAttention(nn.Module):
         # Calculate dot product attention
         logits = torch.einsum("...NHO,...MHO->...HNM", query, key)
 
-        output, attn_coef = self.call_attention(query, key, value, logits,
-                                                training=training, mask=mask)
+        output, attn_coef = self.call_attention(
+            query, key, value, logits, training=training, mask=mask
+        )
 
         if self.return_attn_coef:
             return output, attn_coef
         else:
             return output
 
+
 class RelPositionMultiHeadAttention(MultiHeadAttention):
     def __init__(self, kernel_sizes=None, strides=None, **kwargs):
         super(RelPositionMultiHeadAttention, self).__init__(**kwargs)
 
-    
         num_pos_features = self.num_heads * self.head_size
         input_max = (self.num_heads * self.head_size) ** -0.5
         self.pos_kernel = nn.Parameter(
@@ -806,12 +811,11 @@ class RelPositionMultiHeadAttention(MultiHeadAttention):
         )
         self.pos_bias_u = nn.Parameter(torch.zeros(self.num_heads, self.head_size))
         self.pos_bias_v = nn.Parameter(torch.zeros(self.num_heads, self.head_size))
-        
 
     @staticmethod
     def relative_shift(x):
         x_shape = x.size()
-        x = F.pad(x, (1,0))
+        x = F.pad(x, (1, 0))
 
         x = x.view(x_shape[0], x_shape[1], x_shape[3] + 1, x_shape[2])
         x = x[:, :, 1:, :].view(x_shape)
@@ -832,25 +836,28 @@ class RelPositionMultiHeadAttention(MultiHeadAttention):
 
         logits_with_v = self.relative_shift(logits_with_v)
 
-        logits = logits_with_u + logits_with_v[:, :, :, :logits_with_u.size(3)]
+        logits = logits_with_u + logits_with_v[:, :, :, : logits_with_u.size(3)]
 
         depth = torch.tensor(self.head_size, dtype=torch.float32)
         logits /= torch.sqrt(depth)
 
-        output, attn_coef = self.call_attention(query, key, value, logits,
-                                                training=training, mask=mask, bias=bias)
+        output, attn_coef = self.call_attention(
+            query, key, value, logits, training=training, mask=mask, bias=bias
+        )
 
         if self.return_attn_coef:
             return output, attn_coef
         else:
             return output
 
+
 class GLU(nn.Module):
     def __init__(self, name="glu"):
         super(GLU, self).__init__()
 
     def forward(self, x):
-        return x[:, :x.size(1)//2] * torch.sigmoid(x[:, x.size(1)//2:])
+        return x[:, : x.size(1) // 2] * torch.sigmoid(x[:, x.size(1) // 2 :])
+
 
 class ConvModule(nn.Module):
     def __init__(
@@ -875,48 +882,48 @@ class ConvModule(nn.Module):
             print("Use scaling, no preLN")
             self.scale = nn.Parameter(torch.ones(input_dim))
             self.bias = nn.Parameter(torch.zeros(input_dim))
-        
-        pw1_max = input_dim ** -0.5
-        dw_max = kernel_size ** -0.5
-        pw2_max = input_dim ** -0.5
-        
+
+        pw1_max = input_dim**-0.5
+        dw_max = kernel_size**-0.5
+        pw2_max = input_dim**-0.5
+
         self.pw_conv_1 = nn.Conv1d(
             in_channels=input_dim,
             out_channels=conv_expansion_rate * input_dim,
             kernel_size=1,
             stride=1,
             padding=0,
-            bias=True
+            bias=True,
         )
-        
+
         if conv_use_glu:
             print("Using GLU for Conv")
             self.act1 = GLU()
         else:
             print("Replace GLU with swish for Conv")
             self.act1 = nn.SiLU()
-        self.act1=GLU()
+        self.act1 = GLU()
 
         self.dw_conv = nn.Conv1d(
             in_channels=input_dim,
             out_channels=conv_expansion_rate * input_dim,
             kernel_size=5,
             stride=1,
-            padding=(5// 2),
+            padding=(5 // 2),
             groups=depth_multiplier,
-            bias=True
+            bias=True,
         )
-        
+
         self.bn = nn.BatchNorm1d(conv_expansion_rate * input_dim, momentum=0.985)
         self.act2 = nn.SiLU()
-        
+
         self.pw_conv_2 = nn.Conv1d(
             in_channels=conv_expansion_rate * input_dim,
             out_channels=input_dim,
             kernel_size=1,
             stride=1,
             padding=0,
-            bias=True
+            bias=True,
         )
 
         self.do = nn.Dropout(dropout)
@@ -925,12 +932,11 @@ class ConvModule(nn.Module):
     def forward(self, inputs, training=False, pad_mask=None, **kwargs):
         if not self.adaptive_scale:
             outputs = self.ln(inputs)
-        #else:
-            #scale = self.scale.view(1, 1, -1)
-            #bias = self.bias.view(1, 1, -1)
-            #outputs = inputs * scale + bias
-            
-        
+        # else:
+        # scale = self.scale.view(1, 1, -1)
+        # bias = self.bias.view(1, 1, -1)
+        # outputs = inputs * scale + bias
+
         B, T, E = outputs.size()
         outputs = outputs.view(B, E, T)
         outputs = self.pw_conv_1(outputs)
@@ -941,22 +947,22 @@ class ConvModule(nn.Module):
         outputs = self.pw_conv_2(outputs)
         outputs = outputs.view(B, T, E)
         outputs = self.do(outputs)
-        
+
         return outputs
-    
+
+
 class FFMod(nn.Module):
     def __init__(self, emb_dim, dropout=0.0, expand=2):
         super(FFMod, self).__init__()
-        self.lin = nn.Linear(emb_dim, emb_dim*expand)
+        self.lin = nn.Linear(emb_dim, emb_dim * expand)
         self.act = nn.SiLU()
         self.drop = nn.Dropout(dropout)
-        self.lin_2 = nn.Linear(emb_dim*expand, emb_dim)
-    
+        self.lin_2 = nn.Linear(emb_dim * expand, emb_dim)
+
     def forward(self, x):
-        
-        x=self.lin(x)
+        x = self.lin(x)
         x = self.act(x)
-        x=self.drop(x)
-        x=self.lin_2(x)
+        x = self.drop(x)
+        x = self.lin_2(x)
 
         return self.drop(x)
