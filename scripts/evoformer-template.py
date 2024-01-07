@@ -32,16 +32,16 @@ if __name__ == "__main__":
     # fit loop
     batch_size = 1
     dm = DataModule(
-        name=["yack_train"],
+        name=["utr", "pri_miRNA", "archiveII"],
         strategy=STRATEGY,
         shuffle_train=False,
-        data_type=["dms", "shape", "structure"],  #
+        data_type=["structure"],  #
         force_download=False,
         batch_size=1,
         max_len=1024,
         structure_padding_value=0,
         train_split=None,
-        external_valid=["yack_valid", "utr", "pri_miRNA", "human_mRNA"],
+        external_valid=["yack_valid", "lncRNA", "viral_fragments"],
     )
 
     model = create_model(
@@ -53,11 +53,15 @@ if __name__ == "__main__":
         num_blocks=4,
         no_recycles=0,
         dropout=0,
-        lr=7e-4,
+        lr=5e-4,
         weight_decay=0,
         gamma=0.995,
         wandb=USE_WANDB,
     )
+
+    import torch
+    model.load_state_dict(torch.load('/root/DMSensei/models/fast-firebrand-32_epoch21.pt',
+                                     map_location=torch.device(device)))
 
     if USE_WANDB:
         wandb_logger.watch(model, log="all")
