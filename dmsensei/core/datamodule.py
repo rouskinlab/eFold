@@ -172,10 +172,18 @@ class DataModule(pl.LightningDataModule):
         ]
 
     def train_dataloader(self):
-        if self.trainer is None:
-            raise ValueError(
-                "When using strategy='ddp', the trainer must be passed to the datamodule"
-            )
+        if self.strategy == "ddp":
+            if self.trainer is None:
+                raise ValueError(
+                    "When using strategy='ddp', the trainer must be passed to the datamodule"
+                )
+            else: # ddp
+                num_replicas = self.trainer.num_devices
+                rank = self.trainer.local_rank
+        else:
+            num_replicas = 1
+            rank = 0
+
         return DataLoader(
             self.train_set,
             shuffle=self.shuffle["train"],
@@ -186,9 +194,9 @@ class DataModule(pl.LightningDataModule):
             sampler=sampler_factory(
                 dataset=self.train_set,
                 strategy=self.strategy,
-                num_replicas=self.trainer.num_devices,
+                num_replicas=num_replicas,
                 seed=datetime.datetime.now().hour,
-                rank=self.trainer.local_rank,
+                rank=rank,
             ),
         )
 

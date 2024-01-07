@@ -17,6 +17,11 @@ class DataType:
             if hasattr(getattr(self, attr), "to"):
                 setattr(self, attr, getattr(self, attr).to(device))
         return self
+    
+    def __del__(self):
+        del self.true
+        del self.error
+        del self.pred
 
 
 class DataTypeBatch(DataType):
