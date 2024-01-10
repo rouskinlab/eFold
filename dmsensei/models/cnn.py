@@ -28,14 +28,14 @@ class CNN(Model):
         super().__init__(lr=lr, optimizer_fn=optimizer_fn, **kwargs)
 
         self.model_type = "CNN"
-        self.data_type_output = ["dms", "shape", "structure"]
+        self.data_type_output = ["structure"]
         self.d_model = d_model
         self.d_cnn = d_cnn
 
         self.encoder = nn.Embedding(ntoken, d_model)
-        self.pos_encoder = PositionalEncoding(d_model, dropout)
+        # self.pos_encoder = PositionalEncoding(d_model, dropout)
         self.encoder_adapter = nn.Linear(d_model, d_cnn // 2)
-        self.structure_adapter = nn.Linear(d_cnn // 8, n_heads)
+        # self.structure_adapter = nn.Linear(d_cnn // 8, n_heads)
         self.activ = nn.ReLU()
 
         self.res_layers = nn.Sequential(
@@ -66,28 +66,28 @@ class CNN(Model):
             dim_in=d_cnn // 8, dim_out=1, n_blocks=3, kernel_size=3, dropout=dropout
         )
 
-        self.seq_attention1 = Attention(d_model, n_heads, d_model // n_heads)
-        self.seq_attention2 = Attention(d_model, n_heads, d_model // n_heads)
+        # self.seq_attention1 = Attention(d_model, n_heads, d_model // n_heads)
+        # self.seq_attention2 = Attention(d_model, n_heads, d_model // n_heads)
 
-        self.output_net_DMS = nn.Sequential(
-            nn.Linear(d_model, d_model * 2),
-            nn.LayerNorm(d_model * 2),
-            nn.ReLU(inplace=True),
-            nn.Linear(d_model * 2, d_model),
-            nn.LayerNorm(d_model),
-            nn.ReLU(inplace=True),
-            nn.Linear(d_model, 1),
-        )
+        # self.output_net_DMS = nn.Sequential(
+        #     nn.Linear(d_model, d_model * 2),
+        #     nn.LayerNorm(d_model * 2),
+        #     nn.ReLU(inplace=True),
+        #     nn.Linear(d_model * 2, d_model),
+        #     nn.LayerNorm(d_model),
+        #     nn.ReLU(inplace=True),
+        #     nn.Linear(d_model, 1),
+        # )
 
-        self.output_net_SHAPE = nn.Sequential(
-            nn.Linear(d_model, d_model * 2),
-            nn.LayerNorm(d_model * 2),
-            nn.ReLU(inplace=True),
-            nn.Linear(d_model * 2, d_model),
-            nn.LayerNorm(d_model),
-            nn.ReLU(inplace=True),
-            nn.Linear(d_model, 1),
-        )
+        # self.output_net_SHAPE = nn.Sequential(
+        #     nn.Linear(d_model, d_model * 2),
+        #     nn.LayerNorm(d_model * 2),
+        #     nn.ReLU(inplace=True),
+        #     nn.Linear(d_model * 2, d_model),
+        #     nn.LayerNorm(d_model),
+        #     nn.ReLU(inplace=True),
+        #     nn.Linear(d_model, 1),
+        # )
 
     def forward(self, batch: Batch) -> Tensor:
         """
@@ -99,7 +99,7 @@ class CNN(Model):
         """
         src = batch.get("sequence")
         src = self.encoder(src)
-        src = self.pos_encoder(src)
+        # src = self.pos_encoder(src)
 
         x = self.activ(self.encoder_adapter(src))  # (N, L, d_cnn/2)
 
@@ -115,20 +115,20 @@ class CNN(Model):
         # Output structure
         structure = self.output_structure(matrix).squeeze(1)  # (N, L, L)
 
-        matrix = self.activ(
-            self.structure_adapter(matrix.permute(0, 2, 3, 1))
-        )  # (N, L, L, d_model)
+        # matrix = self.activ(
+        #     self.structure_adapter(matrix.permute(0, 2, 3, 1))
+        # )  # (N, L, L, d_model)
 
-        # Output DMS/SHAPE sequences
-        seq = self.seq_attention1(src, matrix)  # (N, L, d_model)
-        seq = self.seq_attention2(seq, matrix)  # (N, L, d_model)
+        # # Output DMS/SHAPE sequences
+        # seq = self.seq_attention1(src, matrix)  # (N, L, d_model)
+        # seq = self.seq_attention2(seq, matrix)  # (N, L, d_model)
 
-        dms = self.output_net_DMS(seq)
-        shape = self.output_net_SHAPE(seq)
+        # dms = self.output_net_DMS(seq)
+        # shape = self.output_net_SHAPE(seq)
 
         return {
-            "dms": dms.squeeze(dim=-1),
-            "shape": shape.squeeze(dim=-1),
+            # "dms": dms.squeeze(dim=-1),
+            # "shape": shape.squeeze(dim=-1),
             "structure": (structure + structure.permute(0, 2, 1)) / 2,
         }
 

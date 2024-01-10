@@ -59,9 +59,9 @@ if __name__ == "__main__":
         wandb=USE_WANDB,
     )
 
-    import torch
-    model.load_state_dict(torch.load('/root/DMSensei/models/fast-firebrand-32_epoch21.pt',
-                                     map_location=torch.device(device)))
+    # import torch
+    # model.load_state_dict(torch.load('/root/DMSensei/models/fast-firebrand-32_epoch21.pt',
+    #                                  map_location=torch.device(device)))
 
     if USE_WANDB:
         wandb_logger.watch(model, log="all")

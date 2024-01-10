@@ -28,7 +28,7 @@ if __name__ == "__main__":
     STRATEGY = "ddp"
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        project = "Triple-head_tuning"
+        project = "Structure-classic"
         wandb_logger = WandbLogger(project=project)
 
     # fit loop
@@ -36,25 +36,25 @@ if __name__ == "__main__":
         name=["yack_train"], # finetune: "utr", "pri_miRNA", "archiveII"
         strategy=STRATEGY, #random, sorted or ddp
         shuffle_train=False,
-        data_type=["dms", "shape", "structure"],  #
+        data_type=["structure"],  #
         force_download=False,
         batch_size=1,
-        max_len=1024,
+        max_len=800,
         structure_padding_value=0,
         train_split=None,
-        external_valid=["yack_valid", "utr", "pri_miRNA", "human_mRNA"], # finetune: "yack_valid", "human_mRNA"
+        external_valid=["yack_valid", "pri_miRNA", "human_mRNA", "lncRNA", "viral_fragments"], # finetune: "yack_valid", "human_mRNA"
     )
 
     model = create_model(
         model="cnn",
         ntoken=5,
-        d_model=64,
-        d_cnn=128,
+        d_model=640,
+        d_cnn=512,
         n_heads=16,
         dropout=0,
-        lr=1e-4,
+        lr=5e-5,
         weight_decay=0,
-        gamma=0.995,
+        gamma=0.99,
         wandb=USE_WANDB,
     )
 
@@ -67,8 +67,8 @@ if __name__ == "__main__":
 
     trainer = Trainer(
         accelerator=device,
-        devices=2,
-        strategy=DDPStrategy(find_unused_parameters=True) if STRATEGY == "ddp" else 'auto',
+        devices=8,
+        strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else 'auto',
         precision="16-mixed",
         max_epochs=1000,
         log_every_n_steps=1,
