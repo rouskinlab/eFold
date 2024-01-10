@@ -143,6 +143,9 @@ class Model(pl.LightningModule):
         if batch_idx % 100 == 0:
             torch.cuda.empty_cache()
 
+    def on_train_end(self) -> None:
+        torch.cuda.empty_cache()
+
     def validation_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
         predictions = self.forward(batch)
         batch.integrate_prediction(predictions)
