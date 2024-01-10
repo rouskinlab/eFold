@@ -3,7 +3,7 @@ import lightning.pytorch as pl
 from lightning.pytorch.utilities.types import STEP_OUTPUT
 import torch.nn as nn
 import torch
-from ..config import device, UKN
+from ..config import device, UKN, TEST_SETS_NAMES
 import torch.nn.functional as F
 from .batch import Batch
 from torchmetrics import R2Score, PearsonCorrCoef, MeanAbsoluteError, F1Score
@@ -153,6 +153,12 @@ class Model(pl.LightningModule):
         self.metrics_stack[dataloader_idx].update(batch)
         return loss, losses
 
+    def on_validation_batch_end(
+        self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int, dataloader_idx: int = 0
+    ) -> None:
+        if batch_idx % 100 == 0:
+            torch.cuda.empty_cache()
+
     def on_validation_epoch_end(self) -> None:
         # aggregate the stack and log it
         for metrics_dl in self.metrics_stack:
@@ -167,11 +173,41 @@ class Model(pl.LightningModule):
                         sync_dist=True,
                     )
         self.metrics_stack = None
+        torch.cuda.empty_cache()
+
+    def on_test_start(self):
+        self.metrics_stack = [
+            MetricsStack(name=name, data_type=self.data_type_output)
+            for name in TEST_SETS_NAMES
+        ]
 
     def test_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
         predictions = self.forward(batch)
         predictions = self._clean_predictions(batch, predictions)
         batch.integrate_prediction(predictions)
+        self.metrics_stack[dataloader_idx].update(batch)
+
+    def on_test_batch_end(
+        self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int, dataloader_idx: int = 0
+    ) -> None:
+        if batch_idx % 100 == 0:
+            torch.cuda.empty_cache()
+
+    def on_test_epoch_end(self) -> None:
+        # aggregate the stack and log it
+        for metrics_dl in self.metrics_stack:
+            metrics_pack = metrics_dl.compute()
+            for dt, metrics in metrics_pack.items():
+                for name, metric in metrics.items():
+                    # to replace with a gather_all?
+                    self.log(
+                        f"test/{metrics_dl.name}/{dt}/{name}",
+                        metric,
+                        add_dataloader_idx=False,
+                        sync_dist=True,
+                    )
+        self.metrics_stack = None
+        torch.cuda.empty_cache()
 
     def predict_step(self, batch: Batch, batch_idx: int):
         predictions = self.forward(batch)
