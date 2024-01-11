@@ -24,7 +24,8 @@ class DataModule(pl.LightningDataModule):
         shuffle_valid=False,
         external_valid=None,
         use_error=False,
-        max_len=500,
+        max_len=None,
+        min_len=None,
         structure_padding_value=UKN,
         tqdm=True,
         buckets=None,
@@ -79,6 +80,7 @@ class DataModule(pl.LightningDataModule):
             "force_download": force_download,
             "tqdm": tqdm,
             "max_len": max_len,
+            "min_len": min_len,
         }
         self.buckets = buckets
 

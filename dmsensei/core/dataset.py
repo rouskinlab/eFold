@@ -22,6 +22,7 @@ class Dataset(TorchDataset):
         length: np.ndarray,
         sequence: np.ndarray,
         max_len: int,
+        min_len: int,
         structure_padding_value: float,
         use_error: bool,
         dms: DMSDataset = None,
@@ -41,17 +42,20 @@ class Dataset(TorchDataset):
         self.structure = structure
         self.structure_padding_value = structure_padding_value
         self.L = max(self.length)
-        self._remove_long_sequences(max_len)
+        self._remove_sequences_out_of_length_interval(min_len, max_len)
         
         if sort_by_length:
             self.sort()
 
-    def _remove_long_sequences(self, max_len):
-        # remove long sequences
+    def _remove_sequences_out_of_length_interval(self, min_len, max_len):
         if max_len is None:
-            return
-        idx_too_long = [i for i, l in enumerate(self.length) if l > max_len]
-        for idx in idx_too_long[::-1]:
+            max_len = np.inf    
+        if min_len is None:
+            min_len = 0
+        if min_len > max_len:
+            raise ValueError("min_len must be smaller than max_len")
+        idx_out = [i for i, l in enumerate(self.length) if l >= max_len or l <= min_len]
+        for idx in idx_out[::-1]:
             del self.refs[idx]
             del self.length[idx]
             del self.sequence[idx]
@@ -72,6 +76,7 @@ class Dataset(TorchDataset):
             data_type=list(set(self.data_type + other.data_type)),
             use_error=self.use_error or other.use_error,
             max_len=None,
+            min_len=None,
             structure_padding_value=self.structure_padding_value,
             refs=np.concatenate([self.refs, other.refs]).tolist(),
             length=np.concatenate([self.length, other.length]).tolist(),
@@ -94,7 +99,8 @@ class Dataset(TorchDataset):
         data_type: List[str] = ["dms", "shape", "structure"],
         force_download: bool = False,
         use_error: bool = False,
-        max_len=500,
+        max_len=None,
+        min_len=None,
         structure_padding_value: float = UKN,
         sort_by_length: bool = False,
         tqdm=True,
@@ -172,6 +178,7 @@ class Dataset(TorchDataset):
             shape=shape,
             structure=structure,
             max_len=max_len,
+            min_len=min_len,
             structure_padding_value=structure_padding_value,
             sort_by_length=sort_by_length,
         )
