@@ -167,7 +167,7 @@ class DataModule(pl.LightningDataModule):
                 data_type=[data_type],
                 **self.dataset_args,
             )
-            for data_type, datasets in TEST_SETS.items()
+            for data_type, datasets in TEST_SETS.items() if data_type in self.data_type
             for name in datasets
         ]
 
