@@ -39,7 +39,7 @@ if __name__ == "__main__":
         data_type=["structure"],  #
         force_download=False,
         batch_size=1,
-        max_len=800,
+        max_len=1024,
         structure_padding_value=0,
         train_split=None,
         external_valid=["yack_valid", "pri_miRNA", "human_mRNA_sarah", "lncRNA", "viral_fragments"], # finetune: "yack_valid", "human_mRNA"
@@ -63,7 +63,7 @@ if __name__ == "__main__":
 
     trainer = Trainer(
         accelerator=device,
-        devices=8,
+        devices=8 if STRATEGY == "ddp" else 1,
         strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else 'auto',
         precision="16-mixed",
         max_epochs=1000,

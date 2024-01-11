@@ -50,10 +50,10 @@ class U_Net(Model):
 
         src = batch.get("sequence")
         padd_multiple = 32
-        padd_len = 0
+        pad_len = 0
         if src.shape[1]%padd_multiple: 
-            padd_len = (padd_multiple-src.shape[1]%padd_multiple)
-            src = torch.cat((src, torch.tensor([[0]*padd_len], device=self.device)), dim=-1)
+            pad_len = (padd_multiple-src.shape[1]%padd_multiple)
+            src = torch.cat( (src, torch.zeros((src.shape[0], pad_len), device=self.device, dtype=torch.long) ), dim=-1)
 
         x = self.seq2map(src)
 
@@ -96,7 +96,7 @@ class U_Net(Model):
         structure = torch.transpose(d1, -1, -2) * d1
 
         return { 
-            "structure": structure[:, :src.shape[1]-padd_len, :src.shape[1]-padd_len]
+            "structure": structure[:, :src.shape[1]-pad_len, :src.shape[1]-pad_len]
             }
 
 
@@ -107,47 +107,45 @@ class U_Net(Model):
 
         # take integer encoded sequence and return last channel of embedding (pairing energy)
         def creatmat(data, device=None):
-            # if device==None:
-            #     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
             with torch.no_grad():
                 data = int2seq(data)
-                paired = defaultdict(int, {'AU':2, 'UA':2, 'GC':3, 'CG':3, 'UG':0.8, 'GU':0.8})
+                paired = defaultdict(float, {'AU':2., 'UA':2., 'GC':3., 'CG':3., 'UG':0.8, 'GU':0.8})
 
                 mat = torch.tensor([[paired[x+y] for y in data] for x in data]).to(device)
-                # n = len(data)
+                n = len(data)
 
-                # i, j = torch.meshgrid(torch.arange(n).to(device), torch.arange(n).to(device), indexing=None)
-                # t = torch.arange(30).to(device)
-                # m1 = torch.where((i[:, :, None] - t >= 0) & (j[:, :, None] + t < n), mat[torch.clamp(i[:,:,None]-t, 0, n-1), torch.clamp(j[:,:,None]+t, 0, n-1)], 0)
-                # m1 *= torch.exp(-0.5*t*t)
+                i, j = torch.meshgrid(torch.arange(n).to(device), torch.arange(n).to(device), indexing='ij')
+                t = torch.arange(30).to(device)
+                m1 = torch.where((i[:, :, None] - t >= 0) & (j[:, :, None] + t < n), mat[torch.clamp(i[:,:,None]-t, 0, n-1), torch.clamp(j[:,:,None]+t, 0, n-1)], 0)
+                m1 *= torch.exp(-0.5*t*t)
 
-                # m1_0pad = torch.nn.functional.pad(m1, (0, 1))
-                # first0 = torch.argmax((m1_0pad==0).to(int), dim=2)
-                # to0indices = t[None,None,:]>first0[:,:,None]
-                # m1[to0indices] = 0
-                # m1 = m1.sum(dim=2)
+                m1_0pad = torch.nn.functional.pad(m1, (0, 1))
+                first0 = torch.argmax((m1_0pad==0).to(int), dim=2)
+                to0indices = t[None,None,:]>first0[:,:,None]
+                m1[to0indices] = 0
+                m1 = m1.sum(dim=2)
 
-                # t = torch.arange(1, 30).to(device)
-                # m2 = torch.where((i[:, :, None] + t < n) & (j[:, :, None] - t >= 0), mat[torch.clamp(i[:,:,None]+t, 0, n-1), torch.clamp(j[:,:,None]-t, 0, n-1)], 0)
-                # m2 *= torch.exp(-0.5*t*t)
+                t = torch.arange(1, 30).to(device)
+                m2 = torch.where((i[:, :, None] + t < n) & (j[:, :, None] - t >= 0), mat[torch.clamp(i[:,:,None]+t, 0, n-1), torch.clamp(j[:,:,None]-t, 0, n-1)], 0)
+                m2 *= torch.exp(-0.5*t*t)
 
-                # m2_0pad = torch.nn.functional.pad(m2, (0, 1))
-                # first0 = torch.argmax((m2_0pad==0).to(int), dim=2)
-                # to0indices = torch.arange(29).to(device)[None,None,:]>first0[:,:,None]
-                # m2[to0indices] = 0
-                # m2 = m2.sum(dim=2)
-                # m2[m1==0] = 0
+                m2_0pad = torch.nn.functional.pad(m2, (0, 1))
+                first0 = torch.argmax((m2_0pad==0).to(int), dim=2)
+                to0indices = torch.arange(29).to(device)[None,None,:]>first0[:,:,None]
+                m2[to0indices] = 0
+                m2 = m2.sum(dim=2)
+                m2[m1==0] = 0
 
-                # return (m1+m2).to(self.device)
-                return mat.type(torch.float).to(self.device)
-
+                return (m1+m2).to(self.device)
 
         # Assemble all data
         full_map = []
+        one_hot_embed = torch.zeros((5, 4), device=self.device)
+        one_hot_embed[1:] = torch.eye(4)
         for seq in seq_int:
 
-            seq_hot = torch.eye(4, device=self.device)[seq-1].type(torch.long)
+            seq_hot = one_hot_embed[seq].type(torch.long)
             pair_map = torch.kron(seq_hot, seq_hot).reshape(len(seq), len(seq), 16)
 
             energy_map = creatmat(seq)
@@ -155,7 +153,7 @@ class U_Net(Model):
             full_map.append(torch.cat((pair_map, energy_map.unsqueeze(-1)), dim=-1))
 
 
-        return torch.stack(full_map).permute(0, 3, 1, 2)
+        return torch.stack(full_map).permute(0, 3, 1, 2).contiguous()
 
 
 
