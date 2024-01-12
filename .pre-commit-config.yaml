@@ -4,17 +4,17 @@ repos:
     hooks:
     -   id: check-yaml
     -   id: end-of-file-fixer
-    # -   id: trailing-whitespace
-# -   repo: https://github.com/hhatto/autopep8
-#     rev: v2.0.4
-#     hooks:
-#     - id: autopep8
-#       args: [--in-place, --recursive]
+#     # -   id: trailing-whitespace
+# # -   repo: https://github.com/hhatto/autopep8
+# #     rev: v2.0.4
+# #     hooks:
+# #     - id: autopep8
+# #       args: [--in-place, --recursive]
 
--   repo: https://github.com/psf/black
-    rev: 23.11.0
-    hooks:
-    - id: black
+# -   repo: https://github.com/psf/black
+#     rev: 23.11.0
+#     hooks:
+#     - id: black
         # args: [--line-length=88]
 # -   repo: https://github.com/PyCQA/flake8
 #     rev: 6.1.0
