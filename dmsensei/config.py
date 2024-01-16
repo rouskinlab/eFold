@@ -2,6 +2,7 @@ from torch import float32, cuda, backends
 import torch
 
 seq2int = {"X": 0, "A": 1, "C": 2, "G": 3, "U": 4}  # , 'S': 5, 'E': 6}
+# seq2int = {"X": 0, "A": 1, "U": 2, "C": 3, "G": 4}  
 int2seq = {v: k for k, v in seq2int.items()}
 
 START_TOKEN = None  # seq2int['S']
@@ -15,15 +16,15 @@ VAL_GU = 0.095
 device = (
     "cuda"
     if cuda.is_available()
-    else "mps"  # moi j'aime bien le mps
-    if backends.mps.is_available()
+    # else "mps"  # moi j'aime bien le mps
+    # if backends.mps.is_available()
     else "cpu"
 )
 
 TEST_SETS = {
     "structure": ["PDB", "lncRNA", "viral_fragments"], 
     "sequence": [],
-    "dms": ["lncRNA", "viral_fragments"],  
+    "dms": [],  
     "shape": [],  
 }
 

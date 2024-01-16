@@ -49,13 +49,27 @@ class U_Net(Model):
     def forward(self, batch: Batch) -> Tensor:
 
         src = batch.get("sequence")
+
         padd_multiple = 32
         pad_len = 0
         if src.shape[1]%padd_multiple: 
             pad_len = (padd_multiple-src.shape[1]%padd_multiple)
             src = torch.cat( (src, torch.zeros((src.shape[0], pad_len), device=self.device, dtype=torch.long) ), dim=-1)
 
+        # def get_cut_len(data_len,set_len):
+        #     l = data_len
+        #     if l <= set_len:
+        #         l = set_len
+        #     else:
+        #         l = (((l - 1) // 16) + 1) * 16
+        #     return l
+
+        # pad_len = get_cut_len(src.shape[1], 80)-src.shape[1]
+        # src = torch.cat( (src, torch.zeros((src.shape[0], pad_len), device=self.device, dtype=torch.long) ), dim=-1)
+
         x = self.seq2map(src)
+
+        self.train()
 
         # encoding path
         x1 = self.Conv1(x)
@@ -103,6 +117,7 @@ class U_Net(Model):
     def seq2map(self, seq_int):
 
         def int2seq(seq):
+            # return ''.join(['XAUCG'[d] for d in seq])
             return ''.join(['XACGU'[d] for d in seq])
 
         # take integer encoded sequence and return last channel of embedding (pairing energy)

@@ -21,7 +21,7 @@ def mask_and_flatten(func):
     return wrapped
 
 
-@mask_and_flatten
+# @mask_and_flatten
 def f1(pred, true, threshold=0.5):
     """
     Compute the F1 score of the predictions.

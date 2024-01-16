@@ -11,6 +11,8 @@ from .metrics import MetricsStack
 from .datamodule import DataModule
 import time
 
+from .postprocess import postprocess_new_nc as postprocess
+
 METRIC_ARGS = dict(dist_sync_on_step=True)
 
 
@@ -148,6 +150,10 @@ class Model(pl.LightningModule):
 
     def validation_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
         predictions = self.forward(batch)
+        predictions['structure'] = postprocess(predictions['structure'], 
+                                               self.seq2oneHot(batch.get('sequence')),
+                                               0.01, 0.1, 100, 1.6, True, 1.5)
+
         batch.integrate_prediction(predictions)
         loss, losses = self.loss_fn(batch)
         self.metrics_stack[dataloader_idx].update(batch)
@@ -177,6 +183,10 @@ class Model(pl.LightningModule):
 
     def test_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
         predictions = self.forward(batch)
+        predictions['structure'] = postprocess(predictions['structure'], 
+                                               self.seq2oneHot(batch.get('sequence')),
+                                               0.01, 0.1, 100, 1.6, True, 1.5)
+
         predictions = self._clean_predictions(batch, predictions)
         batch.integrate_prediction(predictions)
 
@@ -185,16 +195,15 @@ class Model(pl.LightningModule):
     ) -> None:
         # push the metric directly
         metric_pack = MetricsStack(
-            name=self.trainer.datamodule.external_valid[dataloader_idx],
+            name=TEST_SETS_NAMES[dataloader_idx],
             data_type=self.data_type_output,
             )
         for dt, metrics in metric_pack.update(batch).compute().items():
             for name, metric in metrics.items():
                 self.log(
                     f"test/{metric_pack.name}/{dt}/{name}",
-                    metric,
+                    float(metric),
                     add_dataloader_idx=False,
-                    sync_dist=True,
                     batch_size=len(batch),
                 )
         if batch_idx % 100 == 0:
