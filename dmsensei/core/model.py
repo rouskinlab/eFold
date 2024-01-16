@@ -3,13 +3,15 @@ import lightning.pytorch as pl
 from lightning.pytorch.utilities.types import STEP_OUTPUT
 import torch.nn as nn
 import torch
-from ..config import device, UKN
+from ..config import device, UKN, TEST_SETS_NAMES
 import torch.nn.functional as F
 from .batch import Batch
 from torchmetrics import R2Score, PearsonCorrCoef, MeanAbsoluteError, F1Score
 from .metrics import MetricsStack
 from .datamodule import DataModule
 import time
+
+from .postprocess import postprocess_new_nc as postprocess
 
 METRIC_ARGS = dict(dist_sync_on_step=True)
 
@@ -148,10 +150,20 @@ class Model(pl.LightningModule):
 
     def validation_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
         predictions = self.forward(batch)
+        predictions['structure'] = postprocess(predictions['structure'], 
+                                               self.seq2oneHot(batch.get('sequence')),
+                                               0.01, 0.1, 100, 1.6, True, 1.5)
+
         batch.integrate_prediction(predictions)
         loss, losses = self.loss_fn(batch)
         self.metrics_stack[dataloader_idx].update(batch)
         return loss, losses
+
+    def on_validation_batch_end(
+        self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int, dataloader_idx: int = 0
+    ) -> None:
+        if batch_idx % 100 == 0:
+            torch.cuda.empty_cache()
 
     def on_validation_epoch_end(self) -> None:
         # aggregate the stack and log it
@@ -167,11 +179,38 @@ class Model(pl.LightningModule):
                         sync_dist=True,
                     )
         self.metrics_stack = None
+        torch.cuda.empty_cache()
 
     def test_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
         predictions = self.forward(batch)
+        predictions['structure'] = postprocess(predictions['structure'], 
+                                               self.seq2oneHot(batch.get('sequence')),
+                                               0.01, 0.1, 100, 1.6, True, 1.5)
+
         predictions = self._clean_predictions(batch, predictions)
         batch.integrate_prediction(predictions)
+
+    def on_test_batch_end(
+        self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int, dataloader_idx: int = 0
+    ) -> None:
+        # push the metric directly
+        metric_pack = MetricsStack(
+            name=TEST_SETS_NAMES[dataloader_idx],
+            data_type=self.data_type_output,
+            )
+        for dt, metrics in metric_pack.update(batch).compute().items():
+            for name, metric in metrics.items():
+                self.log(
+                    f"test/{metric_pack.name}/{dt}/{name}",
+                    float(metric),
+                    add_dataloader_idx=False,
+                    batch_size=len(batch),
+                )
+        if batch_idx % 100 == 0:
+            torch.cuda.empty_cache()
+
+    def on_test_epoch_end(self) -> None:
+        torch.cuda.empty_cache()
 
     def predict_step(self, batch: Batch, batch_idx: int):
         predictions = self.forward(batch)

@@ -24,6 +24,7 @@ def base_pairs_to_pairing_matrix(base_pairs, sequence_length, padding, pad_value
         return pairing_matrix
     pairing_matrix[:sequence_length, :sequence_length] = 0.0
     if len(base_pairs) > 0 and base_pairs.shape[1] == 2 and base_pairs.shape[0] > 0:
+        base_pairs = base_pairs.type(torch.long)
         pairing_matrix[base_pairs[:, 0], base_pairs[:, 1]] = 1.0
         pairing_matrix[base_pairs[:, 1], base_pairs[:, 0]] = 1.0
     return pairing_matrix

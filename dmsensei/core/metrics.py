@@ -9,6 +9,8 @@ from typing import TypedDict
 # wrapper for metrics
 def mask_and_flatten(func):
     def wrapped(pred, true):
+        if pred is None or true is None:
+            return np.nan
         mask = true != UKN
         if torch.sum(mask) == 0:
             return np.nan
@@ -19,7 +21,7 @@ def mask_and_flatten(func):
     return wrapped
 
 
-@mask_and_flatten
+# @mask_and_flatten
 def f1(pred, true, threshold=0.5):
     """
     Compute the F1 score of the predictions.
@@ -138,6 +140,7 @@ class MetricsStack:
             pred, true = batch.get_pairs(dt)
             for metric in POSSIBLE_METRICS[dt]:
                 self._add_metric(dt, metric, metric_factory[metric](pred, true))
+        return self
 
     def compute(self) -> dict:
         out = {}
