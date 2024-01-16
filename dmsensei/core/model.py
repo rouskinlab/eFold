@@ -216,3 +216,9 @@ class Model(pl.LightningModule):
         predictions = self.forward(batch)
         predictions = self._clean_predictions(batch, predictions)
         batch.integrate_prediction(predictions)
+
+    def seq2oneHot(self, seq):
+        one_hot_embed = torch.zeros((5, 4), device=self.device)
+        one_hot_embed[1:] = torch.eye(4)
+
+        return one_hot_embed[seq].type(torch.long)
