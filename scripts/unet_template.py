@@ -26,9 +26,12 @@ sys.path.append(os.path.abspath("."))
 if __name__ == "__main__":
     USE_WANDB = 1
     STRATEGY = "ddp"
+    n_gpu = 8
+    batch_size = 32
+    lr = 1e-4
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        project = "Structure-classic"
+        project = "Unet"
         wandb_logger = WandbLogger(project=project)
 
     # fit loop
@@ -49,7 +52,7 @@ if __name__ == "__main__":
         model="unet",
         img_ch=17,
         output_ch=1,
-        lr=1e-3,
+        lr=lr*n_gpu if STRATEGY == "ddp" else lr,
         gamma=0.99,
         wandb=USE_WANDB,
     )
@@ -63,12 +66,12 @@ if __name__ == "__main__":
 
     trainer = Trainer(
         accelerator=device,
-        devices=8 if STRATEGY == "ddp" else 1,
+        devices=n_gpu if STRATEGY == "ddp" else 1,
         strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else 'auto',
         precision="16-mixed",
         max_epochs=1000,
         log_every_n_steps=1,
-        accumulate_grad_batches=32,
+        accumulate_grad_batches=batch_size//n_gpu if STRATEGY == "ddp" else batch_size,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
             ModelCheckpoint(every_n_epoch=1),
