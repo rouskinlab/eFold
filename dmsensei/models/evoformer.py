@@ -12,6 +12,7 @@ import numpy as np
 from ..core.batch import Batch
 from ..core.model import Model
 
+from collections import defaultdict    
 
 dir_name = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(dir_name, ".."))
@@ -47,8 +48,9 @@ class Evoformer(Model):
 
         # Encoder layers
         self.encoder = nn.Embedding(ntoken, d_model)
-        self.encoder_adapter = nn.Linear(d_model, int(c_z / 2))
-        self.activ = nn.ReLU()
+        # self.encoder_adapter = nn.Linear(d_model, int(c_z / 2))
+        # self.activ = nn.ReLU()
+        self.encoder_adapter = nn.Conv2d(17, c_z, kernel_size=15, padding=7, bias=True)
         self.evoformer = EvoFold(
             c_s=d_model,
             c_z=c_z,
@@ -92,12 +94,14 @@ class Evoformer(Model):
     def forward(self, batch: Batch) -> Tensor:
         # Encoding of RNA sequence
         src = batch.get("sequence")
+        
         s = self.encoder(src)  # (N, L, d_model)
+        z = self.encoder_adapter(self.seq2map(src)).permute(0, 2, 3, 1) # (N, L, L, d_model)
 
-        z = self.activ(self.encoder_adapter(s))  # (N, L, c_z / 2)
-        # Outer concatenation
-        z = z.unsqueeze(1).repeat(1, z.shape[1], 1, 1)  # (N, L, L, c_z / 2)
-        z = torch.cat((z, z.permute(0, 2, 1, 3)), dim=-1)  # (N, L, L, c_z)
+        # z = self.activ(self.encoder_adapter(s))  # (N, L, c_z / 2)
+        # # Outer concatenation
+        # z = z.unsqueeze(1).repeat(1, z.shape[1], 1, 1)  # (N, L, L, c_z / 2)
+        # z = torch.cat((z, z.permute(0, 2, 1, 3)), dim=-1)  # (N, L, L, c_z)
 
         s, z = self.evoformer(s, z)
 
@@ -112,6 +116,62 @@ class Evoformer(Model):
             "structure": (structure + structure.permute(0, 2, 1))
             / 2,
         }
+        
+    def seq2map(self, seq_int):
+
+        def int2seq(seq):
+            # return ''.join(['XAUCG'[d] for d in seq])
+            return ''.join(['XACGU'[d] for d in seq])
+
+        # take integer encoded sequence and return last channel of embedding (pairing energy)
+        def creatmat(data, device=None):
+
+            with torch.no_grad():
+                data = int2seq(data)
+                paired = defaultdict(float, {'AU':2., 'UA':2., 'GC':3., 'CG':3., 'UG':0.8, 'GU':0.8})
+
+                mat = torch.tensor([[paired[x+y] for y in data] for x in data]).to(device)
+                n = len(data)
+
+                i, j = torch.meshgrid(torch.arange(n).to(device), torch.arange(n).to(device), indexing='ij')
+                t = torch.arange(30).to(device)
+                m1 = torch.where((i[:, :, None] - t >= 0) & (j[:, :, None] + t < n), mat[torch.clamp(i[:,:,None]-t, 0, n-1), torch.clamp(j[:,:,None]+t, 0, n-1)], 0)
+                m1 *= torch.exp(-0.5*t*t)
+
+                m1_0pad = torch.nn.functional.pad(m1, (0, 1))
+                first0 = torch.argmax((m1_0pad==0).to(int), dim=2)
+                to0indices = t[None,None,:]>first0[:,:,None]
+                m1[to0indices] = 0
+                m1 = m1.sum(dim=2)
+
+                t = torch.arange(1, 30).to(device)
+                m2 = torch.where((i[:, :, None] + t < n) & (j[:, :, None] - t >= 0), mat[torch.clamp(i[:,:,None]+t, 0, n-1), torch.clamp(j[:,:,None]-t, 0, n-1)], 0)
+                m2 *= torch.exp(-0.5*t*t)
+
+                m2_0pad = torch.nn.functional.pad(m2, (0, 1))
+                first0 = torch.argmax((m2_0pad==0).to(int), dim=2)
+                to0indices = torch.arange(29).to(device)[None,None,:]>first0[:,:,None]
+                m2[to0indices] = 0
+                m2 = m2.sum(dim=2)
+                m2[m1==0] = 0
+
+                return (m1+m2).to(self.device)
+
+        # Assemble all data
+        full_map = []
+        one_hot_embed = torch.zeros((5, 4), device=self.device)
+        one_hot_embed[1:] = torch.eye(4)
+        for seq in seq_int:
+
+            seq_hot = one_hot_embed[seq].type(torch.long)
+            pair_map = torch.kron(seq_hot, seq_hot).reshape(len(seq), len(seq), 16)
+
+            energy_map = creatmat(seq)
+
+            full_map.append(torch.cat((pair_map, energy_map.unsqueeze(-1)), dim=-1))
+
+
+        return torch.stack(full_map).permute(0, 3, 1, 2).contiguous()
 
 
 class EvoBlock(nn.Module):
