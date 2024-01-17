@@ -23,10 +23,11 @@ def constraint_matrix_batch(x):
     return au_ua + cg_gc + ug_gu
 
 def constraint_matrix_batch_addnc(x):
+    x = x.type(torch.float)
     base_a = x[:, :, 0]
-    base_u = x[:, :, 1]
-    base_c = x[:, :, 2]
-    base_g = x[:, :, 3]
+    base_u = x[:, :, 3]
+    base_c = x[:, :, 1]
+    base_g = x[:, :, 2]
     batch = base_a.shape[0]
     length = base_a.shape[1]
     au = torch.matmul(base_a.view(batch, length, 1), base_u.view(batch, 1, length))

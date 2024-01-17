@@ -26,13 +26,12 @@ sys.path.append(os.path.abspath("."))
 # Train loop
 if __name__ == "__main__":
     USE_WANDB = 1
-    STRATEGY = "random"
+    STRATEGY = "ddp"
+    n_gpu = 8
 
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        project = "debugging"
-        name = "evoformer-structure"
-        wandb_logger = WandbLogger(project=project, name=name)
+        wandb_logger = WandbLogger(project='Evoformer-final-tests')
 
     # fit loop
     batch_size = 1
@@ -46,7 +45,7 @@ if __name__ == "__main__":
         max_len=1024,
         structure_padding_value=0,
         train_split=None,
-        external_valid=["yack_valid", "utr", "pri_miRNA", "human_mRNA"],
+        external_valid=["yack_valid", "pri_miRNA", "human_mRNA_sarah", "lncRNA", "viral_fragments"],
     )
 
     model = create_model(
@@ -69,8 +68,8 @@ if __name__ == "__main__":
 
     trainer = Trainer(
         accelerator=device,
-        devices=1,
-        strategy=DDPStrategy() if STRATEGY == "ddp" else "auto",
+        devices=n_gpu if STRATEGY == "ddp" else 1,
+        strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else 'auto',
         precision="16-mixed",
         max_epochs=1000,
         log_every_n_steps=1,
@@ -86,8 +85,8 @@ if __name__ == "__main__":
         enable_checkpointing=False,
     )
 
-    # trainer.fit(model, datamodule=dm)
-    trainer.test(model, datamodule=dm)
+    trainer.fit(model, datamodule=dm)
+    # trainer.test(model, datamodule=dm)
 
     if USE_WANDB:
         wandb.finish()
