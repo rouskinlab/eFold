@@ -6,6 +6,8 @@ from torch.nn import init
 from ..core.model import Model
 from ..core.batch import Batch
 
+from ..config import int2seq
+
 import os, sys
 
 from collections import defaultdict    
@@ -116,15 +118,11 @@ class U_Net(Model):
 
     def seq2map(self, seq_int):
 
-        def int2seq(seq):
-            # return ''.join(['XAUCG'[d] for d in seq])
-            return ''.join(['XACGU'[d] for d in seq])
-
         # take integer encoded sequence and return last channel of embedding (pairing energy)
         def creatmat(data, device=None):
 
             with torch.no_grad():
-                data = int2seq(data)
+                data = ''.join([int2seq[d] for d in data.tolist()])
                 paired = defaultdict(float, {'AU':2., 'UA':2., 'GC':3., 'CG':3., 'UG':0.8, 'GU':0.8})
 
                 mat = torch.tensor([[paired[x+y] for y in data] for x in data]).to(device)
