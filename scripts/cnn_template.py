@@ -24,8 +24,9 @@ sys.path.append(os.path.abspath("."))
 
 # Train loop
 if __name__ == "__main__":
-    USE_WANDB = 1
-    STRATEGY = "ddp"
+    n_gpu = 8
+    USE_WANDB = 0
+    STRATEGY = "random"
     print("Running on device: {}".format(device))
     if USE_WANDB:
         project = "Structure-classic"
@@ -58,18 +59,18 @@ if __name__ == "__main__":
         wandb=USE_WANDB,
     )
 
-    # import torch
-    # model.load_state_dict(torch.load('/root/DMSensei/dmsensei/models/trained_models/vocal-voice-12.pt',
-    #                                  map_location=torch.device(device)))
+    import torch
+    model.load_state_dict(torch.load('/Users/alberic/Desktop/lively-waterfall-8_epoch45.pt',
+                                     map_location=torch.device(device)))
 
     if USE_WANDB:
         wandb_logger.watch(model, log="all")
 
     trainer = Trainer(
         accelerator=device,
-        devices=8,
+        devices=n_gpu if STRATEGY == "ddp" else 1,
         strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else 'auto',
-        precision="16-mixed",
+        # precision="16-mixed",
         max_epochs=1000,
         log_every_n_steps=1,
         accumulate_grad_batches=32,
@@ -84,8 +85,8 @@ if __name__ == "__main__":
         use_distributed_sampler=STRATEGY != "ddp",
     )
 
-    trainer.fit(model, datamodule=dm)
-    # trainer.test(model, datamodule=dm)
+    # trainer.fit(model, datamodule=dm)
+    trainer.test(model, datamodule=dm)
 
     if USE_WANDB:
         wandb.finish()
