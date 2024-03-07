@@ -2,7 +2,26 @@ import torch
 import math
 import numpy as np
 import torch.nn.functional as F
+from scipy.optimize import linear_sum_assignment
 
+def hungarian_algorithm(bppm, threshold=0.5):
+    # make sure that the input dimension is batch_size x n x n
+    if len(bppm.shape) == 2:
+        bppm = bppm.unsqueeze(0)
+    assert len(bppm.shape) == 3, "The input bppm matrix should be batch_size x n x n"
+    assert bppm.shape[1] == bppm.shape[2], "The input bppm matrix should be batch_size x n x n"
+    
+    # run hungarian algorithm for each batch
+    n = bppm.shape[1]
+    bp_matrix = np.zeros(bppm.shape)
+    for i in range(bppm.shape[0]):
+        row_ind, col_ind = linear_sum_assignment(-bppm[i].cpu().numpy())
+        for j in range(n):
+            if bppm[i, row_ind[j], col_ind[j]] > threshold:
+                bp_matrix[i, row_ind[j], col_ind[j]] = 1
+    return bp_matrix
+
+    
 
 def constraint_matrix_batch(x):
     """
