@@ -3,6 +3,7 @@ import math
 import numpy as np
 import torch.nn.functional as F
 from scipy.optimize import linear_sum_assignment
+from ..config import seq2int
 
 class HungarianAlgorithm:
         
@@ -14,7 +15,7 @@ class HungarianAlgorithm:
         - threshold (float): the minimum threshold for a base pair to be considered as a pair candidate
         - canonical_bp_only (bool): if True, only AU, CG, GU and pairs with N are considered as pair candidates
         - sequences (list): list of RNA sequences (only used if canonical_bp_only is True)
-        - min_hairpin_loop (int): the minimum length of bases in a hairpin loop in the output structure
+        - min_hairpin_loop (int): the minimum number of bases in a hairpin loop in the output structure
         
         Example:
         >>> inpt = np.diag(np.ones(10))[::-1]
@@ -32,6 +33,8 @@ class HungarianAlgorithm:
                             [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],\
                             [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],\
                             [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]], "The output is not as expected: {}".format(out)
+        >>> out = HungarianAlgorithm().run(torch.tensor([[[0., 0.6, 0.8],[0.6, 0., 0.9],[0.8, 0.9, 0.]]]), threshold=0.5, min_hairpin_loop=0).squeeze(0).tolist()
+        >>> assert out == [[0., 1., 0.],[0., 0., 1.],[1., 0., 0.]], "The output is not as expected: {}".format(out)
         """
         
         bppm = bppm.cpu().numpy()
@@ -53,13 +56,13 @@ class HungarianAlgorithm:
             bppm[i] = self._remove_short_loop(bppm[i], min_hairpin_loop)
             
             # run hungarian algorithm only on rows and columns that have at least one value greater than threshold
-            compressed_matrix_idx = self._pairable_bases(bppm[i], threshold)
-            compressed_bppm = bppm[i][compressed_matrix_idx][:, compressed_matrix_idx]
+            compression_idx = self._pairable_bases(bppm[i], threshold)
+            compressed_bppm = bppm[i][compression_idx][:, compression_idx]
             row_ind, col_ind = self._hungarian_algorithm(compressed_bppm)         
             
             # convert the result to the original sized matrix
             for compressed_row, compressed_col in zip(row_ind, col_ind):
-                bppm_row, bppm_col = compressed_matrix_idx[compressed_row], compressed_matrix_idx[compressed_col]
+                bppm_row, bppm_col = compression_idx[compressed_row], compression_idx[compressed_col]
                 if bppm[i, bppm_row, bppm_col] > threshold:
                     bp_matrix[i, bppm_row, bppm_col] = 1
             
@@ -71,13 +74,12 @@ class HungarianAlgorithm:
         return row_ind, col_ind
     
     def _pairable_bases(self, bppm, threshold):
-        """Returns the indices of rows and columns that have at least one value greater than threshold"""
-        n = bppm.shape[1]
-        row_ind = []
-        for i in range(n):
-            if bppm[i].max() > threshold: 
-                row_ind.append(i)
-        return row_ind
+        """Returns the indices of rows that have at least one value greater than threshold
+        
+        Example:
+        >>> assert (HungarianAlgorithm()._pairable_bases(np.array([[0.0, 0.0, 0.0], [0.0, 0.6, 0.8], [0.0, 0.8, 0.9]]), 0.01) == np.array([1, 2])).all(), "The output is not as expected"
+        """
+        return np.where((bppm > threshold).any(axis=0))[0]
     
     def is_symmetric(self, bppm):
         return (bppm == bppm.transpose(1, 0)).all()
@@ -88,31 +90,32 @@ class HungarianAlgorithm:
         Logic: 
             - embed the sequence
             - sum the sequence with its transpose
-            - canonical base pairs sum into 3, 5 or negative values (N) by design
+            - canonical base pairs sum into 5 (AU, CG) and 7 (GU)
             
-            Mapping: A=0, C=1, G=2, U=3, N=-4
+            Mapping: A=1, C=2, G=3, U=4
             Which gives, in the sum:    
-                A | C | G | U | N
-            A | 0 | 1 | 2 | 3 | -4
-            C | 1 | 2 | 3 | 4 | -3
-            G | 2 | 3 | 4 | 5 | -2
-            U | 3 | 4 | 5 | 6 | -1
-            N |-4 |-3 |-2 |-1 | -8
+                A | C | G | U 
+            A | 2 | 3 | 4 | 5
+            C | 3 | 4 | 5 | 6
+            G | 4 | 5 | 6 | 7
+            U | 5 | 6 | 7 | 8
             
-            If you keep only the values that are 3, 5 or -4, you keep only the canonical base pairs   
+            -> if the sum is 5 or 7, keep the base pair
         
         Example:
-        >>> assert (HungarianAlgorithm()._remove_non_canonical(np.ones((5,5)), 'ACGUN') == np.array([[0., 0., 0., 1.,1.],[0.,0.,1.,0.,1.],[0.,1.,0.,1.,1.],[1.,0.,1.,0.,1.],[1.,1.,1.,1.,1.]])).all(), "The output is not as expected"
+        >>> seq = np.array([seq2int[a] for a in 'ACGU'])
+        >>> out = HungarianAlgorithm()._remove_non_canonical(np.ones((4,4)), seq).tolist()
+        >>> assert (out == np.array([[0., 0., 0., 1.],[0.,0.,1.,0.],[0.,1.,0.,1.],[1.,0.,1.,0.]])).all(), "The output is not as expected: {}".format(out)
         """
-        # embed the sequence
-        mapping = {'A': 0, 'C': 1, 'G': 2, 'U': 3, 'T': 3, 'N': -4}
-        sequence = np.array([mapping[base] for base in sequence]).reshape(-1, 1)
-        
         # make the pairing matrix
+        sequence = sequence.reshape(-1, 1)
         mat = sequence + sequence.T
         
+        # make sure that this function matches the embedding from config
+        assert set([seq2int[a] + seq2int[b] for a, b in (("A","U"), ("C","G"), ("G","U"))]) == set([5, 7]), "The embedding does not match the expected values"
+        
         # remove non-canonical base pairs
-        bp_matrix[(mat>=0) & (mat!=3) & (mat!=5)] = 0
+        bp_matrix[(mat!=5) & (mat!=7)] = 0
         
         return bp_matrix
     
@@ -125,9 +128,7 @@ class HungarianAlgorithm:
         """
         n = bp_matrix.shape[1]
         for i in range(n):
-            for j in range(i-min_hairpin_loop, i+min_hairpin_loop+1):
-                if j >= 0 and j < n:
-                    bp_matrix[i, j] = 0
+            bp_matrix[i, max(0, i-min_hairpin_loop):min(n, i+min_hairpin_loop+1)] = 0
         return bp_matrix
     
 
