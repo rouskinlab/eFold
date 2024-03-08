@@ -22,7 +22,8 @@ class HungarianAlgorithm:
         >>> inpt += np.random.normal(0, 0.2, inpt.shape)
         >>> inpt = (inpt + inpt.T)/2 
         >>> inpt = torch.tensor(inpt).unsqueeze(0)
-        >>> out = HungarianAlgorithm().run(inpt, threshold=0.5, canonical_bp_only=True, sequences=['GAACUAUUCU']).squeeze(0).tolist()
+        >>> seq = np.array([seq2int[a] for a in 'GAACUAUUCU'])
+        >>> out = HungarianAlgorithm().run(inpt, threshold=0.5, canonical_bp_only=True, sequences=[seq]).squeeze(0).tolist()
         >>> assert out == [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],\
                             [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],\
                             [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0],\
@@ -37,13 +38,14 @@ class HungarianAlgorithm:
         >>> assert out == [[0., 1., 0.],[0., 0., 1.],[1., 0., 0.]], "The output is not as expected: {}".format(out)
         """
         
-        bppm = bppm.cpu().numpy()
-        
         # make sure that the input dimension is batch_size x n x n
         if len(bppm.shape) == 2:
             bppm = bppm.unsqueeze(0)
         assert len(bppm.shape) == 3, "The input bppm matrix should be batch_size x n x n"
         assert bppm.shape[1] == bppm.shape[2], "The input bppm matrix should be batch_size x n x n"
+        
+        # just work with numpy (needed for the optimization step)
+        bppm = bppm.cpu().numpy()
         
         # run hungarian algorithm for each batch
         bp_matrix = np.zeros(bppm.shape)
