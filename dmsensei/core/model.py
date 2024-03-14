@@ -195,12 +195,6 @@ class Model(pl.LightningModule):
         self.test_results['reference'] += batch.get('reference')
         self.test_results['sequence'] += [''.join([int2seq[base] for base in seq]) for seq in batch.get('sequence').detach().tolist()]
         self.test_results['structure'] += predictions['structure'].tolist()
-        
-        
-        from ..config import int2seq
-        self.test_results['reference'] += batch.get('reference')
-        self.test_results['sequence'] += [''.join([int2seq[base] for base in seq]) for seq in batch.get('sequence').detach().tolist()]
-        self.test_results['structure'] += predictions['structure'].tolist()
 
         predictions = self._clean_predictions(batch, predictions)
         batch.integrate_prediction(predictions)
@@ -232,14 +226,6 @@ class Model(pl.LightningModule):
         import pandas as pd
         df = pd.DataFrame(self.test_results)
         df.to_feather('test_results_PT+FT.feather')
-
-        torch.cuda.empty_cache()
-
-    def on_test_end(self) -> None:
-        
-        import pandas as pd
-        df = pd.DataFrame(self.test_results)
-        df.to_feather('test_results_UFoldPT.feather')
 
         torch.cuda.empty_cache()
 
