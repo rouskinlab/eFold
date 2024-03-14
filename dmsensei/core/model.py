@@ -157,9 +157,10 @@ class Model(pl.LightningModule):
                                                0.01, 0.1, 100, 1.6, True, 1.5)
 
         batch.integrate_prediction(predictions)
-        loss, losses = self.loss_fn(batch)
+        # loss, losses = self.loss_fn(batch)
         self.metrics_stack[dataloader_idx].update(batch)
-        return loss, losses
+        # return loss, losses
+        return 0, {}
 
     def on_validation_batch_end(
         self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int, dataloader_idx: int = 0

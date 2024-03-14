@@ -31,12 +31,12 @@ if __name__ == "__main__":
     lr = 1e-4
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        project = "Unet"
+        project = "Evoformer-final-tests"
         wandb_logger = WandbLogger(project=project)
 
     # fit loop
     dm = DataModule(
-        name=["yack_train"], # finetune: "utr", "pri_miRNA", "archiveII"
+        name=["bpRNA", "ribo500-blast", "rnacentral_synthetic"], # finetune: "utr", "pri_miRNA", "archiveII"
         strategy=STRATEGY, #random, sorted or ddp
         shuffle_train=False,
         data_type=["structure"],  #
@@ -45,7 +45,7 @@ if __name__ == "__main__":
         max_len=1024,
         structure_padding_value=0,
         train_split=None,
-        external_valid=["yack_valid", "pri_miRNA", "human_mRNA_sarah", "lncRNA", "viral_fragments"], # finetune: "yack_valid", "human_mRNA"
+        external_valid=["yack_valid", "PDB", "archiveII_blast", "lncRNA", "viral_fragments"], # finetune: "yack_valid", "human_mRNA"
     )
 
     model = create_model(

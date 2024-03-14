@@ -21,8 +21,8 @@ sys.path.append(os.path.abspath("."))
 
 # Train loop
 if __name__ == "__main__":
-    USE_WANDB = 1
-    STRATEGY = "ddp"
+    USE_WANDB = 0
+    STRATEGY = "random"
 
     print("Running on device: {}".format(device))
     if USE_WANDB:
@@ -32,7 +32,7 @@ if __name__ == "__main__":
     # fit loop
     batch_size = 1
     dm = DataModule(
-        name=["utr", "pri_miRNA", "archiveII"],
+        name=["bpRNA", "ribo500-blast", "rnacentral_synthetic"],
         strategy=STRATEGY,
         shuffle_train=False,
         data_type=["structure"],  #
@@ -41,7 +41,7 @@ if __name__ == "__main__":
         max_len=1024,
         structure_padding_value=0,
         train_split=None,
-        external_valid=["yack_valid", "lncRNA", "viral_fragments"],
+        external_valid=["yack_valid", "lncRNA", "viral_fragments", "PDB", "archiveII_blast"],
     )
 
     model = create_model(
@@ -53,7 +53,7 @@ if __name__ == "__main__":
         num_blocks=4,
         no_recycles=0,
         dropout=0,
-        lr=5e-4,
+        lr=3e-4,
         weight_decay=0,
         gamma=0.995,
         wandb=USE_WANDB,
@@ -70,7 +70,7 @@ if __name__ == "__main__":
         accelerator=device,
         devices=8,
         strategy=DDPStrategy(),
-        precision="16-mixed",
+        # precision="16-mixed",
         max_epochs=1000,
         log_every_n_steps=1,
         accumulate_grad_batches=32,
