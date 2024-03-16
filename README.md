@@ -44,14 +44,14 @@ pip install path/to/efold
 
 bppm/ # bppm post processing step
 efold/
-	  core/   # backend 
-	  models/ # where we define eFold and other models
+    core/   # backend 
+    models/ # where we define eFold and other models
 scripts/
-	  efold_training.py # our training script
-	  [scripts to train the other models]
+    efold_training.py # our training script
+    [scripts to train the other models]
 best_efold/ # where we store our best model
-	  hyperparameters.json 
-	  weights.json
+    hyperparameters.json 
+    weights.json
 # python module boilerplate
 LICENSE
 requirements.txt
