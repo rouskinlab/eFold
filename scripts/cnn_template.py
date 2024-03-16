@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
     # fit loop
     dm = DataModule(
-        name=["yack_train"], # finetune: "utr", "pri_miRNA", "archiveII"
+        name=["bpRNA", "ribo500-blast", "rnacentral_synthetic"], # finetune: "utr", "pri_miRNA", "archiveII"
         strategy=STRATEGY, #random, sorted or ddp
         shuffle_train=False,
         data_type=["structure"],  #
@@ -43,7 +43,7 @@ if __name__ == "__main__":
         max_len=800,
         structure_padding_value=0,
         train_split=None,
-        external_valid=["yack_valid", "pri_miRNA", "human_mRNA", "lncRNA", "viral_fragments"], # finetune: "yack_valid", "human_mRNA"
+        external_valid=["yack_valid", "PDB", "archiveII_blast", "lncRNA", "viral_fragments"],
     )
 
     model = create_model(

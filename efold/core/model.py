@@ -157,9 +157,10 @@ class Model(pl.LightningModule):
                                                0.01, 0.1, 100, 1.6, True, 1.5)
 
         batch.integrate_prediction(predictions)
-        loss, losses = self.loss_fn(batch)
+        # loss, losses = self.loss_fn(batch)
         self.metrics_stack[dataloader_idx].update(batch)
-        return loss, losses
+        # return loss, losses
+        return 0, {}
 
     def on_validation_batch_end(
         self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int, dataloader_idx: int = 0
@@ -190,12 +191,6 @@ class Model(pl.LightningModule):
                                                0.01, 0.1, 100, 1.6, True, 1.5)
         
 
-        from ..config import int2seq
-        self.test_results['reference'] += batch.get('reference')
-        self.test_results['sequence'] += [''.join([int2seq[base] for base in seq]) for seq in batch.get('sequence').detach().tolist()]
-        self.test_results['structure'] += predictions['structure'].tolist()
-        
-        
         from ..config import int2seq
         self.test_results['reference'] += batch.get('reference')
         self.test_results['sequence'] += [''.join([int2seq[base] for base in seq]) for seq in batch.get('sequence').detach().tolist()]
@@ -231,14 +226,6 @@ class Model(pl.LightningModule):
         import pandas as pd
         df = pd.DataFrame(self.test_results)
         df.to_feather('test_results_PT+FT.feather')
-
-        torch.cuda.empty_cache()
-
-    def on_test_end(self) -> None:
-        
-        import pandas as pd
-        df = pd.DataFrame(self.test_results)
-        df.to_feather('test_results_UFoldPT.feather')
 
         torch.cuda.empty_cache()
 
