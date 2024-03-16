@@ -9,3 +9,5 @@ trash_project_for_testing
 test_models
 predict*
 .env
+bppm/test_results_PT+FT.feather
+.DS_Store

@@ -7,7 +7,7 @@ from ..config import seq2int
 
 class HungarianAlgorithm:
         
-    def run(self, bppm, threshold=0.5, canonical_bp_only=False, sequences=None, min_hairpin_loop=3):
+    def run(self, bppm, threshold=0.5, canonical_bp_only=False, sequences=None, min_hairpin_loop=3, output_format='matrix'):
         """Runs the Hungarian algorithm on the input bppm matrix
         
         Args:
@@ -16,6 +16,7 @@ class HungarianAlgorithm:
         - canonical_bp_only (bool): if True, only AU, CG, GU and pairs with N are considered as pair candidates
         - sequences (list): list of RNA sequences (only used if canonical_bp_only is True)
         - min_hairpin_loop (int): the minimum number of bases in a hairpin loop in the output structure
+        - output_format (str): the output format of the base pairs (either 'matrix' or 'list')
         
         Example:
         >>> inpt = np.diag(np.ones(10))[::-1]
@@ -48,8 +49,16 @@ class HungarianAlgorithm:
         bppm = bppm.cpu().numpy()
         
         # run hungarian algorithm for each batch
-        bp_matrix = np.zeros(bppm.shape)
+        if output_format == 'matrix':
+            bp_matrix = np.zeros(bppm.shape) 
+        elif output_format == 'list':
+            bp_list = []
+        else:
+            raise ValueError("The output format should be either 'matrix' or 'list'")
+        
         for i in range(bppm.shape[0]):
+            if sequences is not None:
+                assert type(sequences[i]) == np.ndarray, "The input sequences should be a numpy array"
             assert self.is_symmetric(bppm[i]), "The input bppm matrix should be symmetric"
             
             # remove non-canonical base pairs and too short hairpins
@@ -66,9 +75,12 @@ class HungarianAlgorithm:
             for compressed_row, compressed_col in zip(row_ind, col_ind):
                 bppm_row, bppm_col = compression_idx[compressed_row], compression_idx[compressed_col]
                 if bppm[i, bppm_row, bppm_col] > threshold:
-                    bp_matrix[i, bppm_row, bppm_col] = 1
-            
-        return bp_matrix
+                    if output_format == 'matrix':
+                        bp_matrix[i, bppm_row, bppm_col] = 1
+                        bp_matrix[i, bppm_col, bppm_row] = 1
+                    elif output_format == 'list':
+                        bp_list.append((bppm_row, bppm_col))
+        return bp_matrix if output_format == 'matrix' else bp_list
     
     def _hungarian_algorithm(self, cost_matrix):
         """Returns the row and column indices of the optimal assignment using the Hungarian algorithm"""
