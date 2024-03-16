@@ -1,7 +1,0 @@
-{
-    "python.testing.pytestArgs": [
-        "efold"
-    ],
-    "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true
-}
