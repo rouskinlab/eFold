@@ -48,7 +48,7 @@ efold/
     models/ # where we define eFold and other models
 scripts/
     efold_training.py # our training script
-    [scripts to train the other models]
+    [...]
 best_efold/ # where we store our best model
     hyperparameters.json 
     weights.json
@@ -106,6 +106,7 @@ From a sequence:
 ```bash
 efold --sequence AACCTGGUG -o seq.txt
 cat seq.txt
+#TODO
 ```
 
 or a fasta file:
@@ -113,6 +114,7 @@ or a fasta file:
 ```bash
 efold --fasta example.fasta -o seq.txt
 cat seq.txt
+#TODO
 ```
 
 ### Using python
@@ -120,7 +122,7 @@ cat seq.txt
 ```python
 >>> from efold import inference
 >>> inference(seq = 'AACUGUGCUA')
-[todo]
+#TODO
 ```
 
 ## Reproducing our results
