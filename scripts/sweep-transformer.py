@@ -6,13 +6,13 @@ from lightning.pytorch.loggers import WandbLogger
 import os
 import sys
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
-from dmsensei.core.callbacks import PredictionLogger
+from efold.core.callbacks import PredictionLogger
 import pandas as pd
 from lightning.pytorch import Trainer
-from dmsensei.core.callbacks import PredictionLogger, ModelChecker
-from dmsensei.util import str2fun
-from dmsensei.config import device
-from dmsensei import DataModule, create_model
+from efold.core.callbacks import PredictionLogger, ModelChecker
+from efold.util import str2fun
+from efold.config import device
+from efold import DataModule, create_model
 import sys
 import os
 

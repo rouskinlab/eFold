@@ -6,9 +6,9 @@ import sys
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 import pandas as pd
 from lightning.pytorch import Trainer
-from dmsensei.util import str2fun
-from dmsensei.config import device
-from dmsensei import DataModule, create_model, metrics
+from efold.util import str2fun
+from efold.config import device
+from efold import DataModule, create_model, metrics
 
 sys.path.append(os.path.abspath("."))
 # os.system('source /Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/RNA_data/env')

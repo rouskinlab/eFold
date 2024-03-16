@@ -4,11 +4,11 @@ from lightning.pytorch.loggers import WandbLogger
 import os
 import sys
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
-from dmsensei.core.callbacks import ModelCheckpoint
+from efold.core.callbacks import ModelCheckpoint
 import pandas as pd
 from lightning.pytorch import Trainer
-from dmsensei.config import device
-from dmsensei import DataModule, create_model, metrics
+from efold.config import device
+from efold import DataModule, create_model, metrics
 
 sys.path.append(os.path.abspath("."))
 # os.system('source /Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/RNA_data/env')

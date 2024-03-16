@@ -10,9 +10,9 @@ import pandas as pd
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import LearningRateMonitor
-from dmsensei.core.callbacks import ModelCheckpoint  # , WandbTestLogger
-from dmsensei.config import device
-from dmsensei import DataModule, create_model
+from efold.core.callbacks import ModelCheckpoint  # , WandbTestLogger
+from efold.config import device
+from efold import DataModule, create_model
 import sys
 import os
 

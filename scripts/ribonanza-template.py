@@ -6,9 +6,9 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from lightning.pytorch import Trainer
-from dmsensei.core.callbacks import WandbFitLogger, KaggleLogger
-from dmsensei.config import device
-from dmsensei import DataModule, create_model
+from efold.core.callbacks import WandbFitLogger, KaggleLogger
+from efold.config import device
+from efold import DataModule, create_model
 import torch
 from lightning.pytorch.strategies import DDPStrategy
 
