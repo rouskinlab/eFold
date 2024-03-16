@@ -4,9 +4,9 @@ from lightning.pytorch.loggers import WandbLogger
 import os
 import sys
 from lightning.pytorch import Trainer
-from dmsensei.core.callbacks import WandbFitLogger, KaggleLogger
-from dmsensei.config import device
-from dmsensei import DataModule, create_model
+from efold.core.callbacks import WandbFitLogger, KaggleLogger
+from efold.config import device
+from efold import DataModule, create_model
 import envbash
 
 envbash.load.load_envbash(".env")
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     )
 
     # import torch
-    # model.load_state_dict(torch.load('/root/DMSensei/models/baseline_SRRF_loss19-0.pt',
+    # model.load_state_dict(torch.load('/root/efold/models/baseline_SRRF_loss19-0.pt',
     #                                  map_location=torch.device(device)))
 
     if USE_WANDB:

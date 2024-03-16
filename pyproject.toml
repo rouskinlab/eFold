@@ -3,10 +3,10 @@ requires = ["setuptools", "setuptools-git-versioning"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-py-modules = ['dmsensei']
+py-modules = ['efold']
 
 [project]
-name =  "dmsensei"
+name =  "efold"
 version = "0.1.0"
 authors = [
     {name = "Yves Martin", email = "yves@martin.yt"},
@@ -25,13 +25,13 @@ requires-python = ">=3.10"
 # add docstrings
 addopts = "--doctest-modules --doctest-glob='*.py' -v --capture=no --envfile env"
 pythonpath = [
-  "dmsensei",
+  "efold",
 ]
-testpaths = ['tests', 'dmsensei']
+testpaths = ['tests', 'efold']
 junit_family = "xunit2"
 
 [tool.poetry.include]
-include = ["dmsensei/resources/*.csv"]
+include = ["efold/resources/*.csv"]
 
 [tool.black]
 line-length = 88
