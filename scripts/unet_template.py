@@ -3,7 +3,7 @@ import sys
 
 sys.path.append(os.path.abspath("."))
 
-from dmsensei.core.callbacks import ModelCheckpoint
+from efold.core.callbacks import ModelCheckpoint
 from lightning.pytorch.strategies import DDPStrategy
 import wandb
 from lightning.pytorch.loggers import WandbLogger
@@ -11,8 +11,8 @@ import pandas as pd
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import LearningRateMonitor
-from dmsensei.config import device
-from dmsensei import DataModule, create_model
+from efold.config import device
+from efold import DataModule, create_model
 import sys
 import os
 from lightning.pytorch.profilers import PyTorchProfiler
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     )
 
     import torch
-    # model.load_state_dict(torch.load('/Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/DMSensei/models/ufold_train_alldata.pt',
+    # model.load_state_dict(torch.load('/Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/efold/models/ufold_train_alldata.pt',
     #                                  map_location=torch.device(device)))
     # model.load_state_dict(torch.load('/Users/alberic/Desktop/wandering-wave-6_epoch25.pt',
     #                                  map_location=torch.device(device)))

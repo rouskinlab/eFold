@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 import sys, os
-sys.path.append("/Users/yvesmartin/src/DMSensei")
-from dmsensei.core.postprocess import HungarianAlgorithm as DMSenseiHungarianAlgorithm
-from dmsensei.core.postprocess import postprocess_new_nc
+sys.path.append("/Users/yvesmartin/src/efold")
+from efold.core.postprocess import HungarianAlgorithm as efoldHungarianAlgorithm
+from efold.core.postprocess import postprocess_new_nc
 import torch
 from util import *
 from sklearn.metrics import f1_score
@@ -145,7 +145,7 @@ class AlgoTemplate(ABC):
     
 class HungarianAlgo(AlgoTemplate):
     name = "Hungarian"
-    ha = DMSenseiHungarianAlgorithm()
+    ha = efoldHungarianAlgorithm()
     
     def run(self, bppm=None, threshold=0.5, **kwargs):
         if bppm is None:
