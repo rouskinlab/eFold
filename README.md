@@ -68,7 +68,7 @@ All the data is stored on the [Rouskin lab HuggingFace page](https://huggingface
 
 - `rnacentral_synthetic` : 226,729 sequences. RNAstructure prediction of a diverse RNA central subset.
 - `ribo500-blast`: 46,060 sequences. [Ribonanza](https://www.kaggle.com/competitions/stanford-ribonanza-rna-folding/discussion/460121) sequences, predicted with RNAstructure, using Ribonanza’s chemical probing signal (CPS) as a constraint. Filtered out CPS < 500 reads and sequences with >80% match.
-- `bpRNA` : 66,715 sequences. From [bpRNA](https://bprna.cgrb.oregonstate.edu/). Structure from covariance analysis.
+- `bpRNA-1m` : 66,715 sequences. From [bpRNA](https://bprna.cgrb.oregonstate.edu/). Structure from covariance analysis.
 - `RNAstralign` : 27,125 sequences. From [RNAstralign](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-021-04540-7). Structure from covariance analysis.
 
 **Fine-tuning**:
