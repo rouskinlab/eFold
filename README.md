@@ -40,8 +40,7 @@ pip install path/to/efold
 
 ## File structure
 
-```
-
+```bash
 bppm/ # bppm post processing step
 efold/
     core/   # backend 
@@ -62,29 +61,11 @@ pyproject.toml
 
 ### List of the datasets we used
 
-All the data is stored on the [Rouskin lab HuggingFace page](https://huggingface.co/rouskinlab). We use the following datasets:
-
-**Pre-training:**
-
-- `rnacentral_synthetic` : 226,729 sequences. RNAstructure prediction of a diverse RNA central subset.
-- `ribo500-blast`: 46,060 sequences. [Ribonanza](https://www.kaggle.com/competitions/stanford-ribonanza-rna-folding/discussion/460121) sequences, predicted with RNAstructure, using Ribonanza’s chemical probing signal (CPS) as a constraint. Filtered out CPS < 500 reads and sequences with >80% match.
-- `bpRNA-1m` : 66,715 sequences. From [bpRNA](https://bprna.cgrb.oregonstate.edu/). Structure from covariance analysis.
-- `RNAstralign` : 27,125 sequences. From [RNAstralign](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-021-04540-7). Structure from covariance analysis.
-
-**Fine-tuning**:
-
-- `pri-miRNA` : 1,098 sequences. This data is new. Structure from RNAstructure using DMS-MaPseq chemical probing as a constraint.
-- `human-mRNA` : 1,456 sequences. This data is new. Structure from RNAstructure using DMS-MaPseq chemical probing as a constraint.
-
-**Testing**:
-
-- `PDB` : 356 sequences. From [PDB](https://www.rcsb.org/stats/growth/growth-rna). Structure from NMR and crystallography.
-- `viral-fragments` : 58 sequences. @Alberic Lajarte where is this data from?
-- `lncRNA` : 15 sequences. [Where is this data from again?] @Alberic Lajarte .
+A breakdown of the data we used is summarized [here](https://github.com/rouskinlab/efold_data). All the data is stored on the [HuggingFace](https://huggingface.co/rouskinlab). 
 
 ### Get the data
 
-You can download your datasets using [rouskinHF](https://github.com/rouskinlab/rouskinhf):
+You can download our datasets using [rouskinHF](https://github.com/rouskinlab/rouskinhf):
 
 ```bash
 pip install rouskinhf
@@ -94,7 +75,7 @@ And in your code, write:
 
 ```python
 >>> import rouskinhf
->>> data = rouskinhf.get_dataset('ribo500-blast')
+>>> data = rouskinhf.get_dataset('ribo500-blast') # look at the dataset names on huggingface
 ```
 
 ## Inference mode
