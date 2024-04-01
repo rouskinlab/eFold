@@ -19,11 +19,49 @@ def _load_sequences_from_fasta(fasta:str):
             sequences[-1] += line.strip()
     return sequences
 
+def _predict_structure(model, sequence:str):
+    seq = sequence_to_int(sequence).unsqueeze(0) 
+    b = batch.Batch(
+        sequence=seq,
+        reference=[""],
+        length=[len(seq)],
+        L = len(seq),
+        use_error=False,
+        batch_size=1,
+        data_types=["sequence"],
+        dt_count={"sequence": 1})
+
+    # predict the structure
+    pred = model(b)
+    structure = postprocess(pred['structure'], 
+                            model.seq2oneHot(b.get('sequence')),
+                            0.01, 0.1, 100, 1.6, True, 1.5).detach().numpy().round().astype(int)[0]
+
+    # turn into 1-indexed base pairs
+    return [(b,c) for b, c in (np.stack(np.where(np.triu(structure) == 1)) + 1).T]
+
 def run(arg:Union[str, List[str]]=None):
     """Runs the Efold API on the provided sequence or fasta file.
     
     Args:
-        arg (str): The sequence or the list of sequences to run Efold on, or the path to a fasta file containing the sequences.   
+        arg (str): The sequence or the list of sequences to run Efold on, or the path to a fasta file containing the sequences.  
+        
+    Returns:
+        dict: A dictionary containing the sequences as keys and the predicted secondary structures as values.
+        
+    Examples:
+    >>> from efold.api.run import run
+    >>> structure = run("GGGAAAUCC") # this is awful, we need to remove the prints
+    No scaling, use preLN
+    Replace GLU with swish for Conv
+    No scaling, use preLN
+    Replace GLU with swish for Conv
+    No scaling, use preLN
+    Replace GLU with swish for Conv
+    No scaling, use preLN
+    Replace GLU with swish for Conv
+    >>> assert structure == {'GGGAAAUCC': [(1, 9), (2, 8)]}, "Test failed: {}".format(structure)
+    
     """
     
     # Check if the input is valid
@@ -54,30 +92,11 @@ def run(arg:Union[str, List[str]]=None):
         weight_decay=0,
         gamma=0.995,
     )
-    model.load_state_dict(torch.load(join(dirname(dirname(__file__)), "resources/efold_weights.pt")))
+    model.load_state_dict(torch.load(join(dirname(dirname(__file__)), "resources/efold_weights.pt")), strict=False)
     
     structures = []
     for seq in sequences:  
-        # Run the model on the sequence
-        seq = sequence_to_int(seq).unsqueeze(0) 
-        b = batch.Batch(
-            sequence=seq,
-            reference=[""],
-            length=[len(seq)],
-            L = len(seq),
-            use_error=False,
-            batch_size=1,
-            data_types=["sequence"],
-            dt_count={"sequence": 1})
-        
-        # predict the structure
-        pred = model(b)
-        structure = postprocess(pred['structure'], 
-                                model.seq2oneHot(b.get('sequence')),
-                                0.01, 0.1, 100, 1.6, True, 1.5).detach().numpy().round().astype(int)[0]
-        
-        # turn into 1-indexed base pairs
-        structures.append([(b,c) for b, c in (np.stack(np.where(np.triu(structure) == 1)) + 1).T])  
+        structures.append(_predict_structure(model, seq))
 
     return {seq: structure for seq, structure in zip(sequences, structures)}
 
