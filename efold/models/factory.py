@@ -1,5 +1,5 @@
 from .transformer import Transformer
-from .efold import eFold
+from .efold import eFold 
 from .cnn import CNN
 from .ribonanza import Ribonanza
 from .unet import U_Net

@@ -35,7 +35,7 @@ class eFold(Model):
         **kwargs,
     ):
         self.save_hyperparameters()
-        super(eFold, self).__init__(
+        super().__init__(
             lr=lr, loss_fn=loss_fn, optimizer_fn=optimizer_fn, **kwargs
         )
 

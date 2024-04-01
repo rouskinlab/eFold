@@ -31,7 +31,7 @@ testpaths = ['tests', 'efold']
 junit_family = "xunit2"
 
 [tool.poetry.include]
-include = ["efold/resources/*.csv"]
+include = ["efold/resources/*.pt"]
 
 [tool.black]
 line-length = 88
