@@ -4,15 +4,18 @@ from efold.api.run import run
 
 @click.command('efold')
 @click.argument('sequence', required=False, type=str)
-@click.option('--seq', '-s', help='Input RNA sequence', type=str, multiple=True)
 @click.option('--fasta', '-f', help='Input FASTA file path')
 @click.option('--output', '-o', default='output.txt', help='Output file path (json, txt or csv)', type=click.Path())
 @click.option('--basepair/--dotbracket', '-bp/-db', default=False, help='Output structure format')
-def cli(sequence, seq, fasta, output, basepair):
+@click.option('--help', '-h', is_flag=True, help='Show this message', type=bool)
+def cli(sequence, fasta, output, basepair, help):
+    
+    if help:
+        click.echo(cli.get_help(click.Context(cli)))
+        return
+    
     fmt = 'bp' if basepair else 'dotbracket'
-    if seq:
-        result = run(seq, fmt)
-    elif sequence:
+    if sequence:
         result = run(sequence, fmt)
     elif fasta:
         result = run(fasta, fmt)
