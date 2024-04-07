@@ -1,7 +1,5 @@
 from setuptools import setup, find_packages
 
-requirements = open('requirements.txt').read().splitlines()
-
 setup(
     name='efold',
     version='0.1.0',
@@ -22,5 +20,4 @@ setup(
     include_package_data=True,
     package_data={'': ['resources/*.pt']},
     packages=find_packages(),
-    install_requires=requirements,
 ) 

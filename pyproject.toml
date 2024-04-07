@@ -7,7 +7,7 @@ py-modules = ['efold']
 
 [project]
 name =  "efold"
-version = "0.1.0"
+version = "0.1.1"
 authors = [
     {name = "Yves Martin", email = "yves@martin.yt"},
     {name = "Alberic de Lajarte", email = "albericlajarte@gmail.com"},
@@ -20,6 +20,23 @@ classifiers = [
     "Programming Language :: Python :: 3.10"
 ]
 requires-python = ">=3.10"
+dependencies = [
+    "pandas>=1.5.2",
+    "matplotlib>=3.6.2",
+    "plotly>=5.11.0",
+    "torch>=1.13.1",
+    "pytorch-lightning>=1.9.4",
+    "lightning>=1.9.4",
+    "torcheval>=0.0.6",
+    "tensorboard>=2.11.2",
+    "wandb",
+    "rouskinhf",
+    "einops",
+    "huggingface-hub",
+    "scikit-learn",
+    "envbash",
+    "click",
+]
 
 [tool.pytest.ini_options]
 # add docstrings
