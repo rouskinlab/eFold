@@ -34,7 +34,7 @@ class eFold(Model):
         optimizer_fn=torch.optim.Adam,
         **kwargs,
     ):
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=['loss_fn'])
         super().__init__(
             lr=lr, loss_fn=loss_fn, optimizer_fn=optimizer_fn, **kwargs
         )
@@ -936,10 +936,8 @@ class ConvModule(nn.Module):
 
         self.adaptive_scale = adaptive_scale
         if not adaptive_scale:
-            print("No scaling, use preLN")
             self.ln = nn.LayerNorm(input_dim, elementwise_affine=True)
         else:
-            print("Use scaling, no preLN")
             self.scale = nn.Parameter(torch.ones(input_dim))
             self.bias = nn.Parameter(torch.zeros(input_dim))
 
@@ -957,10 +955,8 @@ class ConvModule(nn.Module):
         )
 
         if conv_use_glu:
-            print("Using GLU for Conv")
             self.act1 = GLU()
         else:
-            print("Replace GLU with swish for Conv")
             self.act1 = nn.SiLU()
         self.act1 = GLU()
 

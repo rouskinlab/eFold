@@ -31,7 +31,7 @@ testpaths = ['tests', 'efold']
 junit_family = "xunit2"
 
 [tool.poetry.include]
-include = ["efold/resources/*.pt"]
+include = ["efold/resources/*.pt", 'requirements.txt']
 
 [tool.black]
 line-length = 88
@@ -50,3 +50,6 @@ exclude = '''
   | dist
 )/
 '''
+
+[project.scripts]
+efold = "efold.cli:cli"

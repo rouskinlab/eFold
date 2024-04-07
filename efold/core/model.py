@@ -45,7 +45,7 @@ class Model(pl.LightningModule):
         self.automatic_optimization = True
 
         self.weight_data = weight_data
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=['loss_fn'])
         self.lossBCE = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([300])).to(device)
 
         # Metrics
