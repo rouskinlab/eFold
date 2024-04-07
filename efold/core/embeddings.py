@@ -29,13 +29,3 @@ def base_pairs_to_pairing_matrix(base_pairs, sequence_length, padding, pad_value
         pairing_matrix[base_pairs[:, 1], base_pairs[:, 0]] = 1.0
     return pairing_matrix
 
-
-def pairing_matrix_to_base_pairs(pairing_matrix):
-    pairing_matrix = pairing_matrix + 1  # Convert to 1-indexed
-    base_pairs = []
-    for i in range(pairing_matrix.shape[0]):
-        for j in range(pairing_matrix.shape[1]):
-            if pairing_matrix[i, j] == 1:
-                base_pairs.append([i, j])
-                pairing_matrix[j, i] = 0
-    return base_pairs
