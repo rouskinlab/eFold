@@ -13,17 +13,15 @@ pip install efold
 ## File structure
 
 ```bash
-bppm/ # bppm post processing step
 efold/
+    api/    # for inference calls
     core/   # backend 
     models/ # where we define eFold and other models
+    resources/
+        efold_weights.py # our best model weights
 scripts/
     efold_training.py # our training script
     [...]
-best_efold/ # where we store our best model
-    hyperparameters.json 
-    weights.json
-# python module boilerplate
 LICENSE
 requirements.txt
 pyproject.toml
@@ -103,8 +101,8 @@ And in your code, write:
 Run the training script:
 
 ```bash
-cd path/to/efold
-python scripts/efold_training.py
+git clone https://github.com/rouskinlab/eFold
+python eFold/scripts/efold_training.py
 ```
 
 ## Citation
