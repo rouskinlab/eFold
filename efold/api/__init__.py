@@ -1,1 +1,1 @@
-from .run import run as efold_run
+from .run import run as inference

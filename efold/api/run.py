@@ -64,7 +64,7 @@ def run(arg:Union[str, List[str]]=None, fmt="dotbracket"):
     >>> assert structure == {'GGGAAAUCC': [(1, 9), (2, 8)]}, "Test failed: {}".format(structure)
     
     """
-    
+    assert fmt in ["dotbracket", "basepair", 'bp'], "Invalid format. Must be either 'dotbracket' or 'basepair'"
     # Check if the input is valid
     if not arg:
         raise ValueError("Either sequence or fasta must be provided")

@@ -29,6 +29,52 @@ requirements.txt
 pyproject.toml
 ```
 
+
+## Inference mode
+
+### Using the command line
+
+From a sequence:
+
+```bash
+efold AAACAUGAGGAUUACCCAUGU -o seq.txt
+cat seq.txt
+
+AAACAUGAGGAUUACCCAUGU
+..(((((.((....)))))))
+```
+
+or a fasta file:
+
+```bash
+efold --fasta example.fasta
+```
+
+Using different formats:
+```bash
+efold AAACAUGAGGAUUACCCAUGU -bp # base pairs
+efold AAACAUGAGGAUUACCCAUGU -db # dotbracket (default)
+```
+
+Output can be .json, .csv or .txt
+```bash
+efold AAACAUGAGGAUUACCCAUGU -o output.csv
+```
+
+Run help:
+```bash
+efold -h
+```
+
+### Using python
+
+```python
+>>> from efold import inference
+>>> inference('AACUGUGCUA', fmt='dotbracket')
+..(((((.((....)))))))
+```
+
+
 ## Data
 
 ### List of the datasets we used
@@ -50,33 +96,7 @@ And in your code, write:
 >>> data = rouskinhf.get_dataset('ribo500-blast') # look at the dataset names on huggingface
 ```
 
-## Inference mode
 
-### Using the command line
-
-From a sequence:
-
-```bash
-efold --sequence AACCTGGUG -o seq.txt
-cat seq.txt
-#TODO
-```
-
-or a fasta file:
-
-```bash
-efold --fasta example.fasta -o seq.txt
-cat seq.txt
-#TODO
-```
-
-### Using python
-
-```python
->>> from efold import inference
->>> inference(seq = 'AACUGUGCUA')
-#TODO
-```
 
 ## Reproducing our results
 
