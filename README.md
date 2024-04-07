@@ -10,22 +10,6 @@ This repo contains the pytorch code for our paper “*Diverse Database and Machi
 pip install efold
 ```
 
-## File structure
-
-```bash
-efold/
-    api/    # for inference calls
-    core/   # backend 
-    models/ # where we define eFold and other models
-    resources/
-        efold_weights.py # our best model weights
-scripts/
-    efold_training.py # our training script
-    [...]
-LICENSE
-requirements.txt
-pyproject.toml
-```
 
 
 ## Inference mode
@@ -72,6 +56,22 @@ efold -h
 ..(((((.((....)))))))
 ```
 
+## File structure
+
+```bash
+efold/
+    api/    # for inference calls
+    core/   # backend 
+    models/ # where we define eFold and other models
+    resources/
+        efold_weights.py # our best model weights
+scripts/
+    efold_training.py # our training script
+    [...]
+LICENSE
+requirements.txt
+pyproject.toml
+```
 
 ## Data
 
