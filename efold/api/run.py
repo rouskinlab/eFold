@@ -7,6 +7,7 @@ from ..core import batch
 from ..core.embeddings import sequence_to_int
 from ..core.postprocess import postprocess_new_nc as postprocess
 import numpy as np
+from ..util.format_conversion import convert_bp_list_to_dotbracket
 
 def _load_sequences_from_fasta(fasta:str):
     with open(fasta, "r") as f:
@@ -40,7 +41,7 @@ def _predict_structure(model, sequence:str):
     # turn into 1-indexed base pairs
     return [(b,c) for b, c in (np.stack(np.where(np.triu(structure) == 1)) + 1).T]
 
-def run(arg:Union[str, List[str]]=None):
+def run(arg:Union[str, List[str]]=None, fmt="dotbracket"):
     """Runs the Efold API on the provided sequence or fasta file.
     
     Args:
@@ -96,7 +97,12 @@ def run(arg:Union[str, List[str]]=None):
     
     structures = []
     for seq in sequences:  
-        structures.append(_predict_structure(model, seq))
+        structure = _predict_structure(model, seq)
+        if fmt == "dotbracket":
+            db_structure = convert_bp_list_to_dotbracket(structure, len(seq))
+            if db_structure != None:
+                structure = db_structure
+        structures.append(structure)
 
     return {seq: structure for seq, structure in zip(sequences, structures)}
 
