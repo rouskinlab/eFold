@@ -4,38 +4,10 @@ This repo contains the pytorch code for our paper “*Diverse Database and Machi
 
 [[BioRXiv](https://www.biorxiv.org/content/10.1101/2024.01.24.577093v1.full)] [[Data](https://huggingface.co/rouskinlab)]
 
-## Setup
-
-### Download eFold
+## Install
 
 ```bash
-git clone https://github.com/rouskinlab/efold
-```
-
-### Create your environment
-
-Using `virtualenv`
-
-```bash
-cd path/to/efold
-python -m venv .venv
-source .venv/bin/activate
-pip install -m requirements.txt
-```
-
-Using conda
-
-```bash
-cd path/to/efold
-conda create -n efold python=3.10
-conda activate efold
-pip install -m requirements.txt
-```
-
-### Install eFold
-
-```bash
-pip install path/to/efold
+pip install efold
 ```
 
 ## File structure
