@@ -8,6 +8,23 @@ from ..core.embeddings import sequence_to_int
 from ..core.postprocess import postprocess_new_nc as postprocess
 import numpy as np
 from ..util.format_conversion import convert_bp_list_to_dotbracket
+    
+# Load best model
+model = create_model(
+    model="efold",
+    ntoken=5,
+    d_model=64,
+    c_z=32,
+    d_cnn=64,
+    num_blocks=4,
+    no_recycles=0,
+    dropout=0,
+    lr=3e-4,
+    weight_decay=0,
+    gamma=0.995,
+)
+model.load_state_dict(torch.load(join(dirname(dirname(__file__)), "resources/efold_weights.pt")), strict=False)
+
 
 def _load_sequences_from_fasta(fasta:str):
     with open(fasta, "r") as f:
@@ -78,23 +95,7 @@ def run(arg:Union[str, List[str]]=None, fmt="dotbracket"):
         sequences = arg
     else:
         raise ValueError("Either sequence or fasta must be provided")
-    
-    # Load best model
-    model = create_model(
-        model="efold",
-        ntoken=5,
-        d_model=64,
-        c_z=32,
-        d_cnn=64,
-        num_blocks=4,
-        no_recycles=0,
-        dropout=0,
-        lr=3e-4,
-        weight_decay=0,
-        gamma=0.995,
-    )
-    model.load_state_dict(torch.load(join(dirname(dirname(__file__)), "resources/efold_weights.pt")), strict=False)
-    
+
     structures = []
     for seq in sequences:  
         structure = _predict_structure(model, seq)
