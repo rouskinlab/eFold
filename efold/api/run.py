@@ -51,9 +51,10 @@ def _predict_structure(model, sequence:str):
 
     # predict the structure
     pred = model(b)
-    structure = postprocess(pred['structure'], 
-                            model.seq2oneHot(b.get('sequence')),
-                            0.01, 0.1, 100, 1.6, True, 1.5).detach().numpy().round().astype(int)[0]
+    with torch.no_grad():
+        structure = postprocess(pred['structure'], 
+                                model.seq2oneHot(b.get('sequence')),
+                                0.01, 0.1, 100, 1.6, True, 1.5).detach().numpy().round().astype(int)[0]
 
     # turn into 1-indexed base pairs
     return [(b,c) for b, c in (np.stack(np.where(np.triu(structure) == 1)) + 1).T]
