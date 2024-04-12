@@ -52,7 +52,7 @@ efold -h
 
 ```python
 >>> from efold import inference
->>> inference('AACUGUGCUA', fmt='dotbracket')
+>>> inference('AAACAUGAGGAUUACCCAUGU', fmt='dotbracket')
 ..(((((.((....)))))))
 ```
 
