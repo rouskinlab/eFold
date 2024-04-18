@@ -5,7 +5,7 @@ import torch
 from os.path import join, dirname
 from ..core import batch
 from ..core.embeddings import sequence_to_int
-from ..core.postprocess import postprocess_new_nc as postprocess
+from ..core.postprocess import Postprocess
 import numpy as np
 from ..util.format_conversion import convert_bp_list_to_dotbracket
     
@@ -24,7 +24,9 @@ model = create_model(
     gamma=0.995,
 )
 model.load_state_dict(torch.load(join(dirname(dirname(__file__)), "resources/efold_weights.pt")), strict=False)
+model.eval()
 
+postprocesser = Postprocess()
 
 def _load_sequences_from_fasta(fasta:str):
     with open(fasta, "r") as f:
@@ -50,11 +52,9 @@ def _predict_structure(model, sequence:str):
         dt_count={"sequence": 1})
 
     # predict the structure
-    pred = model(b)
-    with torch.no_grad():
-        structure = postprocess(pred['structure'], 
-                                model.seq2oneHot(b.get('sequence')),
-                                0.01, 0.1, 100, 1.6, True, 1.5).detach().numpy().round().astype(int)[0]
+    with torch.inference_mode():
+        pred = model(b)
+        structure = postprocesser.run(pred['structure'], b.get('sequence')).numpy().round()[0]
 
     # turn into 1-indexed base pairs
     return [(b,c) for b, c in (np.stack(np.where(np.triu(structure) == 1)) + 1).T]

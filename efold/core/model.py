@@ -11,7 +11,7 @@ from .metrics import MetricsStack
 from .datamodule import DataModule
 import time
 
-from .postprocess import postprocess_new_nc as postprocess
+from .postprocess import Postprocess
 
 METRIC_ARGS = dict(dist_sync_on_step=True)
 
@@ -53,6 +53,8 @@ class Model(pl.LightningModule):
         self.tic = None
 
         self.test_results = {'reference':[], 'sequence':[] ,'structure':[]}
+
+        self.postprocesser = Postprocess()
 
     def configure_optimizers(self):
         optimizer = self.optimizer_fn(
@@ -152,9 +154,8 @@ class Model(pl.LightningModule):
 
     def validation_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
         predictions = self.forward(batch)
-        predictions['structure'] = postprocess(predictions['structure'], 
-                                               self.seq2oneHot(batch.get('sequence')),
-                                               0.01, 0.1, 100, 1.6, True, 1.5)
+        
+        predictions['structure'] = self.postprocesser.run(predictions['structure'], batch.get('sequence'))
 
         batch.integrate_prediction(predictions)
         # loss, losses = self.loss_fn(batch)
@@ -186,10 +187,7 @@ class Model(pl.LightningModule):
 
     def test_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
         predictions = self.forward(batch)
-        predictions['structure'] = postprocess(predictions['structure'], 
-                                               self.seq2oneHot(batch.get('sequence')),
-                                               0.01, 0.1, 100, 1.6, True, 1.5)
-        
+        predictions['structure'] = self.postprocesser.run(predictions['structure'], batch.get('sequence'))
 
         from ..config import int2seq
         self.test_results['reference'] += batch.get('reference')
