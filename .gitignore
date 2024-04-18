@@ -11,3 +11,4 @@ predict*
 .env
 bppm/test_results_PT+FT.feather
 .DS_Store
+build/
