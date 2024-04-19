@@ -8,7 +8,9 @@ from ..core.embeddings import sequence_to_int
 from ..core.postprocess import Postprocess
 import numpy as np
 from ..util.format_conversion import convert_bp_list_to_dotbracket
-    
+
+torch.set_default_dtype(torch.float32)
+
 # Load best model
 model = create_model(
     model="efold",
@@ -24,6 +26,7 @@ model = create_model(
     gamma=0.995,
 )
 model.load_state_dict(torch.load(join(dirname(dirname(__file__)), "resources/efold_weights.pt")), strict=False)
+model = model.to(device)
 model.eval()
 
 postprocesser = Postprocess()
@@ -39,7 +42,17 @@ def _load_sequences_from_fasta(fasta:str):
             sequences[-1] += line.strip()
     return sequences
 
-def _predict_structure(model, sequence:str):
+def _predict_structure(model, sequence:str, device=None):
+
+    # set device
+    if not device:
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+        elif torch.backends.mps.is_available():
+            device = torch.device("mps")
+        else:
+            device = torch.device("cpu")
+
     seq = sequence_to_int(sequence).unsqueeze(0) 
     b = batch.Batch(
         sequence=seq,
@@ -49,17 +62,17 @@ def _predict_structure(model, sequence:str):
         use_error=False,
         batch_size=1,
         data_types=["sequence"],
-        dt_count={"sequence": 1})
+        dt_count={"sequence": 1}).to(device)
 
     # predict the structure
     with torch.inference_mode():
         pred = model(b)
-        structure = postprocesser.run(pred['structure'], b.get('sequence')).numpy().round()[0]
+        structure = postprocesser.run(pred['structure'].to('cpu'), b.get('sequence').to('cpu')).numpy().round()[0]
 
     # turn into 1-indexed base pairs
     return [(b,c) for b, c in (np.stack(np.where(np.triu(structure) == 1)) + 1).T]
 
-def run(arg:Union[str, List[str]]=None, fmt="dotbracket"):
+def run(arg:Union[str, List[str]]=None, fmt="dotbracket", device=None):
     """Runs the Efold API on the provided sequence or fasta file.
     
     Args:
@@ -99,7 +112,7 @@ def run(arg:Union[str, List[str]]=None, fmt="dotbracket"):
 
     structures = []
     for seq in sequences:  
-        structure = _predict_structure(model, seq)
+        structure = _predict_structure(model, seq, device)
         if fmt == "dotbracket":
             db_structure = convert_bp_list_to_dotbracket(structure, len(seq))
             if db_structure != None:

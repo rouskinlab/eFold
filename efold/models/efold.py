@@ -875,7 +875,9 @@ class RelPositionMultiHeadAttention(MultiHeadAttention):
     @staticmethod
     def relative_shift(x):
         x_shape = x.size()
-        x = F.pad(x, (1, 0))
+        # x = F.pad(x, (1, 0))
+        # replace pad with torch.cat
+        x = torch.cat([x, x.new_zeros(x_shape[0], x_shape[1], x_shape[2], 1)], dim=-1)
 
         x = x.view(x_shape[0], x_shape[1], x_shape[3] + 1, x_shape[2])
         x = x[:, :, 1:, :].view(x_shape)

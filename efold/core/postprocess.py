@@ -194,7 +194,7 @@ class UFold_processing:
 
 class Postprocess:
 
-    def __init__(self, threshold=0.5, canonical_only=False, min_hairpin_length=3):
+    def __init__(self, threshold=0.5, canonical_only=True, min_hairpin_length=3):
         self.threshold = threshold
         self.canonical_only = canonical_only
         self.min_hairpin_length = min_hairpin_length
