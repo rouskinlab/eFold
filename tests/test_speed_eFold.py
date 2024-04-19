@@ -1,5 +1,7 @@
-import sys
-sys.path.append('../../eFold')
+import sys, os
+file_dir = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.join(file_dir, '../../eFold'))
+
 from efold import inference
 import pandas as pd
 import numpy as np
@@ -17,21 +19,20 @@ rnaStructure_dTs = []
 efold_GPU_dTs = []
 efold_CPU_dTs = []
 
-lengths = np.linspace(10, 1000, 100).astype(int)
-# lengths = [2000]
+lengths = np.linspace(10, 500, 100).astype(int)
 for length in tqdm(lengths):
     
     sequence_random = ''.join(np.random.choice(['A', 'C', 'G', 'U'], length))
 
     # eFold GPU
     t0 = time.time()
-    inference(sequence_random, fmt='bp', user_device='cuda')
+    inference(sequence_random, fmt='bp')
     dT = time.time()-t0
     efold_GPU_dTs.append(dT)
 
     # RNAfold
     t0 = time.time()
-    inference(sequence_random, fmt='bp', user_device='cpu')
+    inference(sequence_random, fmt='bp', device='cpu')
     dT = time.time()-t0
     efold_CPU_dTs.append(dT)
 
@@ -53,5 +54,5 @@ fig.update_layout(title='Inference time of eFold vs RNAstructure',
                   width=2000, height=1200)
 # fig.show()
 
-fig.write_image('speed_comparison.jpg')
+fig.write_image(os.path.join(file_dir, 'speed_comparison.jpg'))
 

@@ -1,4 +1,5 @@
-data
+data/
+!tests/data/
 **__pycache__**
 wandb
 efold/models/trained_models
@@ -12,3 +13,4 @@ predict*
 bppm/test_results_PT+FT.feather
 .DS_Store
 build/
+efold.egg-info

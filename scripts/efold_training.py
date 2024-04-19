@@ -36,7 +36,7 @@ if __name__ == "__main__":
     # fit loop
     batch_size = 1
     dm = DataModule(
-        name=["pri_miRNA"], # For pretraining: "bpRNA", "ribo500-blast", "rnacentral_synthetic"
+        name=["rnacentral_synthetic", "ribo500-blast", "bpRNA-1m"], 
         strategy=STRATEGY,
         shuffle_train=False if STRATEGY == "ddp" else True,
         data_type=["structure"],  #
@@ -64,9 +64,9 @@ if __name__ == "__main__":
         wandb=USE_WANDB,
     )
 
-    import torch
-    model.load_state_dict(torch.load('/root/DMSensei/models/glamorous-hill-96_epoch[16, 17, 18, 19, 20]_avg.pt',
-                                     map_location=torch.device(device)))
+    # import torch
+    # model.load_state_dict(torch.load('/root/DMSensei/models/glamorous-hill-96_epoch[16, 17, 18, 19, 20]_avg.pt',
+    #                                  map_location=torch.device(device)))
 
     if USE_WANDB:
         wandb_logger.watch(model, log="all")
