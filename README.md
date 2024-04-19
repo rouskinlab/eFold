@@ -11,7 +11,6 @@ pip install efold
 ```
 
 
-
 ## Inference mode
 
 ### Using the command line
@@ -56,6 +55,11 @@ efold -h
 ..(((((.((....)))))))
 ```
 
+## Inference speed
+Tested on a AMD EPYC 7272 12 core processor, with 32GB RAM and a RTX3090 GPU
+
+![alt text](tests/speed_comparison.jpg)
+
 ## File structure
 
 ```bash
@@ -98,12 +102,14 @@ And in your code, write:
 
 ## Reproducing our results
 
-Run the training script:
+### Training
 
-```bash
-git clone https://github.com/rouskinlab/eFold
-python eFold/scripts/efold_training.py
-```
+A [training script](scripts/efold_training.py) is provided to train eFold from scratch.
+
+### Testing
+
+A [notebook](tests/test_eFold.ipynb) is provided to run eFold inference on the four test sets, compute the F1 score and check the validity of the structures.
+
 
 ## Citation
 
