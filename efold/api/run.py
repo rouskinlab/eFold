@@ -10,6 +10,10 @@ import numpy as np
 from ..util.format_conversion import convert_bp_list_to_dotbracket
 
 torch.set_default_dtype(torch.float32)
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+else:
+    device = torch.device("cpu")
 
 # Load best model
 model = create_model(
@@ -42,16 +46,11 @@ def _load_sequences_from_fasta(fasta:str):
             sequences[-1] += line.strip()
     return sequences
 
-def _predict_structure(model, sequence:str, device=None):
+def _predict_structure(model, sequence:str, user_device=None):
 
-    # set device
-    if not device:
-        if torch.cuda.is_available():
-            device = torch.device("cuda")
-        elif torch.backends.mps.is_available():
-            device = torch.device("mps")
-        else:
-            device = torch.device("cpu")
+    if user_device: 
+        device=user_device
+        model = model.to(device)
 
     seq = sequence_to_int(sequence).unsqueeze(0) 
     b = batch.Batch(
@@ -63,7 +62,7 @@ def _predict_structure(model, sequence:str, device=None):
         batch_size=1,
         data_types=["sequence"],
         dt_count={"sequence": 1}).to(device)
-
+    
     # predict the structure
     with torch.inference_mode():
         pred = model(b)
@@ -72,7 +71,7 @@ def _predict_structure(model, sequence:str, device=None):
     # turn into 1-indexed base pairs
     return [(b,c) for b, c in (np.stack(np.where(np.triu(structure) == 1)) + 1).T]
 
-def run(arg:Union[str, List[str]]=None, fmt="dotbracket", device=None):
+def run(arg:Union[str, List[str]]=None, fmt="dotbracket", user_device=None):
     """Runs the Efold API on the provided sequence or fasta file.
     
     Args:
@@ -112,7 +111,7 @@ def run(arg:Union[str, List[str]]=None, fmt="dotbracket", device=None):
 
     structures = []
     for seq in sequences:  
-        structure = _predict_structure(model, seq, device)
+        structure = _predict_structure(model, seq, user_device=user_device)
         if fmt == "dotbracket":
             db_structure = convert_bp_list_to_dotbracket(structure, len(seq))
             if db_structure != None:
@@ -120,5 +119,3 @@ def run(arg:Union[str, List[str]]=None, fmt="dotbracket", device=None):
         structures.append(structure)
 
     return {seq: structure for seq, structure in zip(sequences, structures)}
-
-
