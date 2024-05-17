@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 from lightning.pytorch import LightningModule, Trainer
 from lightning.pytorch.utilities import rank_zero_only
-from kaggle.api.kaggle_api_extended import KaggleApi
 import wandb
 from typing import Any
 

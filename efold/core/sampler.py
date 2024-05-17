@@ -1,6 +1,6 @@
 from torch.utils.data import Sampler, Subset
 import numpy as np
-from random import shuffle
+# from random import shuffle
 from torch.utils.data import Dataset
 from typing import Union, Optional, TypeVar, Iterator
 import torch.distributed as dist
@@ -165,5 +165,5 @@ def sampler_factory(
     elif strategy == 'ddp':
         return DDPSampler(dataset, num_replicas=num_replicas, rank=rank, shuffle=True, seed=seed)
     else:
-        raise ValueError(f"Invalid strategy value: {shuffle}")
+        raise ValueError(f"Invalid strategy value: {strategy}")
   

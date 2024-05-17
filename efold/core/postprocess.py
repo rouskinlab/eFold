@@ -37,7 +37,7 @@ class Constraints:
 
         # mask elements of the diagonals and sub-diagonals
         mask = np.tri(input_matrix.shape[0], k=-min_hairpin_length-1).astype(int)
-        return torch.tensor(mask + mask.T)
+        return torch.tensor(mask + mask.T, device=input_matrix.device)
 
     def mask_nonCanonical(self, sequence):
 
@@ -51,7 +51,7 @@ class Constraints:
         # find the allowable pairs
         allowable_pair = set()
         for pair in ["GU", "GC", "AU"]: allowable_pair.add(seq2int[pair[0]] + seq2int[pair[1]])
-        allowable_pair = torch.tensor(list(allowable_pair))
+        allowable_pair = torch.tensor(list(allowable_pair), device=pair_of_bases.device)
 
         return torch.isin(pair_of_bases, allowable_pair).int()
 
@@ -91,7 +91,9 @@ class HungarianAlgorithm:
         assert self.is_symmetric(bppm), "The input bppm matrix should be symmetric"
         
         # just work with numpy (needed for the optimization step)
-        if type(bppm)==torch.Tensor: bppm = bppm.cpu().numpy()
+        if type(bppm)==torch.Tensor: 
+            device = bppm.device
+            bppm = bppm.cpu().numpy()
         
         # run hungarian algorithm 
         bp_matrix = np.zeros(bppm.shape) 
@@ -108,7 +110,7 @@ class HungarianAlgorithm:
                 bp_matrix[bppm_row, bppm_col] = 1
                 bp_matrix[bppm_col, bppm_row] = 1
 
-        return torch.tensor(bp_matrix)
+        return torch.tensor(bp_matrix, device=device)
     
     def _hungarian_algorithm(self, cost_matrix):
         """Returns the row and column indices of the optimal assignment using the Hungarian algorithm"""
