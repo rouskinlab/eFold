@@ -223,7 +223,7 @@ class Model(pl.LightningModule):
         
         import pandas as pd
         df = pd.DataFrame(self.test_results)
-        df.to_feather('test_results_PT+FT.feather')
+        df.to_feather('test_results.feather')
 
         torch.cuda.empty_cache()
 

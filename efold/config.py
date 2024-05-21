@@ -22,7 +22,7 @@ device = (
 )
 
 TEST_SETS = {
-    "structure": ["PDB", "archiveII_blast", "lncRNA", "viral_fragments"], 
+    "structure": ["PDB", "archiveII", "lncRNA_nonFiltered", "viral_fragments"], 
     "sequence": [],
     "dms": [],  
     "shape": [],  
