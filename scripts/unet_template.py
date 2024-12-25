@@ -28,12 +28,20 @@ if __name__ == "__main__":
     STRATEGY = "random"
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        project = "Evoformer-final-tests"
-        wandb_logger = WandbLogger(project=project)
+        wandb_logger = WandbLogger(project='family_split', name='uFold_GroupI_test2')
 
     # fit loop
     dm = DataModule(
-        name=["bpRNA", "ribo500-blast", "rnacentral_synthetic"], # finetune: "utr", "pri_miRNA", "archiveII"
+        name=[
+        #       'RNAStralign_Group_I_intron',
+                'RNAStralign_5S',
+                'RNAStralign_telomerase',
+                'RNAStralign_SRP',
+                'RNAStralign_tmRNA',
+                'RNAStralign_RNaseP',
+                'RNAStralign',
+                'RNAStralign_16S',
+                'RNAStralign_tRNA'],
         strategy=STRATEGY, #random, sorted or ddp
         shuffle_train=False,
         data_type=["structure"],  #
@@ -42,24 +50,21 @@ if __name__ == "__main__":
         max_len=2000,
         structure_padding_value=0,
         train_split=None,
-        external_valid=["yack_valid", "PDB", "archiveII_blast", "lncRNA", "viral_fragments"], # finetune: "yack_valid", "human_mRNA"
+        external_valid=["RNAStralign_Group_I_intron",
+                        "RNAStralign_validation"],
     )
 
     model = create_model(
         model="unet",
         img_ch=17,
         output_ch=1,
-        lr=1e-3,
+        lr=2e-3,
         gamma=0.99,
         wandb=USE_WANDB,
     )
 
     import torch
-    # model.load_state_dict(torch.load('/Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/efold/models/ufold_train_alldata.pt',
-    #                                  map_location=torch.device(device)))
-    # model.load_state_dict(torch.load('/Users/alberic/Desktop/wandering-wave-6_epoch25.pt',
-    #                                  map_location=torch.device(device)))
-    model.load_state_dict(torch.load('/Users/alberic/Desktop/usual-yogurt-1_epoch10_UFoldPT.pt',
+    model.load_state_dict(torch.load('/root/eFold/models_eFold_UFold/vital-pine-118_epoch5.pt',
                                      map_location=torch.device(device)))
     
 

@@ -88,7 +88,7 @@ class HungarianAlgorithm:
         assert len(bppm.shape) == 2, "The input bppm matrix should be n x n"
         assert bppm.shape[0] == bppm.shape[1], "The input bppm matrix should be n x n"
 
-        assert self.is_symmetric(bppm), "The input bppm matrix should be symmetric"
+        assert self.is_symmetric(bppm), f"The input bppm matrix should be symmetric, {bppm}"
         
         # just work with numpy (needed for the optimization step)
         if type(bppm)==torch.Tensor: 
@@ -213,7 +213,9 @@ class Postprocess:
                                                             min_hairpin_length=self.min_hairpin_length, 
                                                             canonical_only=self.canonical_only)
             
-            pairing_matrix = UFold_processing().run(pairing_matrix)
+            pairing_matrix_UFold = UFold_processing().run(pairing_matrix)
+            if not pairing_matrix_UFold.isnan().any(): pairing_matrix = pairing_matrix_UFold 
+
 
             pairing_matrix = HungarianAlgorithm().run(pairing_matrix, threshold=self.threshold)
 

@@ -26,27 +26,37 @@ sys.path.append(os.path.abspath("."))
 # Train loop
 if __name__ == "__main__":
     USE_WANDB = 1
-    STRATEGY = "ddp"
-    n_gpu = 8
+    STRATEGY = "random"
+    n_gpu = 1
 
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        wandb_logger = WandbLogger(project='efold-final-tests')
+        wandb_logger = WandbLogger(project='family_split', name='eFold_GroupI_test')
 
     # fit loop
     batch_size = 1
     dm = DataModule(
-        name=["rnacentral_synthetic", "ribo500-blast", "bpRNA-1m"], 
+        name=[
+        #       'RNAStralign_Group_I_intron',
+                'RNAStralign_5S',
+                'RNAStralign_telomerase',
+                'RNAStralign_SRP',
+                'RNAStralign_tmRNA',
+                'RNAStralign_RNaseP',
+                'RNAStralign',
+                'RNAStralign_16S',
+                'RNAStralign_tRNA'],
         strategy=STRATEGY,
         shuffle_train=False if STRATEGY == "ddp" else True,
         data_type=["structure"],  #
         force_download=False,
         batch_size=batch_size,
-        max_len=1024,
-        min_len=10,
+        max_len=1000,
+        min_len=1,
         structure_padding_value=0,
         train_split=None,
-        external_valid=["yack_valid", "PDB", "archiveII_blast", "lncRNA", "viral_fragments"],
+        external_valid=["RNAStralign_Group_I_intron",
+                        "RNAStralign_validation"],
     )
 
     model = create_model(
@@ -58,14 +68,14 @@ if __name__ == "__main__":
         num_blocks=4,
         no_recycles=0,
         dropout=0,
-        lr=3e-4,
+        lr=1e-3,
         weight_decay=0,
         gamma=0.995,
         wandb=USE_WANDB,
     )
 
     # import torch
-    # model.load_state_dict(torch.load('/root/DMSensei/models/glamorous-hill-96_epoch[16, 17, 18, 19, 20]_avg.pt',
+    # model.load_state_dict(torch.load('/root/eFold/models_eFold_UFold/eFold_V2_PT10-15+FT_epoch5.pt',
     #                                  map_location=torch.device(device)))
 
     if USE_WANDB:
