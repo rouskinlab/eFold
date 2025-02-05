@@ -1,48 +1,38 @@
 import os
 import sys
-
 sys.path.append(os.path.abspath("."))
 
 from efold.core.callbacks import ModelCheckpoint
 from lightning.pytorch.strategies import DDPStrategy
 import wandb
 from lightning.pytorch.loggers import WandbLogger
-import pandas as pd
-from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import LearningRateMonitor
 from efold.config import device
 from efold import DataModule, create_model
-import sys
-import os
-from lightning.pytorch.profilers import PyTorchProfiler
-# import envbash
-# envbash.load.load_envbash('.env')
 
-
-sys.path.append(os.path.abspath("."))
 
 # Train loop
 if __name__ == "__main__":
-    USE_WANDB = 0
+    USE_WANDB = False
     STRATEGY = "random"
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        project = "Evoformer-final-tests"
-        wandb_logger = WandbLogger(project=project)
+        wandb_logger = WandbLogger(project='test')
 
     # fit loop
     dm = DataModule(
-        name=["bpRNA", "ribo500-blast", "rnacentral_synthetic"], # finetune: "utr", "pri_miRNA", "archiveII"
-        strategy=STRATEGY, #random, sorted or ddp
+        name=["efold_train"], # finetune: "utr", "pri_miRNA"
+        strategy=STRATEGY,
         shuffle_train=False,
-        data_type=["structure"],  #
+        data_type=["structure"], 
         force_download=False,
         batch_size=1,
-        max_len=2000,
+        max_len=1000,
+        min_len=1,
         structure_padding_value=0,
         train_split=None,
-        external_valid=["yack_valid", "PDB", "archiveII_blast", "lncRNA", "viral_fragments"], # finetune: "yack_valid", "human_mRNA"
+        external_valid=["yack_valid"],
     )
 
     model = create_model(
@@ -54,15 +44,6 @@ if __name__ == "__main__":
         wandb=USE_WANDB,
     )
 
-    import torch
-    # model.load_state_dict(torch.load('/Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/efold/models/ufold_train_alldata.pt',
-    #                                  map_location=torch.device(device)))
-    # model.load_state_dict(torch.load('/Users/alberic/Desktop/wandering-wave-6_epoch25.pt',
-    #                                  map_location=torch.device(device)))
-    model.load_state_dict(torch.load('/Users/alberic/Desktop/usual-yogurt-1_epoch10_UFoldPT.pt',
-                                     map_location=torch.device(device)))
-    
-
     if USE_WANDB:
         wandb_logger.watch(model, log="all")
 
@@ -70,8 +51,7 @@ if __name__ == "__main__":
         accelerator=device,
         devices=8 if STRATEGY == "ddp" else 1,
         strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else 'auto',
-        # precision="16-mixed",
-        max_epochs=1000,
+        max_epochs=15,
         log_every_n_steps=1,
         accumulate_grad_batches=32,
         logger=wandb_logger if USE_WANDB else None,
@@ -85,7 +65,7 @@ if __name__ == "__main__":
         use_distributed_sampler=STRATEGY != "ddp",
     )
 
-    # trainer.fit(model, datamodule=dm)
+    trainer.fit(model, datamodule=dm)
     trainer.test(model, datamodule=dm)
 
     if USE_WANDB:
