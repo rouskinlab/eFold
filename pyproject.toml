@@ -7,12 +7,12 @@ py-modules = ['efold']
 
 [project]
 name =  "efold"
-version = "0.1.2"
+version = "0.1.3"
 authors = [
     {name = "Yves Martin", email = "yves@martin.yt"},
     {name = "Alberic de Lajarte", email = "albericlajarte@gmail.com"},
 ]
-description = "A library to build our DMS signal and RNAstructure prediction models."
+description = "A Python package for RNA folding using end-to-end deep learning"
 readme = "README.md"
 classifiers = [
     "Development Status :: 3 - Alpha",

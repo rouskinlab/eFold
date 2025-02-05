@@ -2,8 +2,8 @@ from setuptools import setup, find_packages
 
 setup(
     name='efold',
-    version='0.1.0',
-    description='A library to build our DMS signal and RNAstructure prediction models.',
+    version='0.1.3',
+    description='A Python package for RNA folding using end-to-end deep learning',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     authors=[

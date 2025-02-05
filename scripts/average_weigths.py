@@ -1,6 +1,6 @@
 import torch
 
-base_model = 'models/efold_V1_PT_epoch.pt'
+base_model = 'models/efold_V1_PT+FT_epoch.pt'
 base_model = base_model.split(".pt")[0]
 epochs = [5,10]
 models = [f'{base_model}{n}.pt' for n in range(epochs[0], epochs[1]+1)]
