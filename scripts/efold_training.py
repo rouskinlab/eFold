@@ -47,7 +47,7 @@ if __name__ == "__main__":
         num_blocks=4,
         no_recycles=0,
         dropout=0,
-        lr=3e-4,
+        lr=1e-3,
         weight_decay=0,
         gamma=0.995,
         wandb=USE_WANDB,

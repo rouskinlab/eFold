@@ -39,7 +39,7 @@ if __name__ == "__main__":
         model="unet",
         img_ch=17,
         output_ch=1,
-        lr=1e-3,
+        lr=2e-3,
         gamma=0.99,
         wandb=USE_WANDB,
     )
