@@ -14,9 +14,9 @@ from efold import DataModule, create_model
 
 # Train loop
 if __name__ == "__main__":
-    USE_WANDB = False
+    USE_WANDB = True
     STRATEGY = "random"
-    n_gpu = 1
+    n_gpu = 4
 
     print("Running on device: {}".format(device))
     if USE_WANDB:
@@ -57,8 +57,8 @@ if __name__ == "__main__":
         wandb_logger.watch(model, log="all")
 
     trainer = Trainer(
-        accelerator=device,
-        devices=n_gpu if STRATEGY == "ddp" else 1,
+        accelerator='gpu',
+        devices=n_gpu,
         strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else 'auto',
         max_epochs=15,
         log_every_n_steps=1,
@@ -75,7 +75,7 @@ if __name__ == "__main__":
     )
 
     trainer.fit(model, datamodule=dm)
-    trainer.test(model, datamodule=dm)
+    #trainer.test(model, datamodule=dm)
 
     if USE_WANDB:
         wandb.finish()
