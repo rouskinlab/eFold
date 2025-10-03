@@ -2,6 +2,7 @@ import os
 import sys
 sys.path.append(os.path.abspath("."))
 
+import torch
 from lightning.pytorch.strategies import DDPStrategy
 import wandb
 from lightning.pytorch.loggers import WandbLogger
@@ -15,20 +16,24 @@ from efold import DataModule, create_model
 # Train loop
 if __name__ == "__main__":
     USE_WANDB = True
-    STRATEGY = "random"
-    n_gpu = 4
+    STRATEGY = "ddp"
+    n_gpu = 3  # <<< use 3 GPUs
 
-    print("Running on device: {}".format(device))
+    # Helpful diagnostics
+    print(f"Running on device (efold.config): {device}")
+    print(f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}")
+    print(f"Torch sees {torch.cuda.device_count()} GPU(s)")
+
     if USE_WANDB:
-        wandb_logger = WandbLogger(project='test')
+        wandb_logger = WandbLogger(project="test")
 
-    # fit loop
+    # Data
     batch_size = 1
     dm = DataModule(
-        name=["efold_train"], 
+        name=["efold_train"],
         strategy=STRATEGY,
         shuffle_train=False if STRATEGY == "ddp" else True,
-        data_type=["structure"],  #
+        data_type=["structure"],
         force_download=False,
         batch_size=batch_size,
         max_len=1000,
@@ -38,6 +43,7 @@ if __name__ == "__main__":
         external_valid=["yack_valid"],
     )
 
+    # Model
     model = create_model(
         model="efold",
         ntoken=5,
@@ -56,22 +62,28 @@ if __name__ == "__main__":
     if USE_WANDB:
         wandb_logger.watch(model, log="all")
 
+    # (Optional) use tensor cores on L40S as PyTorch suggests
+    try:
+        torch.set_float32_matmul_precision("medium")
+    except Exception:
+        pass
+
+    # Trainer
     trainer = Trainer(
-        accelerator='gpu',
-        devices=n_gpu,
-        strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else 'auto',
+        accelerator="gpu",                       # <<< explicit GPU accelerator
+        devices=n_gpu,                           # <<< 3 processes -> 3 GPUs
+        strategy=DDPStrategy(find_unused_parameters=False),
+        num_nodes=1,
         max_epochs=15,
         log_every_n_steps=1,
         accumulate_grad_batches=32,
-        use_distributed_sampler=STRATEGY != "ddp",
+        use_distributed_sampler=True,            # <<< shard data correctly under DDP
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
             LearningRateMonitor(logging_interval="epoch"),
             ModelCheckpoint(every_n_epoch=1),
-        ]
-        if USE_WANDB
-        else [],
-        enable_checkpointing=False,
+        ] if USE_WANDB else [],
+        enable_checkpointing=True,               # <<< ensure checkpoints actually save
     )
 
     trainer.fit(model, datamodule=dm)
