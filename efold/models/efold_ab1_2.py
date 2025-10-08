@@ -32,6 +32,7 @@ class eFold(Model):
         gamma: float = 1.0,
         loss_fn=nn.MSELoss(),
         optimizer_fn=torch.optim.Adam,
+        ablate_trunk: bool = True,
         **kwargs,
     ):
         self.save_hyperparameters(ignore=['loss_fn'])
@@ -46,22 +47,30 @@ class eFold(Model):
         self.train_losses = []
         self.loss = nn.MSELoss()
 
+        self.ablate_trunk = ablate_trunk
+
         # Encoder layers
-        self.encoder = nn.Embedding(ntoken, d_model)
+        if not self.ablate_trunk:
+            self.encoder = nn.Embedding(ntoken, d_model)
+        else:
+            self.encoder = None
         # self.encoder_adapter = nn.Linear(d_model, int(c_z / 2))
         # self.activ = nn.ReLU()
         self.encoder_adapter = nn.Conv2d(17, c_z, kernel_size=15, padding=7, bias=True)
-        self.eFold = EvoFold(
-            c_s=d_model,
-            c_z=c_z,
-            # CHANGE
-            no_heads_s=8,
-            ######
-            no_heads_z=4,
-            num_blocks=num_blocks,
-            dropout=dropout,
-            no_recycles=no_recycles,
-        )
+        if not self.ablate_trunk:
+            self.eFold = EvoFold(
+                c_s=d_model,
+                c_z=c_z,
+                # CHANGE
+                no_heads_s=8,
+                ######
+                no_heads_z=4,
+                num_blocks=num_blocks,
+                dropout=dropout,
+                no_recycles=no_recycles,
+            )
+        else:
+            self.eFold = None
 
         # self.output_net_DMS = nn.Sequential(
         #     nn.LayerNorm(d_model),
@@ -95,7 +104,8 @@ class eFold(Model):
         # Encoding of RNA sequence
         src = batch.get("sequence")
         
-        s = self.encoder(src)  # (N, L, d_model)
+        if self.encoder is not None:
+            s = self.encoder(src)  # (N, L, d_model)
         z = self.encoder_adapter(self.seq2map(src)).permute(0, 2, 3, 1) # (N, L, L, d_model)
 
         # z = self.activ(self.encoder_adapter(s))  # (N, L, c_z / 2)
@@ -103,7 +113,8 @@ class eFold(Model):
         # z = z.unsqueeze(1).repeat(1, z.shape[1], 1, 1)  # (N, L, L, c_z / 2)
         # z = torch.cat((z, z.permute(0, 2, 1, 3)), dim=-1)  # (N, L, L, c_z)
 
-        s, z = self.eFold(s, z)
+        if (self.eFold is not None) and (self.encoder is not None):
+            s, z = self.eFold(s, z)
 
         structure = self.structure_adapter(z)  # (N, L, L, d_cnn)
         structure = self.output_structure(structure.permute(0, 3, 1, 2)).squeeze(
@@ -182,7 +193,6 @@ class EvoBlock(nn.Module):
         no_heads_s,
         no_heads_z,
         dropout: float = 0.0,
-        is_last_block: bool = False,
     ):
         super(EvoBlock, self).__init__()
         assert c_s % no_heads_s == 0
@@ -191,20 +201,16 @@ class EvoBlock(nn.Module):
         assert no_heads_s % 2 == 0
         assert no_heads_z % 2 == 0
 
-        self.is_last_block = is_last_block
         self.c_s = c_s
         self.c_z = c_z
 
         self.layernorm = nn.LayerNorm(c_s)
 
         # Adapter to add sequence rep to pair rep
-        if self.is_last_block:
-            self.sequence_to_pair = SequenceToPair(c_s, c_z // 2, c_z)
-        else:
-            self.sequence_to_pair = None
+        self.sequence_to_pair = SequenceToPair(c_s, c_z // 2, c_z)
 
         # bias attention heads
-        self.pair_to_sequence = None
+        self.pair_to_sequence = PairToSequence(c_z, no_heads_s)
 
         # self.seq_attention = Attention(c_s, no_heads_s, c_s / no_heads_s, gated=True)
 
@@ -218,7 +224,9 @@ class EvoBlock(nn.Module):
         self.pos = PositionalEncoding(self.c_s, dropout)
         self.ln = nn.LayerNorm(self.c_s, eps=1e-12, elementwise_affine=True)
 
-        self.resNet = None
+        self.resNet = ResLayer(
+            dim_in=c_z, dim_out=c_z, n_blocks=2, kernel_size=3, dropout=dropout
+        )
 
         # self.tri_mul_out = TriangleMultiplicationOutgoing(
         #     c_z,
@@ -244,7 +252,7 @@ class EvoBlock(nn.Module):
 
         # Transition
         self.mlp_seq = ResidueMLP(c_s, 2 * c_s, dropout=dropout)
-        self.mlp_pair = None
+        self.mlp_pair = ResidueMLP(c_z, 2 * c_z, dropout=dropout)
 
         assert dropout < 0.4
         self.drop = nn.Dropout(dropout)
@@ -272,14 +280,15 @@ class EvoBlock(nn.Module):
         # torch.nn.init.zeros_(self.tri_att_end.mha.linear_o.weight)
         # torch.nn.init.zeros_(self.tri_att_end.mha.linear_o.bias)
 
-        if self.sequence_to_pair:
-            torch.nn.init.zeros_(self.sequence_to_pair.o_proj.weight)
-            torch.nn.init.zeros_(self.sequence_to_pair.o_proj.bias)
-
+        torch.nn.init.zeros_(self.sequence_to_pair.o_proj.weight)
+        torch.nn.init.zeros_(self.sequence_to_pair.o_proj.bias)
+        torch.nn.init.zeros_(self.pair_to_sequence.linear.weight)
         # torch.nn.init.zeros_(self.seq_attention.o_proj.weight)
         # torch.nn.init.zeros_(self.seq_attention.o_proj.bias)
         torch.nn.init.zeros_(self.mlp_seq.mlp[-2].weight)
         torch.nn.init.zeros_(self.mlp_seq.mlp[-2].bias)
+        torch.nn.init.zeros_(self.mlp_pair.mlp[-2].weight)
+        torch.nn.init.zeros_(self.mlp_pair.mlp[-2].bias)
 
     def forward(self, sequence_state, pairwise_state):
         """
@@ -304,8 +313,8 @@ class EvoBlock(nn.Module):
 
         # Update sequence state
         #BIAS FOR SELF ATTENTION TO REMOVE
-        bias = None
-        #bias = self.pair_to_sequence(pairwise_state)
+        #bias = None
+        bias = self.pair_to_sequence(pairwise_state)
 
         #DEBUT SEQUENCE PROCESSING
         #REL POS MULTI HEAD ATTENTION (SCHEMA)
@@ -336,17 +345,36 @@ class EvoBlock(nn.Module):
         sequence_state = self.mlp_seq(sequence_state)
 
         #END SEQUENCE PROCESSING
+        
+        #BEGIN PAIRWISE PROCESSING
+        # Update pairwise state
+        pairwise_state = pairwise_state + self.sequence_to_pair(sequence_state)
 
-        # For Ablation 2, the pairwise trunk is removed. The pairwise state
-        # is passed through until the last block, where it is recomputed
-        # from the sequence state.
-        if self.is_last_block:
-            # The `pairwise_state * 0` is a trick to ensure the input `pairwise_state`
-            # is marked as "used" in the computation graph to avoid DDP errors,
-            # before it gets overwritten.
-            pairwise_state = (pairwise_state * 0) + self.sequence_to_pair(
-                sequence_state
-            )
+        pairwise_state = self.resNet(pairwise_state.permute(0, 3, 1, 2)).permute(
+            0, 2, 3, 1
+        )
+
+        # # Axial attention
+        # pairwise_state = pairwise_state + self.row_drop(
+        #     self.tri_mul_out(pairwise_state)
+        # )
+        # pairwise_state = pairwise_state + self.col_drop(
+        #     self.tri_mul_in(pairwise_state)
+        # )
+        # pairwise_state = pairwise_state + self.row_drop(
+        #     self.tri_att_start(pairwise_state)
+        # )
+        # pairwise_state = pairwise_state + self.col_drop(
+        #     self.tri_att_end(pairwise_state)
+        # )
+
+        # MLP over pairs.
+        pairwise_state = self.mlp_pair(pairwise_state)
+
+        #END PAIRWISE PROCESSING
+        
+        #Ablation 2 
+        pairwise_state = self.sequence_to_pair(sequence_state)
 
         return sequence_state, pairwise_state
 
@@ -376,19 +404,18 @@ class EvoFold(nn.Module):
 
         self.pairwise_positional_embedding = RelativePosition(position_bins, c_z)
 
-        self.blocks = nn.ModuleList()
-        for i in range(num_blocks):
-            is_last = i == num_blocks - 1
-            self.blocks.append(
+        self.blocks = nn.ModuleList(
+            [
                 EvoBlock(
                     c_s=c_s,
                     c_z=c_z,
                     no_heads_s=no_heads_s,
                     no_heads_z=no_heads_z,
                     dropout=dropout,
-                    is_last_block=is_last,
                 )
-            )
+                for i in range(num_blocks)
+            ]
+        )
 
         self.s_norm = nn.LayerNorm(c_s)
         self.z_norm = nn.LayerNorm(c_z)
