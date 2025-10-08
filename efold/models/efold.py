@@ -62,6 +62,11 @@ class eFold(Model):
             dropout=dropout,
             no_recycles=no_recycles,
         )
+        # Freeze unused trunk and encoder parameters to avoid DDP unused-params error
+        for p in self.encoder.parameters():
+            p.requires_grad_(False)
+        for p in self.eFold.parameters():
+            p.requires_grad_(False)
 
         # self.output_net_DMS = nn.Sequential(
         #     nn.LayerNorm(d_model),
@@ -82,12 +87,12 @@ class eFold(Model):
             ResLayer(
                 dim_in=d_cnn,
                 dim_out=d_cnn // 2,
-                n_blocks=4,
+                n_blocks=12,
                 kernel_size=3,
                 dropout=dropout,
             ),
             ResLayer(
-                dim_in=d_cnn // 2, dim_out=1, n_blocks=4, kernel_size=3, dropout=dropout
+                dim_in=d_cnn // 2, dim_out=1, n_blocks=12, kernel_size=3, dropout=dropout
             ),
         )
 
@@ -103,7 +108,7 @@ class eFold(Model):
         # z = z.unsqueeze(1).repeat(1, z.shape[1], 1, 1)  # (N, L, L, c_z / 2)
         # z = torch.cat((z, z.permute(0, 2, 1, 3)), dim=-1)  # (N, L, L, c_z)
 
-        s, z = self.eFold(s, z)
+        # s, z = self.eFold(s, z)
 
         structure = self.structure_adapter(z)  # (N, L, L, d_cnn)
         structure = self.output_structure(structure.permute(0, 3, 1, 2)).squeeze(
