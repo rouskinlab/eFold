@@ -15,8 +15,8 @@ from efold import DataModule, create_model
 # Train loop
 if __name__ == "__main__":
     USE_WANDB = True
-    STRATEGY = "ddp"
-    n_gpu = 3
+    STRATEGY = "random"
+    n_gpu = 4
 
     print("Running on device: {}".format(device))
     if USE_WANDB:
@@ -57,13 +57,13 @@ if __name__ == "__main__":
         wandb_logger.watch(model, log="all")
 
     trainer = Trainer(
-        accelerator='gpu',
-        devices=n_gpu,
-        strategy=DDPStrategy(find_unused_parameters=False),
+        accelerator=device,
+        devices=n_gpu if STRATEGY == "ddp" else 1,
+        strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else 'auto',
         max_epochs=15,
         log_every_n_steps=1,
         accumulate_grad_batches=32,
-        use_distributed_sampler=True,
+        use_distributed_sampler=STRATEGY != "ddp",
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
             LearningRateMonitor(logging_interval="epoch"),
