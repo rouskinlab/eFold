@@ -15,7 +15,7 @@ from efold import DataModule, create_model
 # Train loop
 if __name__ == "__main__":
     USE_WANDB = True
-    STRATEGY = "random"
+    STRATEGY = "ddp"
     n_gpu = 4
 
     print("Running on device: {}".format(device))
@@ -31,7 +31,7 @@ if __name__ == "__main__":
         data_type=["structure"],  #
         force_download=False,
         batch_size=batch_size,
-        max_len=1000,
+        max_len=1024,
         min_len=1,
         structure_padding_value=0,
         train_split=None,
@@ -47,7 +47,7 @@ if __name__ == "__main__":
         num_blocks=4,
         no_recycles=0,
         dropout=0,
-        lr=1e-3,
+        lr=3e-4,
         weight_decay=0,
         gamma=0.995,
         wandb=USE_WANDB,
@@ -60,9 +60,9 @@ if __name__ == "__main__":
         accelerator=device,
         devices=n_gpu if STRATEGY == "ddp" else 1,
         strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else 'auto',
-        max_epochs=15,
+        max_epochs=16,
         log_every_n_steps=1,
-        accumulate_grad_batches=32,
+        accumulate_grad_batches=64, #If 8 GPUs, 32. If 4 GPUs, 64.
         use_distributed_sampler=STRATEGY != "ddp",
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
