@@ -1,0 +1,18 @@
+_target_: efold.core.datamodule.DataModule
+
+name:
+  - ribo-kaggle
+data_type:
+  - dms
+  - shape
+force_download: false
+batch_size: 128
+num_workers: 0
+train_split: 256
+valid_split: 128
+predict_split: 0
+overfit_mode: false
+shuffle_valid: false
+strategy: random
+shuffle_train: true
+

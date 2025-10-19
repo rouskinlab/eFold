@@ -1,0 +1,11 @@
+accelerator: auto
+devices: 8
+strategy: ddp
+find_unused_parameters: false
+max_epochs: 1000
+log_every_n_steps: 1
+accumulate_grad_batches: 32
+use_distributed_sampler: false
+enable_checkpointing: false
+precision: null
+

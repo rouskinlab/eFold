@@ -1,0 +1,15 @@
+_target_: efold.models.factory.create_model
+
+model: efold
+ntoken: 5
+d_model: 64
+c_z: 32
+d_cnn: 64
+num_blocks: 4
+no_recycles: 0
+dropout: 0.0
+lr: 0.001
+weight_decay: 0.0
+gamma: 0.995
+wandb: ${logging.use_wandb}
+

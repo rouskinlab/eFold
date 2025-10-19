@@ -1,5 +1,4 @@
 import wandb
-from ..config import *
 import lightning.pytorch as pl
 import os
 import matplotlib.pyplot as plt

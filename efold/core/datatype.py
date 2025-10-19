@@ -1,7 +1,9 @@
 import torch
-from ..config import device, UKN, DTYPE_PER_DATA_TYPE
 import torch.nn.functional as F
-from .util import _pad
+
+from efold.constants import device, UKN
+from efold.settings import DTYPE_PER_DATA_TYPE
+from efold.core.util import _pad
 
 
 class DataType:

@@ -1,9 +1,10 @@
 import torch
-from ..config import UKN, POSSIBLE_METRICS
-import torch
-from .batch import Batch
 import numpy as np
 from typing import TypedDict
+
+from efold.constants import UKN
+from efold.settings import POSSIBLE_METRICS
+from efold.core.batch import Batch
 
 
 # wrapper for metrics

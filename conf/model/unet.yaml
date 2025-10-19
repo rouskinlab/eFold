@@ -1,0 +1,10 @@
+_target_: efold.models.factory.create_model
+
+model: unet
+img_ch: 17
+output_ch: 1
+lr: 0.002
+weight_decay: 0.0
+gamma: 0.99
+wandb: ${logging.use_wandb}
+

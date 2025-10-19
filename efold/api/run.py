@@ -1,13 +1,14 @@
 import os
 from typing import List, Union
-from ..models import create_model
 import torch
 from os.path import join, dirname
-from ..core import batch
-from ..core.embeddings import sequence_to_int
-from ..core.postprocess import Postprocess
 import numpy as np
-from ..util.format_conversion import convert_bp_list_to_dotbracket
+
+from efold.models.factory import create_model
+from efold.core import batch
+from efold.core.embeddings import sequence_to_int
+from efold.core.postprocess import Postprocess
+from efold.util.format_conversion import convert_bp_list_to_dotbracket
 
 torch.set_default_dtype(torch.float32)
 

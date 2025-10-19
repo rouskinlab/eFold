@@ -1,0 +1,7 @@
+use_wandb: false
+project: efold-training
+name: null
+watch_model: false
+log_interval: epoch
+checkpoint_every_n_epochs: 1
+

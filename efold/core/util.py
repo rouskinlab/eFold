@@ -1,8 +1,9 @@
-from ..config import UKN
-from .embeddings import base_pairs_to_pairing_matrix
-import torch.nn.functional as F
-from torch import tensor
 import torch
+from torch import tensor
+import torch.nn.functional as F
+
+from efold.constants import UKN
+from efold.core.embeddings import base_pairs_to_pairing_matrix
 
 
 def _pad(arr, L, data_type):

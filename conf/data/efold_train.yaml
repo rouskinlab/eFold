@@ -1,0 +1,19 @@
+_target_: efold.core.datamodule.DataModule
+
+name:
+  - efold_train
+strategy: random
+shuffle_train: true
+shuffle_valid: false
+data_type:
+  - structure
+force_download: false
+batch_size: 1
+max_len: 1000
+min_len: 1
+structure_padding_value: 0
+train_split: null
+external_valid:
+  - yack_valid
+num_workers: 0
+

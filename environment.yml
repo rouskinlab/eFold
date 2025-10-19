@@ -1,0 +1,25 @@
+name: efold
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pandas>=1.5.2
+  - matplotlib>=3.6.2
+  - plotly>=5.11.0
+  - scikit-learn
+  - pyarrow
+  - pytorch>=1.13.1
+  - pytorch-lightning>=1.9.4
+  - lightning>=1.9.4
+  - pip:
+      - torcheval>=0.0.6
+      - tensorboard>=2.11.2
+      - wandb
+      - rouskinhf
+      - einops
+      - huggingface-hub
+      - envbash
+      - click
+

@@ -1,12 +1,14 @@
 from torch.utils.data import random_split, Subset
 import lightning.pytorch as pl
 from typing import Union, List
-from .dataset import Dataset
-from ..config import TEST_SETS, UKN
-from .sampler import sampler_factory
-from .dataloader import DataLoader
 import numpy as np
 import datetime
+
+from efold.core.dataset import Dataset
+from efold.settings import TEST_SETS
+from efold.constants import UKN
+from efold.core.sampler import sampler_factory
+from efold.core.dataloader import DataLoader
 
 
 class DataModule(pl.LightningDataModule):

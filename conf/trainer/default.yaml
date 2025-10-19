@@ -1,0 +1,10 @@
+accelerator: auto
+devices: 1
+strategy: auto
+max_epochs: 15
+log_every_n_steps: 1
+accumulate_grad_batches: 32
+use_distributed_sampler: true
+enable_checkpointing: false
+precision: null
+

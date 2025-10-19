@@ -1,0 +1,9 @@
+defaults:
+  - model: efold
+  - data: efold_train
+  - trainer: default
+  - logging: wandb
+  - _self_
+
+seed: 42
+

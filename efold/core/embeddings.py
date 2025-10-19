@@ -1,6 +1,7 @@
 from torch import nn
 import torch
-from ..config import DEFAULT_FORMAT, UKN, seq2int, int2seq
+
+from efold.constants import DEFAULT_FORMAT, UKN, seq2int, int2seq
 
 NUM_BASES = len(set(seq2int.values()))
 

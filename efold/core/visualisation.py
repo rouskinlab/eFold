@@ -1,9 +1,10 @@
 from matplotlib import pyplot as plt
 import numpy as np
 import wandb
-from .metrics import r2_score, mae_score, pearson_coefficient
-from ..config import UKN
 from rouskinhf import int2seq
+
+from efold.core.metrics import r2_score, mae_score, pearson_coefficient
+from efold.constants import UKN
 
 matplotlib_colors = [
     "red",

@@ -1,0 +1,16 @@
+_target_: efold.models.factory.create_model
+
+model: transformer
+data: multi
+weight_data: true
+ntoken: 5
+d_model: 128
+nhead: 16
+d_hid: 256
+nlayers: 8
+dropout: 0.0
+lr: 0.0005
+weight_decay: 0.0
+gamma: 0.998
+wandb: ${logging.use_wandb}
+

@@ -1,12 +1,12 @@
 import torch
-from torch import tensor
+from torch import tensor, cuda, backends
 import torch.nn.functional as F
-from .embeddings import base_pairs_to_pairing_matrix, sequence_to_int
-from ..config import device, POSSIBLE_METRICS, UKN
-from typing import Dict
-from .datatype import data_type_factory
-from .util import split_data_type
-from torch import cuda, backends
+
+from efold.core.embeddings import base_pairs_to_pairing_matrix, sequence_to_int
+from efold.constants import device, UKN
+from efold.settings import POSSIBLE_METRICS
+from efold.core.datatype import data_type_factory
+from efold.core.util import split_data_type
 
 
 def _pad(arr, L, data_type, accept_none=False):
@@ -210,21 +210,6 @@ class Batch:
     def __len__(self):
         return self.count("sequence")
 
-
-    #     return out
-
-    def __del__(self):
-        del self.dms
-        del self.shape
-        del self.structure
-        del self.reference
-        del self.sequence
-        del self.length
-        del self.L
-        del self.batch_size
-        del self.data_types
-        del self.dt_count
-        del self
     
     @property
     def device(self):

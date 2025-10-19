@@ -1,0 +1,38 @@
+test_sets:
+  structure:
+    - PDB
+    - archiveII
+    - lncRNA_nonFiltered
+    - viral_fragments
+  sequence: []
+  dms: []
+  shape: []
+
+data_types:
+  - structure
+  - dms
+  - shape
+
+metrics:
+  reference:
+    structure: f1
+    dms: mae
+    shape: mae
+  
+  sign:
+    structure: 1
+    dms: -1
+    shape: -1
+  
+  possible:
+    structure:
+      - f1
+    dms:
+      - mae
+      - r2
+      - pearson
+    shape:
+      - mae
+      - r2
+      - pearson
+

@@ -3,14 +3,14 @@ import numpy as np
 import torch
 from torch.utils.data import ConcatDataset, Dataset as TorchDataset, Dataset
 from typing import List
-
-from .batch import Batch
 from rouskinhf import get_dataset
-from .datatype import DMSDataset, SHAPEDataset, StructureDataset
-from .embeddings import sequence_to_int
-from .util import _pad
-from .path import Path
-from ..config import UKN
+
+from efold.constants import UKN
+from efold.core.batch import Batch
+from efold.core.datatype import DMSDataset, SHAPEDataset, StructureDataset
+from efold.core.embeddings import sequence_to_int
+from efold.core.util import _pad
+from efold.core.path import Path
 
 
 class Dataset(TorchDataset):

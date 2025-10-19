@@ -1,16 +1,16 @@
-import sys, os
+import sys
+import os
 file_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(file_dir, '../../eFold'))
 
-from efold import inference
 import pandas as pd
 import numpy as np
 from rouskinhf import get_dataset
 import torch
-
 import time
 from tqdm import tqdm
 
+from efold.api.run import run as inference
 from rnastructure_wrapper import RNAstructure
 
 Fold = RNAstructure(path='/root/RNAstructure/exe/')

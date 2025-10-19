@@ -1,5 +1,6 @@
 import json
 import click
+
 from efold.api.run import run
 
 @click.command('efold')

@@ -1,8 +1,8 @@
-from .transformer import Transformer
-from .efold import eFold 
-from .cnn import CNN
-from .ribonanza import Ribonanza
-from .unet import U_Net
+from efold.models.transformer import Transformer
+from efold.models.efold import eFold
+from efold.models.cnn import CNN
+from efold.models.ribonanza import Ribonanza
+from efold.models.unet import U_Net
 
 
 def create_model(model: str, *args, **kwargs):

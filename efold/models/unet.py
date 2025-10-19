@@ -3,10 +3,9 @@ from torch import nn, Tensor
 import torch.nn.functional as F
 from torch.nn import init
 
-from ..core.model import Model
-from ..core.batch import Batch
-
-from ..config import int2seq
+from efold.core.model import Model
+from efold.core.batch import Batch
+from efold.constants import int2seq
 
 import os, sys
 

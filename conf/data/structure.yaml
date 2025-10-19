@@ -1,0 +1,25 @@
+_target_: efold.core.datamodule.DataModule
+
+name:
+  - bpRNA
+  - ribo500-blast
+  - rnacentral_synthetic
+strategy: random
+shuffle_train: false
+shuffle_valid: false
+data_type:
+  - structure
+force_download: false
+batch_size: 1
+max_len: 800
+min_len: 1
+structure_padding_value: 0
+train_split: null
+external_valid:
+  - yack_valid
+  - PDB
+  - archiveII_blast
+  - lncRNA
+  - viral_fragments
+num_workers: 0
+

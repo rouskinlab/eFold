@@ -3,15 +3,16 @@ import lightning.pytorch as pl
 from lightning.pytorch.utilities.types import STEP_OUTPUT
 import torch.nn as nn
 import torch
-from ..config import device, UKN, TEST_SETS_NAMES
 import torch.nn.functional as F
-from .batch import Batch
-from torchmetrics import R2Score, PearsonCorrCoef, MeanAbsoluteError, F1Score
-from .metrics import MetricsStack
-from .datamodule import DataModule
 import time
+from torchmetrics import R2Score, PearsonCorrCoef, MeanAbsoluteError, F1Score
 
-from .postprocess import Postprocess
+from efold.constants import device, UKN
+from efold.settings import TEST_SETS_NAMES
+from efold.core.batch import Batch
+from efold.core.metrics import MetricsStack
+from efold.core.datamodule import DataModule
+from efold.core.postprocess import Postprocess
 
 METRIC_ARGS = dict(dist_sync_on_step=True)
 
@@ -189,7 +190,7 @@ class Model(pl.LightningModule):
         predictions = self.forward(batch)
         predictions['structure'] = self.postprocesser.run(predictions['structure'], batch.get('sequence'))
 
-        from ..config import int2seq
+        from efold.constants import int2seq
         self.test_results['reference'] += batch.get('reference')
         self.test_results['sequence'] += [''.join([int2seq[base] for base in seq]) for seq in batch.get('sequence').detach().tolist()]
         self.test_results['structure'] += predictions['structure'].tolist()

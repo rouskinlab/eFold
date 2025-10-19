@@ -9,19 +9,19 @@ from lightning.pytorch.utilities import rank_zero_only
 import wandb
 from typing import Any
 
-from .visualisation import plot_factory
-from .metrics import metric_factory
-from .datamodule import DataModule
-from .loader import Loader
-from .batch import Batch
-from ..config import (
+from efold.core.visualisation import plot_factory
+from efold.core.metrics import metric_factory
+from efold.core.datamodule import DataModule
+from efold.core.loader import Loader
+from efold.core.batch import Batch
+from efold.settings import (
     TEST_SETS_NAMES,
     REF_METRIC_SIGN,
     REFERENCE_METRIC,
     DATA_TYPES_TEST_SETS,
     POSSIBLE_METRICS,
 )
-from .logger import Logger, LocalLogger
+from efold.core.logger import Logger, LocalLogger
 
 
 class ModelCheckpoint(pl.Callback):

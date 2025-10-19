@@ -1,8 +1,9 @@
 from torch import nn, tensor
 import torch
-from ..config import device, seq2int, START_TOKEN, END_TOKEN, PADDING_TOKEN
-from ..core.model import Model
 from torch.nn import init
+
+from efold.constants import device, seq2int, START_TOKEN, END_TOKEN, PADDING_TOKEN
+from efold.core.model import Model
 
 global_gain = 0.1
 

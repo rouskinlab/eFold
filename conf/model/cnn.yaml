@@ -1,0 +1,13 @@
+_target_: efold.models.factory.create_model
+
+model: cnn
+ntoken: 5
+d_model: 640
+d_cnn: 512
+n_heads: 16
+dropout: 0.0
+lr: 0.00005
+weight_decay: 0.0
+gamma: 0.99
+wandb: ${logging.use_wandb}
+
