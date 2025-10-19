@@ -42,7 +42,7 @@ class Constraints:
 
     def mask_nonCanonical(self, sequence):
         # Embed sequence
-        if type(sequence) == str:
+        if isinstance(sequence, str):
             sequence = torch.tensor([settings.seq2int[a] for a in sequence])
 
         # make the pairing matrix
@@ -61,14 +61,14 @@ class Constraints:
 class HungarianAlgorithm:
     def run(self, bppm, threshold=0.5):
         """Runs the Hungarian algorithm on the input bppm matrix
-        
+
         Args:
         - bppm (torch.Tensor): n x n matrix of base pair probabilities
-        
+
         Example:
         >>> inpt = np.diag(np.ones(10))[::-1]
         >>> inpt += np.random.normal(0, 0.2, inpt.shape)
-        >>> inpt = (inpt + inpt.T)/2 
+        >>> inpt = (inpt + inpt.T)/2
         >>> inpt = torch.tensor(inpt)
         >>> out = HungarianAlgorithm().run(inpt)
         >>> assert (out == [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],\
@@ -91,7 +91,7 @@ class HungarianAlgorithm:
         assert self.is_symmetric(bppm), f"The input bppm matrix should be symmetric, {bppm}"
 
         # just work with numpy (needed for the optimization step)
-        if type(bppm) == torch.Tensor:
+        if isinstance(bppm, torch.Tensor):
             device = bppm.device
             bppm = bppm.cpu().numpy()
 

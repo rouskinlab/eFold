@@ -1,10 +1,9 @@
 import lightning.pytorch as pl
-from lightning.pytorch import LightningModule, Trainer
-from lightning.pytorch.utilities import rank_zero_only
 import wandb
+from lightning.pytorch import Trainer
+from lightning.pytorch.utilities import rank_zero_only
 
-from efold import settings
-from efold.core import batch, datamodule, loader, logger, metrics, visualisation
+from efold.core import loader
 
 
 class ModelCheckpoint(pl.Callback):

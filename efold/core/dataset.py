@@ -1,13 +1,12 @@
 import os
-import numpy as np
-import torch
-from torch.utils.data import ConcatDataset, Dataset as TorchDataset, Dataset
 from typing import List
 
+import numpy as np
 from rouskinhf import get_dataset
+from torch.utils.data import Dataset as TorchDataset
 
 from efold import settings
-from efold.core import batch, datatype, embeddings, path, util
+from efold.core import batch, datatype, path
 
 
 class Dataset(TorchDataset):
@@ -51,7 +50,7 @@ class Dataset(TorchDataset):
             min_len = 0
         if min_len > max_len:
             raise ValueError("min_len must be smaller than max_len")
-        idx_out = [i for i, l in enumerate(self.length) if l >= max_len or l <= min_len]
+        idx_out = [i for i, len_ in enumerate(self.length) if len_ >= max_len or len_ <= min_len]
         for idx in idx_out[::-1]:
             del self.refs[idx]
             del self.length[idx]
@@ -200,7 +199,7 @@ class Dataset(TorchDataset):
             "length": self.length[index],
         }
         for attr in ["dms", "shape", "structure"]:
-            out[attr] = getattr(self, attr)[index] if getattr(self, attr) != None else None
+            out[attr] = getattr(self, attr)[index] if getattr(self, attr) is not None else None
         return out
 
     def collate_fn(self, batch_data):

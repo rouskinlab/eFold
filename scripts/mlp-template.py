@@ -1,14 +1,12 @@
-import numpy as np
 import os
-import pandas as pd
 import sys
+
 import wandb
-from lightning.pytorch.callbacks.early_stopping import EarlyStopping
-from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch import Trainer
+from lightning.pytorch.loggers import WandbLogger
 
 from efold import settings
-from efold.core import callbacks, datamodule, metrics
+from efold.core import callbacks, datamodule
 from efold.models import factory
 
 sys.path.append(os.path.abspath("."))
@@ -20,7 +18,7 @@ sys.path.append(os.path.abspath("."))
 # why do you need this?
 
 if __name__ == "__main__":
-    print("Running on device: {}".format(device))
+    print("Running on device: {}".format(settings.device))
 
     BATCH_SIZE = 4
     LR = 5e-5
@@ -73,7 +71,7 @@ if __name__ == "__main__":
         max_epochs=1,
         log_every_n_steps=1,
         logger=wandb_logger,
-        accelerator=device,
+        accelerator=settings.device,
         callbacks=[
             callbacks.ModelCheckpoint(every_n_epoch=1),
         ],

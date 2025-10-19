@@ -1,8 +1,8 @@
-from os.path import join
 import os
-from rouskinhf.env import Env
-import numpy as np
 import pickle
+from os.path import join
+
+import numpy as np
 from rouskinhf.path import Path as RouskinPath
 
 

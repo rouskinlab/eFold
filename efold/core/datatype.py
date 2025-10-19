@@ -1,7 +1,6 @@
 import torch
 
 from efold import settings
-from efold.core import util
 
 
 class DataType:

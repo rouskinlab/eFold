@@ -1,7 +1,8 @@
-from os.path import dirname
-from os import makedirs, listdir
-import torch
 import os
+from os import listdir, makedirs
+from os.path import dirname
+
+import torch
 
 
 class Loader:

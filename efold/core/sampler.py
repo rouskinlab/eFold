@@ -1,13 +1,13 @@
-from torch.utils.data import Sampler, Subset
+import math
+import os
+from typing import Iterator, Optional, TypeVar, Union
+
 import numpy as np
+import torch
+import torch.distributed as dist
 
 # from random import shuffle
-from torch.utils.data import Dataset
-from typing import Union, Optional, TypeVar, Iterator
-import torch.distributed as dist
-import math
-import torch
-import os
+from torch.utils.data import Dataset, Sampler, Subset
 
 T_co = TypeVar("T_co", covariant=True)
 

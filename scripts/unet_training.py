@@ -4,21 +4,20 @@ import sys
 sys.path.append(os.path.abspath("."))
 
 import wandb
-from lightning.pytorch.strategies import DDPStrategy
-from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import LearningRateMonitor
+from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.strategies import DDPStrategy
 
 from efold import settings
 from efold.core import callbacks, datamodule
 from efold.models import factory
 
-
 # Train loop
 if __name__ == "__main__":
     USE_WANDB = False
     STRATEGY = "random"
-    print("Running on device: {}".format(device))
+    print("Running on device: {}".format(settings.device))
     if USE_WANDB:
         wandb_logger = WandbLogger(project="test")
 
@@ -50,7 +49,7 @@ if __name__ == "__main__":
         wandb_logger.watch(model, log="all")
 
     trainer = Trainer(
-        accelerator=device,
+        accelerator=settings.device,
         devices=8 if STRATEGY == "ddp" else 1,
         strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else "auto",
         max_epochs=15,

@@ -1,8 +1,8 @@
 import datetime
+from typing import List, Union
+
 import lightning.pytorch as pl
-import numpy as np
-from torch.utils.data import random_split, Subset
-from typing import Union, List
+from torch.utils.data import Subset
 
 from efold import settings
 from efold.core import dataloader, dataset, sampler
@@ -64,7 +64,7 @@ class DataModule(pl.LightningDataModule):
             "predict": predict_split,
         }
         if strategy in ["ddp", "sorted"]:
-            assert shuffle_valid == shuffle_train == False, (
+            assert shuffle_valid == shuffle_train is False, (
                 "You can't shuffle in ddp or sorted mode. Set shuffle_train and shuffle_valid to 0 or use strategy='random'."
             )
         self.shuffle = {
@@ -78,7 +78,6 @@ class DataModule(pl.LightningDataModule):
             "use_error": use_error,
             "force_download": force_download,
             "tqdm": tqdm,
-            "max_len": max_len,
             "min_len": min_len,
         }
         self.buckets = buckets
@@ -96,8 +95,8 @@ class DataModule(pl.LightningDataModule):
     def _dataset_merge(self, datasets):
         merge = datasets[0]
         collate_fn = merge.collate_fn
-        for dataset in datasets[1:]:
-            merge = merge + dataset
+        for ds in datasets[1:]:
+            merge = merge + ds
         merge.collate_fn = collate_fn
         return merge
 
@@ -117,7 +116,7 @@ class DataModule(pl.LightningDataModule):
             self.collate_fn = self.all_datasets.collate_fn
 
         if stage == "fit":
-            if self.splits["train"] == None or self.splits["train"] == 1.0:
+            if self.splits["train"] is None or self.splits["train"] == 1.0:
                 self.train_set = self.all_datasets
             else:
                 num_datapoints = (

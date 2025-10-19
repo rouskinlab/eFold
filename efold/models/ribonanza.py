@@ -77,9 +77,6 @@ class SqueezeAndExcitation(nn.Module):
         return structure * weights.unsqueeze(-1).unsqueeze(-1)
 
 
-from torch.nn.functional import multi_head_attention_forward
-
-
 class SelfAttention(nn.Module):
     def __init__(
         self,

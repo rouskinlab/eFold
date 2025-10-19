@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from torch import nn, Tensor
+from torch import Tensor, nn
 from torch.nn import TransformerEncoderLayer
 
 from efold.core import batch, model
@@ -100,7 +100,7 @@ class Transformer(model.Model):
         src = self.encoder(src)
         src = self.pos_encoder(src)
 
-        for i, l in enumerate(self.transformer_encoder):
+        for i, _ in enumerate(self.transformer_encoder):
             src = self.transformer_encoder[i](src)
 
         src = self.resnet(src.unsqueeze(dim=1)).squeeze(dim=1)
@@ -156,7 +156,7 @@ class ResLayer(nn.Module):
         # Basic Residula block
         self.res_layers = []
         for i in range(n_blocks):
-            dilation = pow(2, (i % 3))
+            pow(2, (i % 3))
             self.res_layers.append(
                 ResBlock(
                     inplanes=dim_in,

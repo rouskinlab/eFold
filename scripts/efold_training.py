@@ -3,16 +3,15 @@ import sys
 
 sys.path.append(os.path.abspath("."))
 
-from lightning.pytorch.strategies import DDPStrategy
 import wandb
-from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import LearningRateMonitor
+from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.strategies import DDPStrategy
 
 from efold import settings
 from efold.core import callbacks, datamodule
 from efold.models import factory
-
 
 # Train loop
 if __name__ == "__main__":

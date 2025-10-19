@@ -1,9 +1,10 @@
 from typing import Any
+
 import lightning.pytorch as pl
-from lightning.pytorch.utilities.types import STEP_OUTPUT
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from lightning.pytorch.utilities.types import STEP_OUTPUT
 
 from efold import settings
 from efold.core import batch, metrics, postprocess
@@ -126,7 +127,7 @@ class Model(pl.LightningModule):
         predictions = self.forward(batch)
         batch.integrate_prediction(predictions)
         loss = self.loss_fn(batch)[0]
-        self.log(f"train/loss", loss, sync_dist=True)
+        self.log("train/loss", loss, sync_dist=True)
         return loss
 
     def on_validation_start(self):
@@ -168,8 +169,8 @@ class Model(pl.LightningModule):
         # aggregate the stack and log it
         for metrics_dl in self.metrics_stack:
             metrics_pack = metrics_dl.compute()
-            for dt, metrics in metrics_pack.items():
-                for name, metric in metrics.items():
+            for dt, metrics_dict in metrics_pack.items():
+                for name, metric in metrics_dict.items():
                     # to replace with a gather_all?
                     self.log(
                         f"valid/{metrics_dl.name}/{dt}/{name}",

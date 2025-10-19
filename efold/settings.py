@@ -3,7 +3,7 @@ from typing import Any
 
 import torch
 import yaml
-from torch import backends, cuda, float32
+from torch import cuda, float32
 
 _settings_path = Path(__file__).parent / "settings.yaml"
 

@@ -1,18 +1,12 @@
-import sys, os
+import os
+import time
 
-file_dir = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(os.path.join(file_dir, "../../eFold"))
+import numpy as np
+from rnastructure_wrapper import RNAstructure
+from tqdm import tqdm
+import plotly.graph_objects as go
 
 from efold.api import run as run_module
-import pandas as pd
-import numpy as np
-from rouskinhf import get_dataset
-import torch
-
-import time
-from tqdm import tqdm
-
-from rnastructure_wrapper import RNAstructure
 
 Fold = RNAstructure(path="/root/RNAstructure/exe/")
 
@@ -41,8 +35,6 @@ for length in tqdm(lengths):
     Fold.fold(sequence_random, mfe_only=False)
     dT = time.time() - t0
     rnaStructure_dTs.append(dT)
-
-import plotly.graph_objects as go
 
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=lengths, y=rnaStructure_dTs, mode="lines", name="RNAstructure"))

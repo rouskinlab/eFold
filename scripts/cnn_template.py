@@ -5,18 +5,17 @@ sys.path.append(os.path.abspath("."))
 
 import os
 import sys
+
 import wandb
-from lightning.pytorch.strategies import DDPStrategy
-from lightning.pytorch.loggers import WandbLogger
-import pandas as pd
-from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import LearningRateMonitor
-from lightning.pytorch.profilers import PyTorchProfiler
+from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.strategies import DDPStrategy
 
 from efold import settings
 from efold.core import callbacks, datamodule
 from efold.models import factory
+
 # import envbash
 # envbash.load.load_envbash('.env')
 
@@ -28,7 +27,7 @@ if __name__ == "__main__":
     n_gpu = 8
     USE_WANDB = 0
     STRATEGY = "random"
-    print("Running on device: {}".format(device))
+    print("Running on device: {}".format(settings.device))
     if USE_WANDB:
         project = "Structure-classic"
         wandb_logger = WandbLogger(project=project)
@@ -69,7 +68,7 @@ if __name__ == "__main__":
     model.load_state_dict(
         torch.load(
             "/Users/alberic/Desktop/lively-waterfall-8_epoch45.pt",
-            map_location=torch.device(device),
+            map_location=torch.device(settings.device),
         )
     )
 
@@ -77,7 +76,7 @@ if __name__ == "__main__":
         wandb_logger.watch(model, log="all")
 
     trainer = Trainer(
-        accelerator=device,
+        accelerator=settings.device,
         devices=n_gpu if STRATEGY == "ddp" else 1,
         strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else "auto",
         # precision="16-mixed",

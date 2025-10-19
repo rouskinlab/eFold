@@ -1,7 +1,8 @@
-import wandb
 import os
+
 import lightning.pytorch as pl
 import matplotlib.pyplot as plt
+import wandb
 
 from efold.settings import *
 

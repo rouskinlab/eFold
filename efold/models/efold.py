@@ -1,10 +1,12 @@
+from collections import defaultdict
+from contextlib import ExitStack
+from typing import List, Union
+
 import numpy as np
 import torch
-from torch import nn, Tensor
-from contextlib import ExitStack
-from einops import rearrange
 import torch.nn.functional as F
-from collections import defaultdict
+from einops import rearrange
+from torch import Tensor, nn
 
 from efold.core import batch, model
 
@@ -471,7 +473,7 @@ class Dropout(nn.Module):
     along a particular dimension.
     """
 
-    def __init__(self, r: float, batch_dim: T.Union[int, T.List[int]]):
+    def __init__(self, r: float, batch_dim: Union[int, List[int]]):
         super(Dropout, self).__init__()
 
         self.r = r
@@ -733,7 +735,7 @@ class MultiHeadAttention(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self._dropout_rate = dropout
 
-        input_max = (self.num_heads * self.head_size) ** -0.5
+        (self.num_heads * self.head_size) ** -0.5
         ### DOUBLE CHECK THIS CODE:
         self.query = nn.Linear(num_heads * head_size, num_heads * head_size, bias=False)
         self.key = nn.Linear(num_heads * head_size, num_heads * head_size, bias=False)
@@ -843,7 +845,7 @@ class RelPositionMultiHeadAttention(MultiHeadAttention):
         super(RelPositionMultiHeadAttention, self).__init__(**kwargs)
 
         num_pos_features = self.num_heads * self.head_size
-        input_max = (self.num_heads * self.head_size) ** -0.5
+        (self.num_heads * self.head_size) ** -0.5
         self.pos_kernel = nn.Parameter(
             torch.rand(self.num_heads, num_pos_features, self.head_size) * 2 - 1
         )
@@ -921,9 +923,9 @@ class ConvModule(nn.Module):
             self.scale = nn.Parameter(torch.ones(input_dim))
             self.bias = nn.Parameter(torch.zeros(input_dim))
 
-        pw1_max = input_dim**-0.5
-        dw_max = kernel_size**-0.5
-        pw2_max = input_dim**-0.5
+        input_dim**-0.5
+        kernel_size**-0.5
+        input_dim**-0.5
 
         self.pw_conv_1 = nn.Conv1d(
             in_channels=input_dim,

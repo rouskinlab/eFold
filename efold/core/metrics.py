@@ -138,7 +138,7 @@ class MetricsStack:
         return self
 
     def compute(self) -> dict:
-        out = {}
+        out: dict = {}
         for dt in self.data_type:
             out[dt] = {}
             for metric in settings.POSSIBLE_METRICS[dt]:

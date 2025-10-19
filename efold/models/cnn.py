@@ -1,8 +1,8 @@
 import numpy as np
 import torch
-from torch import nn, Tensor
-from einops import rearrange
 import torch.nn.functional as F
+from einops import rearrange
+from torch import Tensor, nn
 
 from efold.core import batch, model
 

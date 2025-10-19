@@ -1,7 +1,7 @@
-import torch
-from torch import nn, Tensor
-import torch.nn.functional as F
 from collections import defaultdict
+
+import torch
+from torch import Tensor, nn
 
 from efold import settings
 from efold.core import batch, model

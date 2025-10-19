@@ -1,8 +1,9 @@
-import numpy as np
 import os
-import torch
-from os.path import join, dirname
+from os.path import dirname, join
 from typing import List, Union
+
+import numpy as np
+import torch
 
 from efold.core import batch, embeddings, postprocess
 from efold.models import factory
@@ -87,7 +88,7 @@ def run(
         if not os.path.exists(arg):
             raise ValueError("File not found")
         sequences = _load_sequences_from_fasta(arg)
-    elif type(arg) == str:
+    elif isinstance(arg, str):
         sequences = [arg]
     elif hasattr(arg, "__iter__") and all([isinstance(s, str) for s in arg]):
         sequences = arg
@@ -126,7 +127,7 @@ def run(
         structure = _predict_structure(model, seq, device=device)
         if fmt == "dotbracket":
             db_structure = format_conversion.convert_bp_list_to_dotbracket(structure, len(seq))
-            if db_structure != None:
+            if db_structure is not None:
                 structure = db_structure
         structures.append(structure)
 
