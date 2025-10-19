@@ -50,8 +50,8 @@ efold -h
 ### Using python
 
 ```python
->>> from efold import inference
->>> inference('AAACAUGAGGAUUACCCAUGU', fmt='dotbracket')
+>>> from efold.api import run
+>>> run.run('AAACAUGAGGAUUACCCAUGU', fmt='dotbracket')
 ..(((((.((....)))))))
 ```
 

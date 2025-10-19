@@ -37,6 +37,7 @@ dependencies = [
     "envbash",
     "click",
     "pyarrow",
+    "pyyaml",
 ]
 
 [tool.pytest.ini_options]
@@ -51,23 +52,20 @@ junit_family = "xunit2"
 [tool.poetry.include]
 include = ["efold/resources/*.pt", 'requirements.txt']
 
-[tool.black]
-line-length = 88
-target-version = ['py310']
-include = '\.pyi?$'
-exclude = '''
-/(
-    \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.env
-  | _build
-  | buck-out
-  | build
-  | dist
-)/
-'''
+
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+exclude = ["*.ipynb"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501"]
 
 [project.scripts]
 efold = "efold.cli:cli"

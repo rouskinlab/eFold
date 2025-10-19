@@ -1,12 +1,11 @@
-from torch.utils.data import random_split, Subset
-import lightning.pytorch as pl
-from typing import Union, List
-from .dataset import Dataset
-from ..config import TEST_SETS, UKN
-from .sampler import sampler_factory
-from .dataloader import DataLoader
-import numpy as np
 import datetime
+from typing import List, Optional, Union
+
+import lightning.pytorch as pl
+from torch.utils.data import Subset
+
+from efold.constants import config
+from efold.core import dataloader, dataset, sampler
 
 
 class DataModule(pl.LightningDataModule):
@@ -26,7 +25,7 @@ class DataModule(pl.LightningDataModule):
         use_error=False,
         max_len=None,
         min_len=None,
-        structure_padding_value=UKN,
+        structure_padding_value=config.pytorch.unknown_value,
         tqdm=True,
         buckets=None,
         **kwargs,
@@ -65,9 +64,9 @@ class DataModule(pl.LightningDataModule):
             "predict": predict_split,
         }
         if strategy in ["ddp", "sorted"]:
-            assert (
-                shuffle_valid == shuffle_train == False
-            ), "You can't shuffle in ddp or sorted mode. Set shuffle_train and shuffle_valid to 0 or use strategy='random'."
+            assert shuffle_valid == shuffle_train is False, (
+                "You can't shuffle in ddp or sorted mode. Set shuffle_train and shuffle_valid to 0 or use strategy='random'."
+            )
         self.shuffle = {
             "train": shuffle_train,
             "valid": shuffle_valid,
@@ -79,7 +78,6 @@ class DataModule(pl.LightningDataModule):
             "use_error": use_error,
             "force_download": force_download,
             "tqdm": tqdm,
-            "max_len": max_len,
             "min_len": min_len,
         }
         self.buckets = buckets
@@ -97,18 +95,16 @@ class DataModule(pl.LightningDataModule):
     def _dataset_merge(self, datasets):
         merge = datasets[0]
         collate_fn = merge.collate_fn
-        for dataset in datasets[1:]:
-            merge = merge + dataset
+        for ds in datasets[1:]:
+            merge = merge + ds
         merge.collate_fn = collate_fn
         return merge
 
-    def setup(self, stage: str = None):
-        if stage is None or (
-            stage in ["fit", "predict"] and not hasattr(self, "all_datasets")
-        ):
+    def setup(self, stage: Optional[str] = None):
+        if stage is None or (stage in ["fit", "predict"] and not hasattr(self, "all_datasets")):
             self.all_datasets = self._dataset_merge(
                 [
-                    Dataset.from_local_or_download(
+                    dataset.Dataset.from_local_or_download(
                         name=name,
                         data_type=self.data_type,
                         sort_by_length=self.strategy == "sorted",
@@ -120,7 +116,7 @@ class DataModule(pl.LightningDataModule):
             self.collate_fn = self.all_datasets.collate_fn
 
         if stage == "fit":
-            if self.splits["train"] == None or self.splits["train"] == 1.0:
+            if self.splits["train"] is None or self.splits["train"] == 1.0:
                 self.train_set = self.all_datasets
             else:
                 num_datapoints = (
@@ -129,9 +125,9 @@ class DataModule(pl.LightningDataModule):
                     else self.splits["train"]
                 )
                 assert num_datapoints > 0, "train_split must be greater than 0"
-                assert num_datapoints <= len(
-                    self.all_datasets
-                ), "train_split must be less than the number of datapoints"
+                assert num_datapoints <= len(self.all_datasets), (
+                    "train_split must be less than the number of datapoints"
+                )
                 self.train_set = Subset(
                     self.all_datasets,
                     range(0, num_datapoints),
@@ -140,7 +136,7 @@ class DataModule(pl.LightningDataModule):
                 self.external_val_set = []
                 for name in self.external_valid:
                     self.external_val_set.append(
-                        Dataset.from_local_or_download(
+                        dataset.Dataset.from_local_or_download(
                             name=name,
                             data_type=self.data_type,
                             sort_by_length=True,
@@ -164,12 +160,13 @@ class DataModule(pl.LightningDataModule):
 
     def _select_test_dataset(self):
         return [
-            Dataset.from_local_or_download(
+            dataset.Dataset.from_local_or_download(
                 name=name,
                 data_type=[data_type],
                 **self.dataset_args,
             )
-            for data_type, datasets in TEST_SETS.items() if data_type in self.data_type
+            for data_type, datasets in config.test_sets.as_dict.items()
+            if data_type in self.data_type
             for name in datasets
         ]
 
@@ -179,21 +176,21 @@ class DataModule(pl.LightningDataModule):
                 raise ValueError(
                     "When using strategy='ddp', the trainer must be passed to the datamodule"
                 )
-            else: # ddp
+            else:  # ddp
                 num_replicas = self.trainer.num_devices
                 rank = self.trainer.local_rank
         else:
             num_replicas = 1
             rank = 0
 
-        return DataLoader(
+        return dataloader.DataLoader(
             self.train_set,
             shuffle=self.shuffle["train"],
             num_workers=self.num_workers,
             collate_fn=self.collate_fn,
             batch_size=self.batch_size,
             to_device=self.strategy != "ddp",
-            sampler=sampler_factory(
+            sampler=sampler.sampler_factory(
                 dataset=self.train_set,
                 strategy=self.strategy,
                 num_replicas=num_replicas,
@@ -210,13 +207,13 @@ class DataModule(pl.LightningDataModule):
         if self.external_valid is not None:
             for val_set in self.external_val_set:
                 val_dls.append(
-                    DataLoader(
+                    dataloader.DataLoader(
                         val_set,
                         shuffle=self.shuffle["valid"],
                         collate_fn=self.collate_fn,
                         batch_size=self.batch_size,
                         to_device=self.strategy != "ddp",
-                        sampler=sampler_factory(
+                        sampler=sampler.sampler_factory(
                             dataset=val_set,
                             strategy=self.strategy,
                             num_replicas=self.trainer.num_devices,
@@ -229,7 +226,7 @@ class DataModule(pl.LightningDataModule):
 
     def test_dataloader(self):
         return [
-            DataLoader(
+            dataloader.DataLoader(
                 test_set,
                 num_workers=self.num_workers,
                 collate_fn=test_set.collate_fn,
@@ -239,7 +236,7 @@ class DataModule(pl.LightningDataModule):
         ]
 
     def predict_dataloader(self):
-        return DataLoader(
+        return dataloader.DataLoader(
             self.predict_set,
             num_workers=self.num_workers,
             collate_fn=self.collate_fn,

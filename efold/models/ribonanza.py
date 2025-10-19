@@ -1,8 +1,9 @@
-from torch import nn, tensor
 import torch
-from ..config import device, seq2int, START_TOKEN, END_TOKEN, PADDING_TOKEN
-from ..core.model import Model
+from torch import nn
 from torch.nn import init
+
+from efold.constants import config
+from efold.core import model
 
 global_gain = 0.1
 
@@ -74,9 +75,6 @@ class SqueezeAndExcitation(nn.Module):
         # multiply structure by weights
         # [batch_size, num_heads, seq_len, seq_len] x [batch_size, num_heads, 1, 1]
         return structure * weights.unsqueeze(-1).unsqueeze(-1)
-
-
-from torch.nn.functional import multi_head_attention_forward
 
 
 class SelfAttention(nn.Module):
@@ -168,11 +166,11 @@ class Preprocessing:
             out.append(
                 torch.concat(
                     [
-                        tensor([START_TOKEN], dtype=torch.long).to(device),
+                        torch.tensor([config.tokens.start_token], dtype=torch.long).to(config.device),
                         sequence[:length],
-                        tensor([END_TOKEN], dtype=torch.long).to(device),
-                        tensor([PADDING_TOKEN] * (L - length), dtype=torch.long).to(
-                            device
+                        torch.tensor([config.tokens.end_token], dtype=torch.long).to(config.device),
+                        torch.tensor([config.tokens.padding_token] * (L - length), dtype=torch.long).to(
+                            config.device
                         ),
                     ],
                 )
@@ -182,9 +180,9 @@ class Preprocessing:
     def structure_batch(batch):
         structure = batch.get("structure")
         batch_size, L, _ = structure.shape
-        embedded_matrix = torch.zeros(
-            (batch_size, L + 2, L + 2), dtype=torch.float32
-        ).to(device)
+        embedded_matrix = torch.zeros((batch_size, L + 2, L + 2), dtype=torch.float32).to(
+            config.device
+        )
         embedded_matrix[:, 1:-1, 1:-1] = structure
         return embedded_matrix
 
@@ -205,7 +203,7 @@ class Encoder(nn.Module):
         return sequence, structure
 
 
-class Ribonanza(Model):
+class Ribonanza(model.Model):
     ntokens = 7
     data_type = ["dms", "shape"]
 

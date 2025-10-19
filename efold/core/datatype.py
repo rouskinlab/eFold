@@ -1,13 +1,14 @@
+from typing import Optional
+
 import torch
-from ..config import device, UKN, DTYPE_PER_DATA_TYPE
-import torch.nn.functional as F
-from .util import _pad
+
+from efold.constants import config
 
 
 class DataType:
     attributes = ["true", "pred", "error"]
 
-    def __init__(self, true: list, error: list = None, pred: list = None):
+    def __init__(self, true: list, error: Optional[list] = None, pred: Optional[list] = None):
         self.true = true
         self.error = error
         self.pred = pred
@@ -17,7 +18,7 @@ class DataType:
             if hasattr(getattr(self, attr), "to"):
                 setattr(self, attr, getattr(self, attr).to(device))
         return self
-    
+
     def __del__(self):
         del self.true
         del self.error
@@ -46,9 +47,7 @@ class DataTypeDataset(DataType):
 
     def __add__(self, other):
         if self.name != other.name:
-            raise ValueError(
-                f"Cannot concatenate {self.name} and {other.name} datasets."
-            )
+            raise ValueError(f"Cannot concatenate {self.name} and {other.name} datasets.")
 
         if other is None:
             return self
@@ -69,7 +68,7 @@ class DataTypeDataset(DataType):
             del self.error[idx]
         if self.pred is not None:
             del self.pred[idx]
-            
+
     def sort(self, idx_sorted):
         self.true = [self.true[i] for i in idx_sorted]
         if self.error is not None:
@@ -85,16 +84,14 @@ class DataTypeDataset(DataType):
             values = data_json[ref]
             if data_type in values:
                 true.append(
-                    torch.tensor(
-                        values[data_type], dtype=DTYPE_PER_DATA_TYPE[data_type]
-                    )
+                    torch.tensor(values[data_type], dtype=config.data.types_format_torch[data_type])
                 )
                 if data_type != "structure":
                     if "error_{}".format(data_type) in values:
                         error.append(
                             torch.tensor(
                                 values["error_{}".format(data_type)],
-                                dtype=DTYPE_PER_DATA_TYPE[data_type],
+                                dtype=config.data.types_format_torch[data_type],
                             )
                         )
                     else:

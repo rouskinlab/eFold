@@ -1,19 +1,13 @@
-import torch
-from torch import nn, Tensor
-from torch.nn import TransformerEncoderLayer
 import numpy as np
-import os
-import sys
-from ..core.model import Model
-from ..core.batch import Batch
-from einops import rearrange
+import torch
 import torch.nn.functional as F
+from einops import rearrange
+from torch import Tensor, nn
 
-dir_name = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(dir_name, ".."))
+from efold.core import batch, model
 
 
-class CNN(Model):
+class CNN(model.Model):
     def __init__(
         self,
         ntoken: int,
@@ -89,7 +83,7 @@ class CNN(Model):
         #     nn.Linear(d_model, 1),
         # )
 
-    def forward(self, batch: Batch) -> Tensor:
+    def forward(self, batch: batch.Batch) -> dict[str, Tensor]:
         """
         Args:
             src: Tensor, shape [seq_len, batch_size]
@@ -105,9 +99,7 @@ class CNN(Model):
 
         # Outer concatenation
         matrix = x.unsqueeze(1).repeat(1, x.shape[1], 1, 1)  # (N, L, L, d_cnn/2)
-        matrix = torch.cat(
-            (matrix, matrix.permute(0, 2, 1, 3)), dim=-1
-        )  # (N, L, L, d_cnn)
+        matrix = torch.cat((matrix, matrix.permute(0, 2, 1, 3)), dim=-1)  # (N, L, L, d_cnn)
 
         # Resnet layers
         matrix = self.res_layers(matrix.permute(0, 3, 1, 2))  # (N, d_cnn//8, L, L)
@@ -225,9 +217,7 @@ class ResLayer(nn.Module):
         self.res_blocks = nn.Sequential(*self.res_layers)
 
         # Adapter to change depth
-        self.conv_output = nn.Conv2d(
-            dim_in, dim_out, kernel_size=7, padding=3, bias=True
-        )
+        self.conv_output = nn.Conv2d(dim_in, dim_out, kernel_size=7, padding=3, bias=True)
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.res_blocks(x)
@@ -252,14 +242,10 @@ class ResBlock(nn.Module):
 
         self.bn1 = nn.BatchNorm2d(inplanes)
         self.relu1 = nn.ReLU(inplace=True)
-        self.conv1 = conv3x3(
-            inplanes, planes, dilation=dilation1, kernel_size=kernel_size
-        )
+        self.conv1 = conv3x3(inplanes, planes, dilation=dilation1, kernel_size=kernel_size)
         self.dropout = nn.Dropout(p=dropout)
         self.relu2 = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3(
-            planes, planes, dilation=dilation2, kernel_size=kernel_size
-        )
+        self.conv2 = conv3x3(planes, planes, dilation=dilation2, kernel_size=kernel_size)
 
     def forward(self, x: Tensor) -> Tensor:
         identity = x
@@ -276,9 +262,7 @@ class ResBlock(nn.Module):
         return out
 
 
-def conv3x3(
-    in_planes: int, out_planes: int, dilation: int = 1, kernel_size=3
-) -> nn.Conv2d:
+def conv3x3(in_planes: int, out_planes: int, dilation: int = 1, kernel_size=3) -> nn.Conv2d:
     """3x3 convolution with padding"""
     return nn.Conv2d(
         in_planes,

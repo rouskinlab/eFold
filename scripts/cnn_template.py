@@ -3,19 +3,19 @@ import sys
 
 sys.path.append(os.path.abspath("."))
 
-from efold.core.callbacks import ModelCheckpoint
-from lightning.pytorch.strategies import DDPStrategy
+import os
+import sys
+
 import wandb
-from lightning.pytorch.loggers import WandbLogger
-import pandas as pd
-from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import LearningRateMonitor
-from efold.config import device
-from efold import DataModule, create_model
-import sys
-import os
-from lightning.pytorch.profilers import PyTorchProfiler
+from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.strategies import DDPStrategy
+
+from efold.constants import config
+from efold.core import callbacks, datamodule
+from efold.models import factory
+
 # import envbash
 # envbash.load.load_envbash('.env')
 
@@ -27,15 +27,19 @@ if __name__ == "__main__":
     n_gpu = 8
     USE_WANDB = 0
     STRATEGY = "random"
-    print("Running on device: {}".format(device))
+    print("Running on device: {}".format(config.device))
     if USE_WANDB:
         project = "Structure-classic"
         wandb_logger = WandbLogger(project=project)
 
     # fit loop
-    dm = DataModule(
-        name=["bpRNA", "ribo500-blast", "rnacentral_synthetic"], # finetune: "utr", "pri_miRNA", "archiveII"
-        strategy=STRATEGY, #random, sorted or ddp
+    dm = datamodule.DataModule(
+        name=[
+            "bpRNA",
+            "ribo500-blast",
+            "rnacentral_synthetic",
+        ],  # finetune: "utr", "pri_miRNA", "archiveII"
+        strategy=STRATEGY,  # random, sorted or ddp
         shuffle_train=False,
         data_type=["structure"],  #
         force_download=False,
@@ -46,7 +50,7 @@ if __name__ == "__main__":
         external_valid=["yack_valid", "PDB", "archiveII_blast", "lncRNA", "viral_fragments"],
     )
 
-    model = create_model(
+    model = factory.create_model(
         model="cnn",
         ntoken=5,
         d_model=640,
@@ -60,24 +64,29 @@ if __name__ == "__main__":
     )
 
     import torch
-    model.load_state_dict(torch.load('/Users/alberic/Desktop/lively-waterfall-8_epoch45.pt',
-                                     map_location=torch.device(device)))
+
+    model.load_state_dict(
+        torch.load(
+            "/Users/alberic/Desktop/lively-waterfall-8_epoch45.pt",
+            map_location=torch.device(config.device),
+        )
+    )
 
     if USE_WANDB:
         wandb_logger.watch(model, log="all")
 
     trainer = Trainer(
-        accelerator=device,
+        accelerator=config.device,
         devices=n_gpu if STRATEGY == "ddp" else 1,
-        strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else 'auto',
+        strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else "auto",
         # precision="16-mixed",
         max_epochs=1000,
         log_every_n_steps=1,
         accumulate_grad_batches=32,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
-            ModelCheckpoint(every_n_epoch=1),
-            LearningRateMonitor(logging_interval="epoch")
+            callbacks.ModelCheckpoint(every_n_epoch=1),
+            LearningRateMonitor(logging_interval="epoch"),
         ]
         if USE_WANDB
         else [],

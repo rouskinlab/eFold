@@ -1,9 +1,9 @@
-from matplotlib import pyplot as plt
 import numpy as np
-import wandb
-from .metrics import r2_score, mae_score, pearson_coefficient
-from ..config import UKN
+from matplotlib import pyplot as plt
 from rouskinhf import int2seq
+
+from efold.constants import config
+from efold.core import metrics
 
 matplotlib_colors = [
     "red",
@@ -38,9 +38,9 @@ def plot_signal(
     fig, ax = plt.subplots()
 
     # Compute metrics while you still have tensors
-    r2 = r2_score(pred=pred, true=true)
-    r = pearson_coefficient(pred=pred, true=true)
-    mae = mae_score(pred=pred, true=true)
+    r2 = metrics.r2_score(pred=pred, true=true)
+    r = metrics.pearson_coefficient(pred=pred, true=true)
+    mae = metrics.mae_score(pred=pred, true=true)
 
     # Base position with no coverage or G/U base are removed
     def chop_array(x):
@@ -50,7 +50,7 @@ def plot_signal(
         return x[mask].cpu().numpy()
 
     pred, true, sequence = chop_array(pred), chop_array(true), chop_array(sequence)
-    mask = true != UKN
+    mask = true != config.pytorch.unknown_value
     true, pred, sequence = (
         known_bases_to_list(true, mask),
         known_bases_to_list(pred, mask),
@@ -129,11 +129,7 @@ def plot_structure(pred, true, **kwargs):
 
 
 plot_factory = {
-    ("dms", "scatter"): lambda *args, **kwargs: plot_signal(
-        *args, **kwargs, data_type="DMS"
-    ),
-    ("shape", "scatter"): lambda *args, **kwargs: plot_signal(
-        *args, **kwargs, data_type="SHAPE"
-    ),
+    ("dms", "scatter"): lambda *args, **kwargs: plot_signal(*args, **kwargs, data_type="DMS"),
+    ("shape", "scatter"): lambda *args, **kwargs: plot_signal(*args, **kwargs, data_type="SHAPE"),
     ("structure", "heatmap"): plot_structure,
 }

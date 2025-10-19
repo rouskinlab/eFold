@@ -1,17 +1,18 @@
-from torch.utils.data import Sampler, Subset
-import numpy as np
-# from random import shuffle
-from torch.utils.data import Dataset
-from typing import Union, Optional, TypeVar, Iterator
-import torch.distributed as dist
 import math
-import torch
 import os
+from typing import Iterator, Optional, TypeVar, Union
 
-T_co = TypeVar('T_co', covariant=True)
+import numpy as np
+import torch
+import torch.distributed as dist
+
+# from random import shuffle
+from torch.utils.data import Dataset, Sampler, Subset
+
+T_co = TypeVar("T_co", covariant=True)
 
 
-class DDPSampler(Sampler):    
+class DDPSampler(Sampler):
     r"""Sampler that restricts data loading to a subset of the dataset.
 
     It is especially useful in conjunction with
@@ -58,12 +59,17 @@ class DDPSampler(Sampler):
         ...     if is_distributed:
         ...         sampler.set_epoch(epoch)
         ...     train(loader)
-        """
-    def __init__(self, dataset: Dataset, num_replicas: Optional[int] = None,
-                 rank: Optional[int] = None, shuffle: bool = True,
-                 seed: int = os.environ.get('PL_GLOBAL_SEED', 0), 
-                 drop_last: bool = False) -> None:
+    """
 
+    def __init__(
+        self,
+        dataset: Dataset,
+        num_replicas: Optional[int] = None,
+        rank: Optional[int] = None,
+        shuffle: bool = True,
+        seed: int = int(os.environ.get("PL_GLOBAL_SEED", 0)),
+        drop_last: bool = False,
+    ) -> None:
         if num_replicas is None:
             if not dist.is_available():
                 raise RuntimeError("Requires distributed package to be available")
@@ -74,7 +80,9 @@ class DDPSampler(Sampler):
             rank = dist.get_rank()
         if rank >= num_replicas or rank < 0:
             raise ValueError(
-                f"Invalid rank {rank}, rank should be in the interval [0, {num_replicas - 1}] because num_replicas={num_replicas}")
+                f"Invalid rank {rank}, rank should be in the interval [0, {num_replicas - 1}]",
+                f"because num_replicas={num_replicas}",
+            )
         self.dataset = dataset
         self.num_replicas = num_replicas
         self.rank = rank
@@ -94,12 +102,14 @@ class DDPSampler(Sampler):
         self.total_size = self.num_samples * self.num_replicas
         self.shuffle = shuffle
         self.seed = seed
-        
+
         if isinstance(dataset, Subset):
-            self.length = dataset.dataset.length[slice(dataset.indices.start, dataset.indices.stop, dataset.indices.step)] 
+            self.length = dataset.dataset.length[
+                slice(dataset.indices.start, dataset.indices.stop, dataset.indices.step)
+            ]
         elif isinstance(dataset, Dataset):
-            self.length = dataset.length 
-        
+            self.length = dataset.length
+
     def __iter__(self) -> Iterator[T_co]:
         # deterministically shuffle based on epoch and seed
         if self.shuffle:
@@ -118,24 +128,24 @@ class DDPSampler(Sampler):
                 indices += (indices * math.ceil(padding_size / len(indices)))[:padding_size]
         else:
             # remove tail of data to make it evenly divisible.
-            indices = indices[:self.total_size]
+            indices = indices[: self.total_size]
         assert len(indices) == self.total_size
 
         # subsample
-        indices = indices[self.rank:self.total_size:self.num_replicas]
+        indices = indices[self.rank : self.total_size : self.num_replicas]
         assert len(indices) == self.num_samples
 
         # sort by length
-        lengths = [self.length[i] for i in indices] 
+        lengths = [self.length[i] for i in indices]
         length_order = np.argsort(lengths)
         indices = [indices[i] for i in length_order]
-        
+
         # shuffle them again to avoid having the samples sorted by length
         g = torch.Generator()
         g.manual_seed(self.seed + self.epoch + 42)
         deterministic_order = torch.randperm(len(indices), generator=g).tolist()
         indices = [indices[i] for i in deterministic_order]
-        
+
         return iter(indices)
 
     def __len__(self) -> int:
@@ -156,14 +166,13 @@ class DDPSampler(Sampler):
 def sampler_factory(
     dataset: Union[Dataset, Subset],
     strategy: str,
-    seed:int = os.environ.get('PL_GLOBAL_SEED', 0),
+    seed: int = int(os.environ.get("PL_GLOBAL_SEED", 0)),
     num_replicas: Optional[int] = None,
     rank: Optional[int] = None,
 ):
-    if strategy in ['random', 'sorted']:
+    if strategy in ["random", "sorted"]:
         return None
-    elif strategy == 'ddp':
+    elif strategy == "ddp":
         return DDPSampler(dataset, num_replicas=num_replicas, rank=rank, shuffle=True, seed=seed)
     else:
         raise ValueError(f"Invalid strategy value: {strategy}")
-  

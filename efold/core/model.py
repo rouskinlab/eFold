@@ -1,17 +1,13 @@
 from typing import Any
-import lightning.pytorch as pl
-from lightning.pytorch.utilities.types import STEP_OUTPUT
-import torch.nn as nn
-import torch
-from ..config import device, UKN, TEST_SETS_NAMES
-import torch.nn.functional as F
-from .batch import Batch
-from torchmetrics import R2Score, PearsonCorrCoef, MeanAbsoluteError, F1Score
-from .metrics import MetricsStack
-from .datamodule import DataModule
-import time
 
-from .postprocess import Postprocess
+import lightning.pytorch as pl
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from lightning.pytorch.utilities.types import STEP_OUTPUT
+
+from efold.constants import config
+from efold.core import batch, metrics, postprocess
 
 METRIC_ARGS = dict(dist_sync_on_step=True)
 
@@ -45,16 +41,16 @@ class Model(pl.LightningModule):
         self.automatic_optimization = True
 
         self.weight_data = weight_data
-        self.save_hyperparameters(ignore=['loss_fn'])
-        self.lossBCE = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([300])).to(device)
+        self.save_hyperparameters(ignore=["loss_fn"])
+        self.lossBCE = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([300])).to(config.device)
 
         # Metrics
         self.metrics_stack = None
         self.tic = None
 
-        self.test_results = {'reference':[], 'sequence':[] ,'structure':[]}
+        self.test_results: dict[str, list[Any]] = {"reference": [], "sequence": [], "structure": []}
 
-        self.postprocesser = Postprocess()
+        self.postprocesser = postprocess.Postprocess()
 
     def configure_optimizers(self):
         optimizer = self.optimizer_fn(
@@ -69,7 +65,7 @@ class Model(pl.LightningModule):
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=self.gamma)
         return [optimizer], [scheduler]
 
-    def _loss_signal(self, batch: Batch, data_type: str):
+    def _loss_signal(self, batch: batch.Batch, data_type: str):
         assert data_type in [
             "dms",
             "shape",
@@ -85,7 +81,7 @@ class Model(pl.LightningModule):
 
         ## vv MSE loss vv ##
         mask = torch.zeros_like(true)
-        mask[true != UKN] = 1
+        mask[true != config.pytorch.unknown_value] = 1
         loss = F.mse_loss(pred * mask, true * mask)
 
         non_zeros = (mask == 1).sum() / mask.numel()
@@ -96,13 +92,13 @@ class Model(pl.LightningModule):
         assert not torch.isnan(loss), "Loss is NaN for {}".format(data_type)
         return loss
 
-    def _loss_structure(self, batch: Batch):
+    def _loss_structure(self, batch: batch.Batch):
         pred, true = batch.get_pairs("structure")
         loss = self.lossBCE(pred, true)
         assert not torch.isnan(loss), "Loss is NaN for structure"
         return loss
 
-    def loss_fn(self, batch: Batch):
+    def loss_fn(self, batch: batch.Batch):
         count = {k: v for k, v in batch.dt_count.items() if k in self.data_type_output}
         losses = {}
         if "dms" in count.keys():
@@ -127,23 +123,21 @@ class Model(pl.LightningModule):
             predictions[data_type] = torch.clip(predictions[data_type], min=0, max=1)
         return predictions
 
-    def training_step(self, batch: Batch, batch_idx: int):
+    def training_step(self, batch: batch.Batch, batch_idx: int):
         predictions = self.forward(batch)
         batch.integrate_prediction(predictions)
         loss = self.loss_fn(batch)[0]
-        self.log(f"train/loss", loss, sync_dist=True)
+        self.log("train/loss", loss, sync_dist=True)
         return loss
 
     def on_validation_start(self):
         val_dl_names = self.trainer.datamodule.external_valid
         self.metrics_stack = [
-            MetricsStack(name=name, data_type=self.data_type_output)
+            metrics.MetricsStack(name=name, data_type=self.data_type_output)
             for name in val_dl_names
         ]
 
-    def on_train_batch_end(
-        self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int
-    ) -> None:
+    def on_train_batch_end(self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int) -> None:
         del outputs
         del batch
         if batch_idx % 100 == 0:
@@ -152,10 +146,12 @@ class Model(pl.LightningModule):
     def on_train_end(self) -> None:
         torch.cuda.empty_cache()
 
-    def validation_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
+    def validation_step(self, batch: batch.Batch, batch_idx: int, dataloader_idx=0):
         predictions = self.forward(batch)
-        
-        predictions['structure'] = self.postprocesser.run(predictions['structure'], batch.get('sequence'))
+
+        predictions["structure"] = self.postprocesser.run(
+            predictions["structure"], batch.get("sequence")
+        )
 
         batch.integrate_prediction(predictions)
         # loss, losses = self.loss_fn(batch)
@@ -173,8 +169,8 @@ class Model(pl.LightningModule):
         # aggregate the stack and log it
         for metrics_dl in self.metrics_stack:
             metrics_pack = metrics_dl.compute()
-            for dt, metrics in metrics_pack.items():
-                for name, metric in metrics.items():
+            for dt, metrics_dict in metrics_pack.items():
+                for name, metric in metrics_dict.items():
                     # to replace with a gather_all?
                     self.log(
                         f"valid/{metrics_dl.name}/{dt}/{name}",
@@ -185,14 +181,20 @@ class Model(pl.LightningModule):
         self.metrics_stack = None
         torch.cuda.empty_cache()
 
-    def test_step(self, batch: Batch, batch_idx: int, dataloader_idx=0):
+    def test_step(self, batch: batch.Batch, batch_idx: int, dataloader_idx=0):
         predictions = self.forward(batch)
-        predictions['structure'] = self.postprocesser.run(predictions['structure'], batch.get('sequence'))
+        predictions["structure"] = self.postprocesser.run(
+            predictions["structure"], batch.get("sequence")
+        )
 
-        from ..config import int2seq
-        self.test_results['reference'] += batch.get('reference')
-        self.test_results['sequence'] += [''.join([int2seq[base] for base in seq]) for seq in batch.get('sequence').detach().tolist()]
-        self.test_results['structure'] += predictions['structure'].tolist()
+        from efold.constants import config
+
+        self.test_results["reference"] += batch.get("reference")
+        self.test_results["sequence"] += [
+            "".join([config.tokens.int2seq[base] for base in seq])
+            for seq in batch.get("sequence").detach().tolist()
+        ]
+        self.test_results["structure"] += predictions["structure"].tolist()
 
         predictions = self._clean_predictions(batch, predictions)
         batch.integrate_prediction(predictions)
@@ -201,12 +203,12 @@ class Model(pl.LightningModule):
         self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int, dataloader_idx: int = 0
     ) -> None:
         # push the metric directly
-        metric_pack = MetricsStack(
-            name=TEST_SETS_NAMES[dataloader_idx],
+        metric_pack = metrics.MetricsStack(
+            name=config.test_sets.all_names[dataloader_idx],
             data_type=self.data_type_output,
-            )
-        for dt, metrics in metric_pack.update(batch).compute().items():
-            for name, metric in metrics.items():
+        )
+        for dt, metric_dict in metric_pack.update(batch).compute().items():
+            for name, metric in metric_dict.items():
                 self.log(
                     f"test/{metric_pack.name}/{dt}/{name}",
                     float(metric),
@@ -218,16 +220,16 @@ class Model(pl.LightningModule):
 
     def on_test_epoch_end(self) -> None:
         torch.cuda.empty_cache()
-        
+
     def on_test_end(self) -> None:
-        
         import pandas as pd
+
         df = pd.DataFrame(self.test_results)
-        df.to_feather('test_results.feather')
+        df.to_feather("test_results.feather")
 
         torch.cuda.empty_cache()
 
-    def predict_step(self, batch: Batch, batch_idx: int):
+    def predict_step(self, batch: batch.Batch, batch_idx: int):
         predictions = self.forward(batch)
         predictions = self._clean_predictions(batch, predictions)
         batch.integrate_prediction(predictions)

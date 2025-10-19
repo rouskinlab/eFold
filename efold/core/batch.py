@@ -1,33 +1,31 @@
+from typing import Optional
+
 import torch
-from torch import tensor
 import torch.nn.functional as F
-from .embeddings import base_pairs_to_pairing_matrix, sequence_to_int
-from ..config import device, POSSIBLE_METRICS, UKN
-from typing import Dict
-from .datatype import data_type_factory
-from .util import split_data_type
-from torch import cuda, backends
+
+from efold.constants import config
+from efold.core import datatype, embeddings, util
 
 
-def _pad(arr, L, data_type, accept_none=False):
+def _pad(arr: torch.Tensor, L: int, data_type: str, accept_none: bool = False) -> torch.Tensor:
     padding_values = {
         "sequence": 0,
-        "dms": UKN,
-        "shape": UKN,
+        "dms": config.pytorch.unknown_value,
+        "shape": config.pytorch.unknown_value,
     }
-    assert (
-        data_type in padding_values.keys()
-    ), f"Unknown data type {data_type}. If you want to pad a structure, use base_pairs_to_pairing_matrix."
+    assert data_type in padding_values.keys(), (
+        f"Unknown data type {data_type}. If you want to pad a structure, use base_pairs_to_pairing_matrix."
+    )
     if accept_none and arr is None:
-        return tensor([padding_values[data_type]] * L)
+        return torch.tensor([padding_values[data_type]] * L)
     return F.pad(arr, (0, L - len(arr)), value=padding_values[data_type])
 
 
-def get_padded_vector(dp, data_type, data_part, L):
+def get_padded_vector(dp: dict, data_type: str, data_part: str, L: int) -> torch.Tensor:
     if getattr(dp, data_type) is None:
-        return tensor([UKN] * L)
+        return torch.tensor([config.pytorch.unknown_value] * L)
     if getattr(getattr(dp, data_type), data_part) is None:
-        return tensor([UKN] * L)
+        return torch.tensor([config.pytorch.unknown_value] * L)
     return _pad(getattr(getattr(dp, data_type), data_part), L, data_type)
 
 
@@ -45,7 +43,7 @@ class Batch:
         dms=None,
         shape=None,
         structure=None,
-        device = 'cpu'
+        device="cpu",
     ):
         self.reference = reference
         self.sequence = sequence
@@ -66,7 +64,7 @@ class Batch:
         batch_data: list,
         data_type: str,
         use_error: bool,
-        structure_padding_value: float = UKN,
+        structure_padding_value: float = config.pytorch.unknown_value,
     ):
         reference = [dp["reference"] for dp in batch_data]
         length = [dp["length"] for dp in batch_data]
@@ -74,7 +72,7 @@ class Batch:
 
         # move the conversion to the dataset
         sequence = torch.stack(
-            [_pad(sequence_to_int(dp["sequence"]), L, "sequence") for dp in batch_data]
+            [_pad(embeddings.sequence_to_int(dp["sequence"]), L, "sequence") for dp in batch_data]
         )
         batch_size = len(reference)
 
@@ -91,16 +89,16 @@ class Batch:
         }
         for dt in data_type:
             if dt == "structure":
-                data[dt] = data_type_factory["batch"][dt](
+                data[dt] = datatype.data_type_factory["batch"][dt](
                     true=torch.stack(
                         [
-                            base_pairs_to_pairing_matrix(
+                            embeddings.base_pairs_to_pairing_matrix(
                                 dp["structure"]["true"],
-                                l,
+                                len_,
                                 padding=L,
                                 pad_value=structure_padding_value,
                             )
-                            for (dp, l) in zip(batch_data, length)
+                            for (dp, len_) in zip(batch_data, length)
                         ]
                     ),
                     error=None,
@@ -113,16 +111,14 @@ class Batch:
                 true = torch.stack(true)
 
                 # use error if there's a single non-None error and if the true signal is not None
-                if use_error and len(
-                    [1 for dp in batch_data if dp[dt]["error"] is not None]
-                ):
+                if use_error and len([1 for dp in batch_data if dp[dt]["error"] is not None]):
                     for dp in batch_data:
                         error.append(_pad(dp[dt]["error"], L, dt, accept_none=True))
                     error = torch.stack(error)
                 else:
                     error = [None] * batch_size
 
-                data[dt] = data_type_factory["batch"][dt](true=true, error=error)
+                data[dt] = datatype.data_type_factory["batch"][dt](true=true, error=error)
 
         return cls(
             reference=reference,
@@ -136,12 +132,12 @@ class Batch:
             **data,
         )
 
-    def get(self, data_type, index=None, to_numpy=False):
+    def get(self, data_type: str, index: Optional[int] = None, to_numpy: bool = False):
         if data_type in ["reference", "sequence", "length"]:
             out = getattr(self, data_type)
             data_part = None
         else:
-            data_part, data_type = split_data_type(data_type)
+            data_part, data_type = util.split_data_type(data_type)
 
             # could be in the dataset but wasn't requested in the dm init
             if data_type not in self.data_types:
@@ -157,9 +153,9 @@ class Batch:
         if index is not None:
             out = out[index]
             if hasattr(out, "__len__"):
-                l = self.get("length")[index]
+                len_ = self.get("length")[index]
                 if data_type == "structure":
-                    out = out[:l, :l]
+                    out = out[:len_, :len_]
                 else:
                     out = out[: self.get("length")[index]]
 
@@ -168,7 +164,7 @@ class Batch:
                 out = out.squeeze().cpu().numpy()
         return out
 
-    def integrate_prediction(self, prediction):
+    def integrate_prediction(self, prediction: dict) -> None:
         for data_type, pred in prediction.items():
             if getattr(self, data_type) is not None:
                 getattr(self, data_type).pred = pred
@@ -176,44 +172,39 @@ class Batch:
                 setattr(
                     self,
                     data_type,
-                    data_type_factory["batch"][data_type](true=None, pred=pred),
+                    datatype.data_type_factory["batch"][data_type](true=None, pred=pred),
                 )
 
-    def get_pairs(self, data_type, to_numpy=False):
+    def get_pairs(self, data_type: str, to_numpy: bool = False) -> tuple:
         return (
             self.get("pred_{}".format(data_type), to_numpy=to_numpy),
             self.get("true_{}".format(data_type), to_numpy=to_numpy),
         )
 
-    def count(self, data_type):
+    def count(self, data_type: str) -> int:
         if data_type in ["reference", "sequence", "length"]:
             return self.batch_size
-        if not data_type in self.dt_count or getattr(self, data_type) is None:
+        if data_type not in self.dt_count or getattr(self, data_type) is None:
             return 0
         return self.dt_count[data_type]
 
-    def contains(self, data_type):
+    def contains(self, data_type: str) -> bool:
         if data_type in ["reference", "sequence", "length"]:
             return True
-        data_part, data_type = split_data_type(data_type)
+        data_part, data_type = util.split_data_type(data_type)
         if not self.count(data_type):
             return False
         if (
-            not hasattr(
-                getattr(self, data_type), data_part
-            )  # that's more of a sanity check
+            not hasattr(getattr(self, data_type), data_part)  # that's more of a sanity check
             or getattr(getattr(self, data_type), data_part) is None
         ):
             return False
         return True
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.count("sequence")
 
-
-    #     return out
-
-    def __del__(self):
+    def __del__(self) -> None:
         del self.dms
         del self.shape
         del self.structure
@@ -225,27 +216,26 @@ class Batch:
         del self.data_types
         del self.dt_count
         del self
-    
+
     @property
-    def device(self):
+    def device(self) -> str:
         return self._device
 
     @device.getter
-    def device(self):
+    def device(self) -> str:
         return self._device
 
     @device.setter
-    def device(self, device):
-        # assert device exists
-        if device == 'mps' and not backends.mps.is_available():
+    def device(self, device: str) -> None:
+        if device == "mps" and not torch.backends.mps.is_available():
             raise ValueError("MPS is not available on this device.")
-        if device == 'cuda' and not cuda.is_available():
+        if device == "cuda" and not torch.cuda.is_available():
             raise ValueError("CUDA is not available on this device.")
-        for attr in ['dms', 'shape', 'structure', 'sequence']:
+        for attr in ["dms", "shape", "structure", "sequence"]:
             if getattr(self, attr) is not None:
                 setattr(self, attr, getattr(self, attr).to(device))
         self._device = device
 
-    def to(self, device):
+    def to(self, device: str) -> "Batch":
         self.device = device
         return self

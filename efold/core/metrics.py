@@ -1,9 +1,8 @@
-import torch
-from ..config import UKN, POSSIBLE_METRICS
-import torch
-from .batch import Batch
 import numpy as np
-from typing import TypedDict
+import torch
+
+from efold.constants import config
+from efold.core import batch
 
 
 # wrapper for metrics
@@ -11,7 +10,7 @@ def mask_and_flatten(func):
     def wrapped(pred, true):
         if pred is None or true is None:
             return np.nan
-        mask = true != UKN
+        mask = true != config.pytorch.unknown_value
         if torch.sum(mask) == 0:
             return np.nan
         pred = pred[mask]
@@ -84,9 +83,7 @@ def r2_score(pred, true):
     :return: R2 score
     """
 
-    return (
-        1 - torch.sum((true - pred) ** 2) / torch.sum((true - torch.mean(true)) ** 2)
-    ).item()
+    return (1 - torch.sum((true - pred) ** 2) / torch.sum((true - torch.mean(true)) ** 2)).item()
 
 
 @mask_and_flatten
@@ -100,9 +97,7 @@ def pearson_coefficient(pred, true):
     """
 
     return torch.mean(
-        (pred - torch.mean(pred))
-        * (true - torch.mean(true))
-        / (torch.std(pred) * torch.std(true))
+        (pred - torch.mean(pred)) * (true - torch.mean(true)) / (torch.std(pred) * torch.std(true))
     ).item()
 
 
@@ -135,18 +130,18 @@ class MetricsStack:
         self.shape = dict(mae=[], pearson=[], r2=[])
         self.structure = dict(f1=[])
 
-    def update(self, batch: Batch):
+    def update(self, batch: batch.Batch):
         for dt in self.data_type:
             pred, true = batch.get_pairs(dt)
-            for metric in POSSIBLE_METRICS[dt]:
+            for metric in config.metrics.possible_metrics[dt]:
                 self._add_metric(dt, metric, metric_factory[metric](pred, true))
         return self
 
     def compute(self) -> dict:
-        out = {}
+        out: dict = {}
         for dt in self.data_type:
             out[dt] = {}
-            for metric in POSSIBLE_METRICS[dt]:
+            for metric in config.metrics.possible_metrics[dt]:
                 out[dt][metric] = self._get_nanmean(dt, metric)
         return out
 
