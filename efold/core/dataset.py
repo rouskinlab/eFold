@@ -4,13 +4,10 @@ import torch
 from torch.utils.data import ConcatDataset, Dataset as TorchDataset, Dataset
 from typing import List
 
-from .batch import Batch
 from rouskinhf import get_dataset
-from .datatype import DMSDataset, SHAPEDataset, StructureDataset
-from .embeddings import sequence_to_int
-from .util import _pad
-from .path import Path
-from ..config import UKN
+
+from efold import settings
+from efold.core import batch, datatype, embeddings, path, util
 
 
 class Dataset(TorchDataset):
@@ -25,9 +22,9 @@ class Dataset(TorchDataset):
         min_len: int,
         structure_padding_value: float,
         use_error: bool,
-        dms: DMSDataset = None,
-        shape: SHAPEDataset = None,
-        structure: StructureDataset = None,
+        dms: datatype.DMSDataset = None,
+        shape: datatype.SHAPEDataset = None,
+        structure: datatype.StructureDataset = None,
         sort_by_length: bool = False,
     ) -> None:
         super().__init__()
@@ -43,13 +40,13 @@ class Dataset(TorchDataset):
         self.structure_padding_value = structure_padding_value
         self.L = max(self.length)
         self._remove_sequences_out_of_length_interval(min_len, max_len)
-        
+
         if sort_by_length:
             self.sort()
 
     def _remove_sequences_out_of_length_interval(self, min_len, max_len):
         if max_len is None:
-            max_len = np.inf    
+            max_len = np.inf
         if min_len is None:
             min_len = 0
         if min_len > max_len:
@@ -81,9 +78,7 @@ class Dataset(TorchDataset):
             refs=np.concatenate([self.refs, other.refs]).tolist(),
             length=np.concatenate([self.length, other.length]).tolist(),
             sequence=np.concatenate([self.sequence, other.sequence]).tolist(),
-            dms=self.dms + other.dms
-            if self.dms is not None and other.dms is not None
-            else None,
+            dms=self.dms + other.dms if self.dms is not None and other.dms is not None else None,
             shape=self.shape + other.shape
             if self.shape is not None and other.shape is not None
             else None,
@@ -101,36 +96,36 @@ class Dataset(TorchDataset):
         use_error: bool = False,
         max_len=None,
         min_len=None,
-        structure_padding_value: float = UKN,
+        structure_padding_value: float = settings.UKN,
         sort_by_length: bool = False,
         tqdm=True,
     ):
-        path = Path(name=name)
+        path_obj = path.Path(name=name)
         if force_download:
-            path.clear()
+            path_obj.clear()
 
-        if os.path.exists(path.get_reference()):
+        if os.path.exists(path_obj.get_reference()):
             print("Loading dataset from disk")
 
             print("Load references              \r", end="")
-            refs = path.load_reference().tolist()
+            refs = path_obj.load_reference().tolist()
 
             print("Load lengths         \r", end="")
-            length = path.load_length().tolist()
+            length = path_obj.load_length().tolist()
             L = max(length)
 
             print("Load sequences         \r", end="")
-            sequence = path.load_sequence().tolist()
+            sequence = path_obj.load_sequence().tolist()
             dms, shape, structure = None, None, None
             if "dms" in data_type:
                 print("Load dms         \r", end="")
-                dms = path.load_dms()
+                dms = path_obj.load_dms()
             if "shape" in data_type:
                 print("Load shape         \r", end="")
-                shape = path.load_shape()
+                shape = path_obj.load_shape()
             if "structure" in data_type:
                 print("Load structure      \r", end="")
-                structure = path.load_structure()
+                structure = path_obj.load_structure()
 
         else:
             data = get_dataset(
@@ -142,28 +137,28 @@ class Dataset(TorchDataset):
 
             print("Dump lengths              \r", end="")
             length = [len(d["sequence"]) for d in data.values()]
-            path.dump_length(np.array(length))
+            path_obj.dump_length(np.array(length))
 
             print("Dump references              \r", end="")
             refs = list(data.keys())
-            path.dump_reference(np.array(list(data.keys())))
+            path_obj.dump_reference(np.array(list(data.keys())))
             L = max(length)
 
             print("Dump sequences              \r", end="")
             sequence = [d["sequence"] for d in data.values()]
-            path.dump_sequence(np.array(sequence))
+            path_obj.dump_sequence(np.array(sequence))
 
             print("Dump dms              \r", end="")
-            dms = DMSDataset.from_data_json(data, L, refs)
-            path.dump_dms(dms)
+            dms = datatype.DMSDataset.from_data_json(data, L, refs)
+            path_obj.dump_dms(dms)
 
             print("Dump shape              \r", end="")
-            shape = SHAPEDataset.from_data_json(data, L, refs)
-            path.dump_shape(shape)
+            shape = datatype.SHAPEDataset.from_data_json(data, L, refs)
+            path_obj.dump_shape(shape)
 
             print("Dump structure              \r", end="")
-            structure = StructureDataset.from_data_json(data, L, refs)
-            path.dump_structure(structure)
+            structure = datatype.StructureDataset.from_data_json(data, L, refs)
+            path_obj.dump_structure(structure)
 
         print("Done!                            ")
 
@@ -205,16 +200,14 @@ class Dataset(TorchDataset):
             "length": self.length[index],
         }
         for attr in ["dms", "shape", "structure"]:
-            out[attr] = (
-                getattr(self, attr)[index] if getattr(self, attr) != None else None
-            )
+            out[attr] = getattr(self, attr)[index] if getattr(self, attr) != None else None
         return out
 
     def collate_fn(self, batch_data):
-        batch = Batch.from_dataset_items(
+        batch_obj = batch.Batch.from_dataset_items(
             batch_data,
             self.data_type,
             use_error=self.use_error,
             structure_padding_value=self.structure_padding_value,
         )
-        return batch
+        return batch_obj

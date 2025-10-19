@@ -1,16 +1,17 @@
+import os
+import sys
+import torch
 import wandb
 from lightning.pytorch.callbacks import LearningRateMonitor
 from lightning.pytorch.loggers import WandbLogger
-import os
-import sys
+from lightning.pytorch import Trainer
+from lightning.pytorch.strategies import DDPStrategy
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from lightning.pytorch import Trainer
-from efold.core.callbacks import WandbFitLogger, KaggleLogger
-from efold.config import device
-from efold import DataModule, create_model
-import torch
-from lightning.pytorch.strategies import DDPStrategy
+
+from efold import settings
+from efold.core import callbacks, datamodule
+from efold.models import factory
 
 if __name__ == "__main__":
     USE_WANDB = True
@@ -32,7 +33,7 @@ if __name__ == "__main__":
     }
 
     # Create dataset
-    dm = DataModule(
+    dm = datamodule.DataModule(
         name=["ribo500"],
         data_type=["dms", "shape", "structure"],
         force_download=False,
@@ -47,7 +48,7 @@ if __name__ == "__main__":
 
     params["dim_per_head"] = params["embed_dim"] // params["num_heads"]
 
-    model = create_model(
+    model = factory.create_model(
         model="ribonanza",
         params=params,
     )
@@ -64,7 +65,7 @@ if __name__ == "__main__":
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
             LearningRateMonitor(logging_interval="epoch"),
-            WandbFitLogger(dm=dm),
+            callbacks.WandbFitLogger(dm=dm),
         ]
         if USE_WANDB
         else [],

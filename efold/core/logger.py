@@ -1,9 +1,9 @@
 import wandb
-from ..config import *
-import lightning.pytorch as pl
 import os
+import lightning.pytorch as pl
 import matplotlib.pyplot as plt
-import torchmetrics
+
+from efold.settings import *
 
 
 class LocalLogger:
@@ -17,9 +17,7 @@ class LocalLogger:
 
     def test_plot(self, dataloader, data_type, name, plot: plt.Figure, idx=None):
         # save the wandb Image to a png
-        plot.savefig(
-            os.path.join(self.path, f"{dataloader}_{data_type}_{name}_{idx}.png")
-        )
+        plot.savefig(os.path.join(self.path, f"{dataloader}_{data_type}_{name}_{idx}.png"))
         plt.close(plot)
 
 

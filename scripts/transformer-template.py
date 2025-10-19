@@ -1,13 +1,13 @@
+import envbash
+import os
+import sys
 import wandb
 from lightning.pytorch.callbacks import LearningRateMonitor
 from lightning.pytorch.loggers import WandbLogger
-import os
-import sys
 from lightning.pytorch import Trainer
-from efold.core.callbacks import WandbFitLogger, KaggleLogger
-from efold.config import device
-from efold import DataModule, create_model
-import envbash
+
+from efold.core import callbacks, datamodule
+from efold.models import factory
 
 envbash.load.load_envbash(".env")
 sys.path.append(os.path.abspath("."))
@@ -25,7 +25,7 @@ if __name__ == "__main__":
     batch_size = 128
 
     # Create dataset
-    dm = DataModule(
+    dm = datamodule.DataModule(
         name=["ribo-kaggle"],
         data_type=["dms", "shape"],
         force_download=False,
@@ -38,7 +38,7 @@ if __name__ == "__main__":
         shuffle_valid=False,
     )
 
-    model = create_model(
+    model = factory.create_model(
         model="transformer",
         data="multi",
         weight_data=True,
@@ -72,7 +72,7 @@ if __name__ == "__main__":
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
             LearningRateMonitor(logging_interval="epoch"),
-            WandbFitLogger(dm=dm, batch_size=batch_size, load_model=None),
+            callbacks.WandbFitLogger(dm=dm, batch_size=batch_size, load_model=None),
         ]
         if USE_WANDB
         else [],
@@ -81,7 +81,7 @@ if __name__ == "__main__":
 
     trainer.fit(model, datamodule=dm)
 
-    dm = DataModule(
+    dm = datamodule.DataModule(
         name=["ribo-test"],
         data_type=["dms", "shape"],
         force_download=False,
@@ -99,7 +99,7 @@ if __name__ == "__main__":
         devices=1,
         callbacks=[
             # don't change this
-            KaggleLogger(push_to_kaggle=True, load_model=None)
+            callbacks.KaggleLogger(push_to_kaggle=True, load_model=None)
         ],
     )
 

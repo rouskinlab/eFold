@@ -1,15 +1,17 @@
 import os
 import sys
+
 sys.path.append(os.path.abspath("."))
 
-from efold.core.callbacks import ModelCheckpoint
-from lightning.pytorch.strategies import DDPStrategy
 import wandb
+from lightning.pytorch.strategies import DDPStrategy
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import LearningRateMonitor
-from efold.config import device
-from efold import DataModule, create_model
+
+from efold import settings
+from efold.core import callbacks, datamodule
+from efold.models import factory
 
 
 # Train loop
@@ -18,14 +20,14 @@ if __name__ == "__main__":
     STRATEGY = "random"
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        wandb_logger = WandbLogger(project='test')
+        wandb_logger = WandbLogger(project="test")
 
     # fit loop
-    dm = DataModule(
-        name=["efold_train"], # finetune: "utr", "pri_miRNA"
+    dm = datamodule.DataModule(
+        name=["efold_train"],  # finetune: "utr", "pri_miRNA"
         strategy=STRATEGY,
         shuffle_train=False,
-        data_type=["structure"], 
+        data_type=["structure"],
         force_download=False,
         batch_size=1,
         max_len=1000,
@@ -35,7 +37,7 @@ if __name__ == "__main__":
         external_valid=["yack_valid"],
     )
 
-    model = create_model(
+    model = factory.create_model(
         model="unet",
         img_ch=17,
         output_ch=1,
@@ -50,14 +52,14 @@ if __name__ == "__main__":
     trainer = Trainer(
         accelerator=device,
         devices=8 if STRATEGY == "ddp" else 1,
-        strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else 'auto',
+        strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else "auto",
         max_epochs=15,
         log_every_n_steps=1,
         accumulate_grad_batches=32,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
-            ModelCheckpoint(every_n_epoch=1),
-            LearningRateMonitor(logging_interval="epoch")
+            callbacks.ModelCheckpoint(every_n_epoch=1),
+            LearningRateMonitor(logging_interval="epoch"),
         ]
         if USE_WANDB
         else [],

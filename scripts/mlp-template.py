@@ -1,14 +1,15 @@
 import numpy as np
-import wandb
-from lightning.pytorch.loggers import WandbLogger
 import os
-import sys
-from lightning.pytorch.callbacks.early_stopping import EarlyStopping
-from efold.core.callbacks import ModelCheckpoint
 import pandas as pd
+import sys
+import wandb
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
+from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch import Trainer
-from efold.config import device
-from efold import DataModule, create_model, metrics
+
+from efold import settings
+from efold.core import callbacks, datamodule, metrics
+from efold.models import factory
 
 sys.path.append(os.path.abspath("."))
 # os.system('source /Users/alberic/Desktop/Pro/RouskinLab/projects/deep_learning/RNA_data/env')
@@ -38,7 +39,7 @@ if __name__ == "__main__":
     MAX_LEN = 1024
 
     # Create dataset
-    dm = DataModule(
+    dm = datamodule.DataModule(
         name=["utr", "utr"],
         data="dms",
         force_download=False,
@@ -52,7 +53,7 @@ if __name__ == "__main__":
         # overfit_mode=True
     )
 
-    model = create_model(
+    model = factory.create_model(
         data="dms",
         model="mlp",
         hidden_layers=[4096, 4096, 2048, 1024, 512],
@@ -74,7 +75,7 @@ if __name__ == "__main__":
         logger=wandb_logger,
         accelerator=device,
         callbacks=[
-            ModelCheckpoint(every_n_epoch=1),
+            callbacks.ModelCheckpoint(every_n_epoch=1),
         ],
         enable_checkpointing=False,
     )

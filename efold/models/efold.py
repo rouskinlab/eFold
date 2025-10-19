@@ -1,24 +1,15 @@
 import numpy as np
 import torch
 from torch import nn, Tensor
-import os
-import sys
 from contextlib import ExitStack
-
-import typing as T
 from einops import rearrange
 import torch.nn.functional as F
-import numpy as np
-from ..core.batch import Batch
-from ..core.model import Model
+from collections import defaultdict
 
-from collections import defaultdict    
-
-dir_name = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(dir_name, ".."))
+from efold.core import batch, model
 
 
-class eFold(Model):
+class eFold(model.Model):
     def __init__(
         self,
         ntoken: int,
@@ -34,10 +25,8 @@ class eFold(Model):
         optimizer_fn=torch.optim.Adam,
         **kwargs,
     ):
-        self.save_hyperparameters(ignore=['loss_fn'])
-        super().__init__(
-            lr=lr, loss_fn=loss_fn, optimizer_fn=optimizer_fn, **kwargs
-        )
+        self.save_hyperparameters(ignore=["loss_fn"])
+        super().__init__(lr=lr, loss_fn=loss_fn, optimizer_fn=optimizer_fn, **kwargs)
 
         self.model_type = "eFold"
         self.data_type_output = ["structure"]
@@ -86,17 +75,15 @@ class eFold(Model):
                 kernel_size=3,
                 dropout=dropout,
             ),
-            ResLayer(
-                dim_in=d_cnn // 2, dim_out=1, n_blocks=4, kernel_size=3, dropout=dropout
-            ),
+            ResLayer(dim_in=d_cnn // 2, dim_out=1, n_blocks=4, kernel_size=3, dropout=dropout),
         )
 
-    def forward(self, batch: Batch) -> Tensor:
+    def forward(self, batch: batch.Batch) -> Tensor:
         # Encoding of RNA sequence
         src = batch.get("sequence")
-        
+
         s = self.encoder(src)  # (N, L, d_model)
-        z = self.encoder_adapter(self.seq2map(src)).permute(0, 2, 3, 1) # (N, L, L, d_model)
+        z = self.encoder_adapter(self.seq2map(src)).permute(0, 2, 3, 1)  # (N, L, L, d_model)
 
         # z = self.activ(self.encoder_adapter(s))  # (N, L, c_z / 2)
         # # Outer concatenation
@@ -106,70 +93,81 @@ class eFold(Model):
         s, z = self.eFold(s, z)
 
         structure = self.structure_adapter(z)  # (N, L, L, d_cnn)
-        structure = self.output_structure(structure.permute(0, 3, 1, 2)).squeeze(
-            1
-        )  # (N, L, L)
+        structure = self.output_structure(structure.permute(0, 3, 1, 2)).squeeze(1)  # (N, L, L)
 
         return {
             # "dms": self.output_net_DMS(s).squeeze(axis=2),
             # "shape": self.output_net_SHAPE(s).squeeze(axis=2),
-            "structure": (structure + structure.permute(0, 2, 1))
-            / 2,
+            "structure": (structure + structure.permute(0, 2, 1)) / 2,
         }
-        
-    def seq2map(self, seq_int):
 
+    def seq2map(self, seq_int):
         def int2seq(seq):
             # return ''.join(['XAUCG'[d] for d in seq])
-            return ''.join(['XACGU'[d] for d in seq])
+            return "".join(["XACGU"[d] for d in seq])
 
         # take integer encoded sequence and return last channel of embedding (pairing energy)
         def creatmat(data, device=None):
-
             with torch.no_grad():
                 data = int2seq(data)
-                paired = defaultdict(float, {'AU':2., 'UA':2., 'GC':3., 'CG':3., 'UG':0.8, 'GU':0.8})
+                paired = defaultdict(
+                    float, {"AU": 2.0, "UA": 2.0, "GC": 3.0, "CG": 3.0, "UG": 0.8, "GU": 0.8}
+                )
 
-                mat = torch.tensor([[paired[x+y] for y in data] for x in data]).to(device)
+                mat = torch.tensor([[paired[x + y] for y in data] for x in data]).to(device)
                 n = len(data)
 
-                i, j = torch.meshgrid(torch.arange(n).to(device), torch.arange(n).to(device), indexing='ij')
+                i, j = torch.meshgrid(
+                    torch.arange(n).to(device), torch.arange(n).to(device), indexing="ij"
+                )
                 t = torch.arange(30).to(device)
-                m1 = torch.where((i[:, :, None] - t >= 0) & (j[:, :, None] + t < n), mat[torch.clamp(i[:,:,None]-t, 0, n-1), torch.clamp(j[:,:,None]+t, 0, n-1)], 0)
-                m1 *= torch.exp(-0.5*t*t)
+                m1 = torch.where(
+                    (i[:, :, None] - t >= 0) & (j[:, :, None] + t < n),
+                    mat[
+                        torch.clamp(i[:, :, None] - t, 0, n - 1),
+                        torch.clamp(j[:, :, None] + t, 0, n - 1),
+                    ],
+                    0,
+                )
+                m1 *= torch.exp(-0.5 * t * t)
 
                 m1_0pad = torch.nn.functional.pad(m1, (0, 1))
-                first0 = torch.argmax((m1_0pad==0).to(int), dim=2)
-                to0indices = t[None,None,:]>first0[:,:,None]
+                first0 = torch.argmax((m1_0pad == 0).to(int), dim=2)
+                to0indices = t[None, None, :] > first0[:, :, None]
                 m1[to0indices] = 0
                 m1 = m1.sum(dim=2)
 
                 t = torch.arange(1, 30).to(device)
-                m2 = torch.where((i[:, :, None] + t < n) & (j[:, :, None] - t >= 0), mat[torch.clamp(i[:,:,None]+t, 0, n-1), torch.clamp(j[:,:,None]-t, 0, n-1)], 0)
-                m2 *= torch.exp(-0.5*t*t)
+                m2 = torch.where(
+                    (i[:, :, None] + t < n) & (j[:, :, None] - t >= 0),
+                    mat[
+                        torch.clamp(i[:, :, None] + t, 0, n - 1),
+                        torch.clamp(j[:, :, None] - t, 0, n - 1),
+                    ],
+                    0,
+                )
+                m2 *= torch.exp(-0.5 * t * t)
 
                 m2_0pad = torch.nn.functional.pad(m2, (0, 1))
-                first0 = torch.argmax((m2_0pad==0).to(int), dim=2)
-                to0indices = torch.arange(29).to(device)[None,None,:]>first0[:,:,None]
+                first0 = torch.argmax((m2_0pad == 0).to(int), dim=2)
+                to0indices = torch.arange(29).to(device)[None, None, :] > first0[:, :, None]
                 m2[to0indices] = 0
                 m2 = m2.sum(dim=2)
-                m2[m1==0] = 0
+                m2[m1 == 0] = 0
 
-                return (m1+m2).to(self.device)
+                return (m1 + m2).to(self.device)
 
         # Assemble all data
         full_map = []
         one_hot_embed = torch.zeros((5, 4), device=self.device)
         one_hot_embed[1:] = torch.eye(4)
         for seq in seq_int:
-
             seq_hot = one_hot_embed[seq].type(torch.long)
             pair_map = torch.kron(seq_hot, seq_hot).reshape(len(seq), len(seq), 16)
 
             energy_map = creatmat(seq)
 
             full_map.append(torch.cat((pair_map, energy_map.unsqueeze(-1)), dim=-1))
-
 
         return torch.stack(full_map).permute(0, 3, 1, 2).contiguous()
 
@@ -213,9 +211,7 @@ class EvoBlock(nn.Module):
         self.pos = PositionalEncoding(self.c_s, dropout)
         self.ln = nn.LayerNorm(self.c_s, eps=1e-12, elementwise_affine=True)
 
-        self.resNet = ResLayer(
-            dim_in=c_z, dim_out=c_z, n_blocks=2, kernel_size=3, dropout=dropout
-        )
+        self.resNet = ResLayer(dim_in=c_z, dim_out=c_z, n_blocks=2, kernel_size=3, dropout=dropout)
 
         # self.tri_mul_out = TriangleMultiplicationOutgoing(
         #     c_z,
@@ -330,9 +326,7 @@ class EvoBlock(nn.Module):
         # Update pairwise state
         pairwise_state = pairwise_state + self.sequence_to_pair(sequence_state)
 
-        pairwise_state = self.resNet(pairwise_state.permute(0, 3, 1, 2)).permute(
-            0, 2, 3, 1
-        )
+        pairwise_state = self.resNet(pairwise_state.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
 
         # # Axial attention
         # pairwise_state = pairwise_state + self.row_drop(
@@ -635,9 +629,7 @@ class ResLayer(nn.Module):
         self.res_blocks = nn.Sequential(*self.res_layers)
 
         # Adapter to change depth
-        self.conv_output = nn.Conv2d(
-            dim_in, dim_out, kernel_size=7, padding=3, bias=True
-        )
+        self.conv_output = nn.Conv2d(dim_in, dim_out, kernel_size=7, padding=3, bias=True)
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.res_blocks(x)
@@ -662,14 +654,10 @@ class ResBlock(nn.Module):
 
         self.bn1 = nn.BatchNorm2d(inplanes)
         self.relu1 = nn.ReLU(inplace=True)
-        self.conv1 = conv3x3(
-            inplanes, planes, dilation=dilation1, kernel_size=kernel_size
-        )
+        self.conv1 = conv3x3(inplanes, planes, dilation=dilation1, kernel_size=kernel_size)
         self.dropout = nn.Dropout(p=dropout)
         self.relu2 = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3(
-            planes, planes, dilation=dilation2, kernel_size=kernel_size
-        )
+        self.conv2 = conv3x3(planes, planes, dilation=dilation2, kernel_size=kernel_size)
 
     def forward(self, x: Tensor) -> Tensor:
         identity = x
@@ -686,9 +674,7 @@ class ResBlock(nn.Module):
         return out
 
 
-def conv3x3(
-    in_planes: int, out_planes: int, dilation: int = 1, kernel_size=3
-) -> nn.Conv2d:
+def conv3x3(in_planes: int, out_planes: int, dilation: int = 1, kernel_size=3) -> nn.Conv2d:
     """3x3 convolution with padding"""
     return nn.Conv2d(
         in_planes,
@@ -754,9 +740,7 @@ class MultiHeadAttention(nn.Module):
         self.value = nn.Linear(num_heads * head_size, num_heads * head_size, bias=False)
         ###########################
 
-        self.projection_kernel = nn.Parameter(
-            torch.rand(num_heads, head_size, output_size) * 2 - 1
-        )
+        self.projection_kernel = nn.Parameter(torch.rand(num_heads, head_size, output_size) * 2 - 1)
 
         if use_projection_bias:
             self.projection_bias = nn.Parameter(torch.rand(output_size) * 2 - 1)
@@ -786,9 +770,7 @@ class MultiHeadAttention(nn.Module):
 
         return query, key, value
 
-    def call_attention(
-        self, query, key, value, logits, bias=None, training=False, mask=None
-    ):
+    def call_attention(self, query, key, value, logits, bias=None, training=False, mask=None):
         # Mask = attention mask with shape [B, Tquery, Tkey] with 1 for positions we want to attend, 0 for masked
         if mask is not None:
             if len(mask.size()) < 2:
@@ -822,15 +804,11 @@ class MultiHeadAttention(nn.Module):
         attn_coef_dropout = self.dropout(attn_coef)
 
         # Attention * value
-        multihead_output = torch.einsum(
-            "...HNM,...MHI->...NHI", attn_coef_dropout, value
-        )
+        multihead_output = torch.einsum("...HNM,...MHI->...NHI", attn_coef_dropout, value)
 
         # Run the outputs through another linear projection layer. Recombining heads
         # is automatically done.
-        output = torch.einsum(
-            "...NHI,HIO->...NO", multihead_output, self.projection_kernel
-        )
+        output = torch.einsum("...NHI,HIO->...NO", multihead_output, self.projection_kernel)
 
         if self.projection_bias is not None:
             output += self.projection_bias

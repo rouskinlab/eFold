@@ -1,0 +1,66 @@
+# Token mappings
+seq2int:
+  X: 0
+  A: 1
+  C: 2
+  G: 3
+  U: 4
+
+# Special tokens
+start_token: null
+end_token: null
+padding_token_key: X
+
+# PyTorch configuration
+default_format: float32
+unknown_value: -1000.0
+val_gu: 0.095
+
+# Test sets
+test_sets:
+  structure:
+    - PDB
+    - archiveII
+    - lncRNA_nonFiltered
+    - viral_fragments
+  sequence: []
+  dms: []
+  shape: []
+
+# Data types
+data_types:
+  - structure
+  - dms
+  - shape
+
+# Data type formats
+data_types_format:
+  structure: int32
+  dms: float32
+  shape: float32
+
+# Reference metrics
+reference_metric:
+  structure: f1
+  dms: mae
+  shape: mae
+
+# Metric signs (1 for higher is better, -1 for lower is better)
+ref_metric_sign:
+  structure: 1
+  dms: -1
+  shape: -1
+
+# Possible metrics per data type
+possible_metrics:
+  structure:
+    - f1
+  dms:
+    - mae
+    - r2
+    - pearson
+  shape:
+    - mae
+    - r2
+    - pearson
+

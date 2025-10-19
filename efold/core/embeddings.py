@@ -1,24 +1,29 @@
 from torch import nn
 import torch
-from ..config import DEFAULT_FORMAT, UKN, seq2int, int2seq
 
-NUM_BASES = len(set(seq2int.values()))
+from efold import settings
 
-
-def sequence_to_int(sequence: str):
-    return torch.tensor([seq2int[s] for s in sequence], dtype=torch.int64)
+NUM_BASES = len(set(settings.seq2int.values()))
 
 
-def int_to_sequence(sequence: torch.tensor):
-    return "".join([int2seq[i.item()] for i in sequence])
+def sequence_to_int(sequence: str) -> torch.Tensor:
+    return torch.tensor([settings.seq2int[s] for s in sequence], dtype=torch.int64)
 
 
-def sequence_to_one_hot(sequence_batch: torch.tensor):
-    """Converts a sequence to a one-hot encoding"""
-    return nn.functional.one_hot(sequence_batch, NUM_BASES).type(DEFAULT_FORMAT)
+def int_to_sequence(sequence: torch.Tensor) -> str:
+    return "".join([settings.int2seq[i.item()] for i in sequence])
 
 
-def base_pairs_to_pairing_matrix(base_pairs, sequence_length, padding, pad_value=UKN):
+def sequence_to_one_hot(sequence_batch: torch.Tensor) -> torch.Tensor:
+    return nn.functional.one_hot(sequence_batch, NUM_BASES).type(settings.DEFAULT_FORMAT)
+
+
+def base_pairs_to_pairing_matrix(
+    base_pairs: torch.Tensor,
+    sequence_length: int,
+    padding: int,
+    pad_value: float = settings.UKN,
+) -> torch.Tensor:
     pairing_matrix = torch.ones((padding, padding)) * pad_value
     if base_pairs is None:
         return pairing_matrix
@@ -28,4 +33,3 @@ def base_pairs_to_pairing_matrix(base_pairs, sequence_length, padding, pad_value
         pairing_matrix[base_pairs[:, 0], base_pairs[:, 1]] = 1.0
         pairing_matrix[base_pairs[:, 1], base_pairs[:, 0]] = 1.0
     return pairing_matrix
-

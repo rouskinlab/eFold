@@ -1,8 +1,9 @@
-from torch import nn, tensor
 import torch
-from ..config import device, seq2int, START_TOKEN, END_TOKEN, PADDING_TOKEN
-from ..core.model import Model
+from torch import nn
 from torch.nn import init
+
+from efold import settings
+from efold.core import model
 
 global_gain = 0.1
 
@@ -168,11 +169,11 @@ class Preprocessing:
             out.append(
                 torch.concat(
                     [
-                        tensor([START_TOKEN], dtype=torch.long).to(device),
+                        torch.tensor([settings.START_TOKEN], dtype=torch.long).to(settings.device),
                         sequence[:length],
-                        tensor([END_TOKEN], dtype=torch.long).to(device),
-                        tensor([PADDING_TOKEN] * (L - length), dtype=torch.long).to(
-                            device
+                        torch.tensor([settings.END_TOKEN], dtype=torch.long).to(settings.device),
+                        torch.tensor([settings.PADDING_TOKEN] * (L - length), dtype=torch.long).to(
+                            settings.device
                         ),
                     ],
                 )
@@ -182,9 +183,9 @@ class Preprocessing:
     def structure_batch(batch):
         structure = batch.get("structure")
         batch_size, L, _ = structure.shape
-        embedded_matrix = torch.zeros(
-            (batch_size, L + 2, L + 2), dtype=torch.float32
-        ).to(device)
+        embedded_matrix = torch.zeros((batch_size, L + 2, L + 2), dtype=torch.float32).to(
+            settings.device
+        )
         embedded_matrix[:, 1:-1, 1:-1] = structure
         return embedded_matrix
 
@@ -205,7 +206,7 @@ class Encoder(nn.Module):
         return sequence, structure
 
 
-class Ribonanza(Model):
+class Ribonanza(model.Model):
     ntokens = 7
     data_type = ["dms", "shape"]
 
