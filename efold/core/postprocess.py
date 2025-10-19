@@ -186,7 +186,8 @@ class UFold_processing:
             #     grad_a = (lmbd * soft_sign(torch.sum(contact_a(a_hat, m), dim=-1) - 1)).unsqueeze_(-1).expand(u.shape) - u / 2
             #     grad = a_hat * m * (grad_a + torch.transpose(grad_a, -1, -2))
             #     n2 = torch.norm(grad)
-            #     print([t, 'norms', n1, n2, aug_lagrangian(u, m, a_hat, lmbd), torch.sum(contact_a(a_hat, u))])
+            #     print([t, 'norms', n1, n2, aug_lagrangian(u, m, a_hat, lmbd),
+            #           torch.sum(contact_a(a_hat, u))])
 
         a = a_hat * a_hat
         a = (a + torch.transpose(a, -1, -2)) / 2

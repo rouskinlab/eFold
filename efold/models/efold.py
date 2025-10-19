@@ -773,7 +773,8 @@ class MultiHeadAttention(nn.Module):
         return query, key, value
 
     def call_attention(self, query, key, value, logits, bias=None, training=False, mask=None):
-        # Mask = attention mask with shape [B, Tquery, Tkey] with 1 for positions we want to attend, 0 for masked
+        # Mask = attention mask with shape [B, Tquery, Tkey] with 1 for positions we want to attend,
+        # 0 for masked
         if mask is not None:
             if len(mask.size()) < 2:
                 raise ValueError("'mask' must have at least 2 dimensions")

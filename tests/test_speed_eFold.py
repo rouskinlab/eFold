@@ -51,5 +51,5 @@ fig.update_layout(
     height=1200,
 )
 # fig.show()
-
+file_dir = os.path.dirname(os.path.realpath(__file__))
 fig.write_image(os.path.join(file_dir, "speed_comparison.jpg"))

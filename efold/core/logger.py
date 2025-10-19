@@ -4,8 +4,6 @@ import lightning.pytorch as pl
 import matplotlib.pyplot as plt
 import wandb
 
-from efold.settings import *
-
 
 class LocalLogger:
     def __init__(self, path: str = "local_testing_output", overwrite: bool = False):

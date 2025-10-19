@@ -60,7 +60,8 @@ class U_Net(model.Model):
         #     return l
 
         # pad_len = get_cut_len(src.shape[1], 80)-src.shape[1]
-        # src = torch.cat( (src, torch.zeros((src.shape[0], pad_len), device=self.device, dtype=torch.long) ), dim=-1)
+        # src = torch.cat( (src, torch.zeros((src.shape[0], pad_len), device=self.device,
+        # dtype=torch.long) ), dim=-1)
 
         x = self.seq2map(src)
 

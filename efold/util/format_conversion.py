@@ -86,9 +86,11 @@ def _get_non_redudant_bp_list(conflict_list: list) -> list:
 def _get_list_bp_conflicts(bp_list: list[tuple[int, int]]) -> list:
     """given a bp_list gives the list of conflicts bp-s which indicate PK structure
     Args:
-            bp_list: of list of base pairs where the base pairs are list of indeces of the bp in increasing order (bp[0]<bp[1])
+            bp_list: of list of base pairs where the base pairs are list of indeces of the bp
+            in increasing order (bp[0]<bp[1])
     returns:
-            List of conflicting basepairs, where conflicting is pairs of base pairs that are intertwined.
+            List of conflicting basepairs, where conflicting is pairs of base pairs that are
+            intertwined.
     """
     if len(bp_list) <= 1:
         return []

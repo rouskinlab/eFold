@@ -80,7 +80,8 @@ class DDPSampler(Sampler):
             rank = dist.get_rank()
         if rank >= num_replicas or rank < 0:
             raise ValueError(
-                f"Invalid rank {rank}, rank should be in the interval [0, {num_replicas - 1}] because num_replicas={num_replicas}"
+                f"Invalid rank {rank}, rank should be in the interval [0, {num_replicas - 1}]",
+                f"because num_replicas={num_replicas}",
             )
         self.dataset = dataset
         self.num_replicas = num_replicas
