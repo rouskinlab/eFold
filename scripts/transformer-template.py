@@ -7,7 +7,7 @@ from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import LearningRateMonitor
 from lightning.pytorch.loggers import WandbLogger
 
-from efold import settings
+from efold.constants import config
 from efold.core import callbacks, datamodule
 from efold.models import factory
 
@@ -18,7 +18,7 @@ sys.path.append(os.path.abspath("."))
 
 if __name__ == "__main__":
     USE_WANDB = True
-    print("Running on device: {}".format(settings.device))
+    print("Running on device: {}".format(config.device))
     if USE_WANDB:
         wandb_logger = WandbLogger(project="CHANGE_ME", name="debug")
 
@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
     # train with both splits
     trainer = Trainer(
-        accelerator=settings.device,
+        accelerator=config.device,
         # devices=4,
         # strategy="ddp",
         # precision="16-mixed",
@@ -97,7 +97,7 @@ if __name__ == "__main__":
     )
 
     trainer = Trainer(
-        accelerator=settings.device,
+        accelerator=config.device,
         devices=1,
         callbacks=[
             # don't change this

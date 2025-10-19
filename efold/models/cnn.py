@@ -83,7 +83,7 @@ class CNN(model.Model):
         #     nn.Linear(d_model, 1),
         # )
 
-    def forward(self, batch: batch.Batch) -> Tensor:
+    def forward(self, batch: batch.Batch) -> dict[str, Tensor]:
         """
         Args:
             src: Tensor, shape [seq_len, batch_size]

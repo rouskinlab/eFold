@@ -1,12 +1,14 @@
+from typing import Optional
+
 import torch
 
-from efold import settings
+from efold.constants import config
 
 
 class DataType:
     attributes = ["true", "pred", "error"]
 
-    def __init__(self, true: list, error: list = None, pred: list = None):
+    def __init__(self, true: list, error: Optional[list] = None, pred: Optional[list] = None):
         self.true = true
         self.error = error
         self.pred = pred
@@ -82,14 +84,14 @@ class DataTypeDataset(DataType):
             values = data_json[ref]
             if data_type in values:
                 true.append(
-                    torch.tensor(values[data_type], dtype=settings.DTYPE_PER_DATA_TYPE[data_type])
+                    torch.tensor(values[data_type], dtype=config.data.types_format_torch[data_type])
                 )
                 if data_type != "structure":
                     if "error_{}".format(data_type) in values:
                         error.append(
                             torch.tensor(
                                 values["error_{}".format(data_type)],
-                                dtype=settings.DTYPE_PER_DATA_TYPE[data_type],
+                                dtype=config.data.types_format_torch[data_type],
                             )
                         )
                     else:

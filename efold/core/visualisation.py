@@ -2,7 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from rouskinhf import int2seq
 
-from efold import settings
+from efold.constants import config
 from efold.core import metrics
 
 matplotlib_colors = [
@@ -50,7 +50,7 @@ def plot_signal(
         return x[mask].cpu().numpy()
 
     pred, true, sequence = chop_array(pred), chop_array(true), chop_array(sequence)
-    mask = true != settings.UKN
+    mask = true != config.pytorch.unknown_value
     true, pred, sequence = (
         known_bases_to_list(true, mask),
         known_bases_to_list(pred, mask),

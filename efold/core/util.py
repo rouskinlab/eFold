@@ -1,15 +1,15 @@
 import torch
 import torch.nn.functional as F
 
-from efold import settings
+from efold.constants import config
 from efold.core import embeddings
 
 
 def _pad(arr: torch.Tensor, L: int, data_type: str) -> torch.Tensor:
     padding_values = {
         "sequence": 0,
-        "dms": settings.UKN,
-        "shape": settings.UKN,
+        "dms": config.pytorch.unknown_value,
+        "shape": config.pytorch.unknown_value,
     }
     if data_type == "structure":
         return embeddings.base_pairs_to_pairing_matrix(arr, L)

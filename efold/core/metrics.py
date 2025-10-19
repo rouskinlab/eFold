@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from efold import settings
+from efold.constants import config
 from efold.core import batch
 
 
@@ -10,7 +10,7 @@ def mask_and_flatten(func):
     def wrapped(pred, true):
         if pred is None or true is None:
             return np.nan
-        mask = true != settings.UKN
+        mask = true != config.pytorch.unknown_value
         if torch.sum(mask) == 0:
             return np.nan
         pred = pred[mask]
@@ -133,7 +133,7 @@ class MetricsStack:
     def update(self, batch: batch.Batch):
         for dt in self.data_type:
             pred, true = batch.get_pairs(dt)
-            for metric in settings.POSSIBLE_METRICS[dt]:
+            for metric in config.metrics.possible_metrics[dt]:
                 self._add_metric(dt, metric, metric_factory[metric](pred, true))
         return self
 
@@ -141,7 +141,7 @@ class MetricsStack:
         out: dict = {}
         for dt in self.data_type:
             out[dt] = {}
-            for metric in settings.POSSIBLE_METRICS[dt]:
+            for metric in config.metrics.possible_metrics[dt]:
                 out[dt][metric] = self._get_nanmean(dt, metric)
         return out
 

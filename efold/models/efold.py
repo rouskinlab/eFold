@@ -34,7 +34,7 @@ class eFold(model.Model):
         self.data_type_output = ["structure"]
         self.lr = lr
         self.gamma = gamma
-        self.train_losses = []
+        self.train_losses: list[float] = []
         self.loss = nn.MSELoss()
 
         # Encoder layers
@@ -80,7 +80,7 @@ class eFold(model.Model):
             ResLayer(dim_in=d_cnn // 2, dim_out=1, n_blocks=4, kernel_size=3, dropout=dropout),
         )
 
-    def forward(self, batch: batch.Batch) -> Tensor:
+    def forward(self, batch: batch.Batch) -> dict[str, Tensor]:
         # Encoding of RNA sequence
         src = batch.get("sequence")
 
@@ -617,7 +617,6 @@ class ResLayer(nn.Module):
         # Basic Residula block
         self.res_layers = []
         for i in range(n_blocks):
-            # dilation = pow(2, (i % 3))
             self.res_layers.append(
                 ResBlock(
                     inplanes=dim_in,
@@ -735,7 +734,6 @@ class MultiHeadAttention(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self._dropout_rate = dropout
 
-        (self.num_heads * self.head_size) ** -0.5
         ### DOUBLE CHECK THIS CODE:
         self.query = nn.Linear(num_heads * head_size, num_heads * head_size, bias=False)
         self.key = nn.Linear(num_heads * head_size, num_heads * head_size, bias=False)
@@ -846,7 +844,6 @@ class RelPositionMultiHeadAttention(MultiHeadAttention):
         super(RelPositionMultiHeadAttention, self).__init__(**kwargs)
 
         num_pos_features = self.num_heads * self.head_size
-        (self.num_heads * self.head_size) ** -0.5
         self.pos_kernel = nn.Parameter(
             torch.rand(self.num_heads, num_pos_features, self.head_size) * 2 - 1
         )
@@ -923,10 +920,6 @@ class ConvModule(nn.Module):
         else:
             self.scale = nn.Parameter(torch.ones(input_dim))
             self.bias = nn.Parameter(torch.zeros(input_dim))
-
-        input_dim**-0.5
-        kernel_size**-0.5
-        input_dim**-0.5
 
         self.pw_conv_1 = nn.Conv1d(
             in_channels=input_dim,

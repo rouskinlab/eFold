@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch.nn import init
 
-from efold import settings
+from efold.constants import config
 from efold.core import model
 
 global_gain = 0.1
@@ -166,11 +166,11 @@ class Preprocessing:
             out.append(
                 torch.concat(
                     [
-                        torch.tensor([settings.START_TOKEN], dtype=torch.long).to(settings.device),
+                        torch.tensor([config.tokens.start_token], dtype=torch.long).to(config.device),
                         sequence[:length],
-                        torch.tensor([settings.END_TOKEN], dtype=torch.long).to(settings.device),
-                        torch.tensor([settings.PADDING_TOKEN] * (L - length), dtype=torch.long).to(
-                            settings.device
+                        torch.tensor([config.tokens.end_token], dtype=torch.long).to(config.device),
+                        torch.tensor([config.tokens.padding_token] * (L - length), dtype=torch.long).to(
+                            config.device
                         ),
                     ],
                 )
@@ -181,7 +181,7 @@ class Preprocessing:
         structure = batch.get("structure")
         batch_size, L, _ = structure.shape
         embedded_matrix = torch.zeros((batch_size, L + 2, L + 2), dtype=torch.float32).to(
-            settings.device
+            config.device
         )
         embedded_matrix[:, 1:-1, 1:-1] = structure
         return embedded_matrix

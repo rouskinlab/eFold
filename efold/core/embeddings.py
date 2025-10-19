@@ -1,28 +1,28 @@
 import torch
 from torch import nn
 
-from efold import settings
+from efold.constants import config
 
-NUM_BASES = len(set(settings.seq2int.values()))
+NUM_BASES = len(set(config.tokens.seq2int.values()))
 
 
 def sequence_to_int(sequence: str) -> torch.Tensor:
-    return torch.tensor([settings.seq2int[s] for s in sequence], dtype=torch.int64)
+    return torch.tensor([config.tokens.seq2int[s] for s in sequence], dtype=torch.int64)
 
 
 def int_to_sequence(sequence: torch.Tensor) -> str:
-    return "".join([settings.int2seq[i.item()] for i in sequence])
+    return "".join([config.tokens.int2seq[i.item()] for i in sequence])
 
 
 def sequence_to_one_hot(sequence_batch: torch.Tensor) -> torch.Tensor:
-    return nn.functional.one_hot(sequence_batch, NUM_BASES).type(settings.DEFAULT_FORMAT)
+    return nn.functional.one_hot(sequence_batch, NUM_BASES).type(torch.float32)
 
 
 def base_pairs_to_pairing_matrix(
     base_pairs: torch.Tensor,
     sequence_length: int,
     padding: int,
-    pad_value: float = settings.UKN,
+    pad_value: float = config.pytorch.unknown_value,
 ) -> torch.Tensor:
     pairing_matrix = torch.ones((padding, padding)) * pad_value
     if base_pairs is None:

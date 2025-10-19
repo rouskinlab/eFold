@@ -3,7 +3,7 @@ from collections import defaultdict
 import torch
 from torch import Tensor, nn
 
-from efold import settings
+from efold.constants import config
 from efold.core import batch, model
 
 CH_FOLD2 = 1
@@ -39,7 +39,7 @@ class U_Net(model.Model):
 
         self.Conv_1x1 = nn.Conv2d(int(32 * CH_FOLD2), output_ch, kernel_size=1, stride=1, padding=0)
 
-    def forward(self, batch: batch.Batch) -> Tensor:
+    def forward(self, batch: batch.Batch) -> dict[str, Tensor]:
         src = batch.get("sequence")
 
         padd_multiple = 32
@@ -111,7 +111,7 @@ class U_Net(model.Model):
         # take integer encoded sequence and return last channel of embedding (pairing energy)
         def creatmat(data, device=None):
             with torch.no_grad():
-                data = "".join([settings.int2seq[d] for d in data.tolist()])
+                data = "".join([config.tokens.int2seq[d] for d in data.tolist()])
                 paired = defaultdict(
                     float, {"AU": 2.0, "UA": 2.0, "GC": 3.0, "CG": 3.0, "UG": 0.8, "GU": 0.8}
                 )

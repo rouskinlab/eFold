@@ -67,7 +67,7 @@ class DDPSampler(Sampler):
         num_replicas: Optional[int] = None,
         rank: Optional[int] = None,
         shuffle: bool = True,
-        seed: int = os.environ.get("PL_GLOBAL_SEED", 0),
+        seed: int = int(os.environ.get("PL_GLOBAL_SEED", 0)),
         drop_last: bool = False,
     ) -> None:
         if num_replicas is None:
@@ -166,7 +166,7 @@ class DDPSampler(Sampler):
 def sampler_factory(
     dataset: Union[Dataset, Subset],
     strategy: str,
-    seed: int = os.environ.get("PL_GLOBAL_SEED", 0),
+    seed: int = int(os.environ.get("PL_GLOBAL_SEED", 0)),
     num_replicas: Optional[int] = None,
     rank: Optional[int] = None,
 ):

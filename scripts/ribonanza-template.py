@@ -10,13 +10,13 @@ from lightning.pytorch.strategies import DDPStrategy
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from efold import settings
+from efold.constants import config
 from efold.core import callbacks, datamodule
 from efold.models import factory
 
 if __name__ == "__main__":
     USE_WANDB = True
-    print("Running on device: {}".format(settings.device))
+    print("Running on device: {}".format(config.device))
     if USE_WANDB:
         wandb_logger = WandbLogger(project="ribonanza-solution", name="first-run")
 
@@ -62,7 +62,7 @@ if __name__ == "__main__":
         devices=8,
         strategy=DDPStrategy(find_unused_parameters=True),
         max_epochs=1000,
-        accelerator=settings.device,
+        accelerator=config.device,
         logger=wandb_logger if USE_WANDB else None,
         callbacks=[
             LearningRateMonitor(logging_interval="epoch"),

@@ -88,7 +88,7 @@ class Transformer(model.Model):
             ResLayer(n_blocks=4, dim_in=c_z // 4, dim_out=1, kernel_size=3, dropout=dropout),
         )
 
-    def forward(self, batch: batch.Batch) -> Tensor:
+    def forward(self, batch: batch.Batch) -> dict[str, Tensor]:
         """
         Args:
             src: Tensor, shape [seq_len, batch_size]

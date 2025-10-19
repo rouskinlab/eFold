@@ -1,10 +1,10 @@
 import datetime
-from typing import List, Union
+from typing import List, Optional, Union
 
 import lightning.pytorch as pl
 from torch.utils.data import Subset
 
-from efold import settings
+from efold.constants import config
 from efold.core import dataloader, dataset, sampler
 
 
@@ -25,7 +25,7 @@ class DataModule(pl.LightningDataModule):
         use_error=False,
         max_len=None,
         min_len=None,
-        structure_padding_value=settings.UKN,
+        structure_padding_value=config.pytorch.unknown_value,
         tqdm=True,
         buckets=None,
         **kwargs,
@@ -100,7 +100,7 @@ class DataModule(pl.LightningDataModule):
         merge.collate_fn = collate_fn
         return merge
 
-    def setup(self, stage: str = None):
+    def setup(self, stage: Optional[str] = None):
         if stage is None or (stage in ["fit", "predict"] and not hasattr(self, "all_datasets")):
             self.all_datasets = self._dataset_merge(
                 [
@@ -165,7 +165,7 @@ class DataModule(pl.LightningDataModule):
                 data_type=[data_type],
                 **self.dataset_args,
             )
-            for data_type, datasets in settings.TEST_SETS.items()
+            for data_type, datasets in config.test_sets.as_dict.items()
             if data_type in self.data_type
             for name in datasets
         ]

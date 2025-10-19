@@ -1,6 +1,6 @@
 import os
 from os.path import dirname, join
-from typing import List, Union
+from typing import List, Optional, Union
 
 import numpy as np
 import torch
@@ -53,7 +53,7 @@ def _predict_structure(model, sequence: str, device: str = "cpu") -> list[tuple[
 
 
 def run(
-    arg: Union[str, List[str]] = None, fmt: str = "dotbracket", device: str = None
+    arg: Optional[Union[str, List[str]]] = None, fmt: str = "dotbracket", device: Optional[str] = None
 ) -> dict[str, Union[str, list[tuple[int, int]]]]:
     """Runs the Efold API on the provided sequence or fasta file.
 

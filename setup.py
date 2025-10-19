@@ -18,6 +18,6 @@ setup(
     python_requires=">=3.10",
     py_modules=["efold"],
     include_package_data=True,
-    package_data={"": ["resources/*.pt", "settings.yaml"]},
+    package_data={"": ["resources/*.pt"]},
     packages=find_packages(),
 )

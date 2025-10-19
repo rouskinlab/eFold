@@ -1,15 +1,17 @@
+from typing import Optional
+
 import torch
 import torch.nn.functional as F
 
-from efold import settings
+from efold.constants import config
 from efold.core import datatype, embeddings, util
 
 
 def _pad(arr: torch.Tensor, L: int, data_type: str, accept_none: bool = False) -> torch.Tensor:
     padding_values = {
         "sequence": 0,
-        "dms": settings.UKN,
-        "shape": settings.UKN,
+        "dms": config.pytorch.unknown_value,
+        "shape": config.pytorch.unknown_value,
     }
     assert data_type in padding_values.keys(), (
         f"Unknown data type {data_type}. If you want to pad a structure, use base_pairs_to_pairing_matrix."
@@ -21,9 +23,9 @@ def _pad(arr: torch.Tensor, L: int, data_type: str, accept_none: bool = False) -
 
 def get_padded_vector(dp: dict, data_type: str, data_part: str, L: int) -> torch.Tensor:
     if getattr(dp, data_type) is None:
-        return torch.tensor([settings.UKN] * L)
+        return torch.tensor([config.pytorch.unknown_value] * L)
     if getattr(getattr(dp, data_type), data_part) is None:
-        return torch.tensor([settings.UKN] * L)
+        return torch.tensor([config.pytorch.unknown_value] * L)
     return _pad(getattr(getattr(dp, data_type), data_part), L, data_type)
 
 
@@ -62,7 +64,7 @@ class Batch:
         batch_data: list,
         data_type: str,
         use_error: bool,
-        structure_padding_value: float = settings.UKN,
+        structure_padding_value: float = config.pytorch.unknown_value,
     ):
         reference = [dp["reference"] for dp in batch_data]
         length = [dp["length"] for dp in batch_data]
@@ -130,7 +132,7 @@ class Batch:
             **data,
         )
 
-    def get(self, data_type: str, index: int = None, to_numpy: bool = False):
+    def get(self, data_type: str, index: Optional[int] = None, to_numpy: bool = False):
         if data_type in ["reference", "sequence", "length"]:
             out = getattr(self, data_type)
             data_part = None

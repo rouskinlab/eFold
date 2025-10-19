@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from lightning.pytorch.utilities.types import STEP_OUTPUT
 
-from efold import settings
+from efold.constants import config
 from efold.core import batch, metrics, postprocess
 
 METRIC_ARGS = dict(dist_sync_on_step=True)
@@ -42,13 +42,13 @@ class Model(pl.LightningModule):
 
         self.weight_data = weight_data
         self.save_hyperparameters(ignore=["loss_fn"])
-        self.lossBCE = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([300])).to(settings.device)
+        self.lossBCE = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([300])).to(config.device)
 
         # Metrics
         self.metrics_stack = None
         self.tic = None
 
-        self.test_results = {"reference": [], "sequence": [], "structure": []}
+        self.test_results: dict[str, list[Any]] = {"reference": [], "sequence": [], "structure": []}
 
         self.postprocesser = postprocess.Postprocess()
 
@@ -81,7 +81,7 @@ class Model(pl.LightningModule):
 
         ## vv MSE loss vv ##
         mask = torch.zeros_like(true)
-        mask[true != settings.UKN] = 1
+        mask[true != config.pytorch.unknown_value] = 1
         loss = F.mse_loss(pred * mask, true * mask)
 
         non_zeros = (mask == 1).sum() / mask.numel()
@@ -187,11 +187,11 @@ class Model(pl.LightningModule):
             predictions["structure"], batch.get("sequence")
         )
 
-        from efold import settings
+        from efold.constants import config
 
         self.test_results["reference"] += batch.get("reference")
         self.test_results["sequence"] += [
-            "".join([settings.int2seq[base] for base in seq])
+            "".join([config.tokens.int2seq[base] for base in seq])
             for seq in batch.get("sequence").detach().tolist()
         ]
         self.test_results["structure"] += predictions["structure"].tolist()
@@ -204,7 +204,7 @@ class Model(pl.LightningModule):
     ) -> None:
         # push the metric directly
         metric_pack = metrics.MetricsStack(
-            name=settings.TEST_SETS_NAMES[dataloader_idx],
+            name=config.test_sets.all_names[dataloader_idx],
             data_type=self.data_type_output,
         )
         for dt, metric_dict in metric_pack.update(batch).compute().items():

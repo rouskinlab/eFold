@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 from scipy.optimize import linear_sum_assignment
 
-from efold import settings
+from efold.constants import config
 
 
 class Constraints:
@@ -17,7 +17,7 @@ class Constraints:
 
     Example:
     >>> inpt = torch.tensor([[0.1, 0.6, 0.8],[0.6, 0.1, 0.9],[0.8, 0.9, 0.1]])
-    >>> sequence = torch.tensor([settings.seq2int[a] for a in "GCU"])
+    >>> sequence = torch.tensor([config.tokens.seq2int[a] for a in "GCU"])
     >>> out = Constraints().apply_constraints(inpt, sequence=sequence, min_hairpin_length=0, canonical_only=True)
     >>> assert (out == torch.tensor([[0.0, 0.6, 0.8],[0.6, 0.0, 0.0],[0.8, 0.0, 0.0]])).all(), "The output is not as expected: {}".format(out)
 
@@ -43,7 +43,7 @@ class Constraints:
     def mask_nonCanonical(self, sequence):
         # Embed sequence
         if isinstance(sequence, str):
-            sequence = torch.tensor([settings.seq2int[a] for a in sequence])
+            sequence = torch.tensor([config.tokens.seq2int[a] for a in sequence])
 
         # make the pairing matrix
         sequence = sequence.reshape(-1, 1)
@@ -52,7 +52,7 @@ class Constraints:
         # find the allowable pairs
         allowable_pair = set()
         for pair in ["GU", "GC", "AU"]:
-            allowable_pair.add(settings.seq2int[pair[0]] + settings.seq2int[pair[1]])
+            allowable_pair.add(config.tokens.seq2int[pair[0]] + config.tokens.seq2int[pair[1]])
         allowable_pair = torch.tensor(list(allowable_pair), device=pair_of_bases.device)
 
         return torch.isin(pair_of_bases, allowable_pair).int()

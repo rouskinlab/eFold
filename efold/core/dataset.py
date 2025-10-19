@@ -1,11 +1,11 @@
 import os
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 from rouskinhf import get_dataset
 from torch.utils.data import Dataset as TorchDataset
 
-from efold import settings
+from efold.constants import config
 from efold.core import batch, datatype, path
 
 
@@ -21,9 +21,9 @@ class Dataset(TorchDataset):
         min_len: int,
         structure_padding_value: float,
         use_error: bool,
-        dms: datatype.DMSDataset = None,
-        shape: datatype.SHAPEDataset = None,
-        structure: datatype.StructureDataset = None,
+        dms: Optional[datatype.DMSDataset] = None,
+        shape: Optional[datatype.SHAPEDataset] = None,
+        structure: Optional[datatype.StructureDataset] = None,
         sort_by_length: bool = False,
     ) -> None:
         super().__init__()
@@ -95,7 +95,7 @@ class Dataset(TorchDataset):
         use_error: bool = False,
         max_len=None,
         min_len=None,
-        structure_padding_value: float = settings.UKN,
+        structure_padding_value: float = config.pytorch.unknown_value,
         sort_by_length: bool = False,
         tqdm=True,
     ):

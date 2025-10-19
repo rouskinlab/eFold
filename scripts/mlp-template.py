@@ -5,7 +5,7 @@ import wandb
 from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import WandbLogger
 
-from efold import settings
+from efold.constants import config
 from efold.core import callbacks, datamodule
 from efold.models import factory
 
@@ -18,7 +18,7 @@ sys.path.append(os.path.abspath("."))
 # why do you need this?
 
 if __name__ == "__main__":
-    print("Running on device: {}".format(settings.device))
+    print("Running on device: {}".format(config.device))
 
     BATCH_SIZE = 4
     LR = 5e-5
@@ -71,7 +71,7 @@ if __name__ == "__main__":
         max_epochs=1,
         log_every_n_steps=1,
         logger=wandb_logger,
-        accelerator=settings.device,
+        accelerator=config.device,
         callbacks=[
             callbacks.ModelCheckpoint(every_n_epoch=1),
         ],

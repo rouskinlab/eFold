@@ -12,7 +12,7 @@ from lightning.pytorch.callbacks import LearningRateMonitor
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.strategies import DDPStrategy
 
-from efold import settings
+from efold.constants import config
 from efold.core import callbacks, datamodule
 from efold.models import factory
 
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     n_gpu = 8
     USE_WANDB = 0
     STRATEGY = "random"
-    print("Running on device: {}".format(settings.device))
+    print("Running on device: {}".format(config.device))
     if USE_WANDB:
         project = "Structure-classic"
         wandb_logger = WandbLogger(project=project)
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     model.load_state_dict(
         torch.load(
             "/Users/alberic/Desktop/lively-waterfall-8_epoch45.pt",
-            map_location=torch.device(settings.device),
+            map_location=torch.device(config.device),
         )
     )
 
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         wandb_logger.watch(model, log="all")
 
     trainer = Trainer(
-        accelerator=settings.device,
+        accelerator=config.device,
         devices=n_gpu if STRATEGY == "ddp" else 1,
         strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else "auto",
         # precision="16-mixed",

@@ -1,7 +1,8 @@
 # this code wsa taken from arnie_utils.py
+from typing import Optional
 
 
-def convert_bp_list_to_dotbracket(bp_list: list[tuple[int, int]], seq_len: int) -> str:
+def convert_bp_list_to_dotbracket(bp_list: list[tuple[int, int]], seq_len: int) -> Optional[str]:
     bp_list = [(b - 1, c - 1) for b, c in bp_list]
 
     db = "." * seq_len

@@ -1,6 +1,7 @@
 import os
 from os import listdir, makedirs
 from os.path import dirname
+from typing import Optional
 
 import torch
 
@@ -14,7 +15,7 @@ class Loader:
         makedirs(dirname(self.get_path()), exist_ok=True)
 
     @classmethod
-    def find_best_model(cls, prefix: str) -> "Loader":
+    def find_best_model(cls, prefix: str) -> Optional["Loader"]:
         models = [model for model in listdir("models") if model.startswith(prefix)]
         if len(models) == 0:
             return None
