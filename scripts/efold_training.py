@@ -59,8 +59,10 @@ if __name__ == "__main__":
     trainer = Trainer(
         accelerator=device,
         devices=n_gpu if STRATEGY == "ddp" else 1,
-        strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else 'auto',
-        max_epochs=15,
+        strategy=DDPStrategy(find_unused_parameters=False)
+        if STRATEGY == "ddp"
+        else "auto",
+        max_epochs=30,
         log_every_n_steps=1,
         accumulate_grad_batches=32,
         use_distributed_sampler=STRATEGY != "ddp",
