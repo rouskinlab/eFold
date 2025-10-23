@@ -66,7 +66,9 @@ class Model(pl.LightningModule):
         if not hasattr(self, "gamma") or self.gamma is None:
             return optimizer
 
-        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=self.gamma)
+        scheduler = torch.optim.lr_scheduler.LinearWarmupCosineAnnealingLR(
+            optimizer, warmup_epochs=3, max_epochs=self.max_epochs
+        )
         return [optimizer], [scheduler]
 
     def _loss_signal(self, batch: Batch, data_type: str):

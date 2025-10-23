@@ -6,7 +6,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from lightning.pytorch import Trainer
-from efold.core.callbacks import WandbFitLogger, KaggleLogger
+from efold.core.callbacks import WandbFitLogger
 from efold.config import device
 from efold import DataModule, create_model
 import torch
