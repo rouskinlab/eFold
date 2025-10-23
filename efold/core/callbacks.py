@@ -1,27 +1,9 @@
-import os
-from lightning import LightningModule, Trainer
 import lightning.pytorch as pl
-import torch
-import numpy as np
-import pandas as pd
-from lightning.pytorch import LightningModule, Trainer
+from lightning.pytorch import Trainer
 from lightning.pytorch.utilities import rank_zero_only
 import wandb
-from typing import Any
 
-from .visualisation import plot_factory
-from .metrics import metric_factory
-from .datamodule import DataModule
 from .loader import Loader
-from .batch import Batch
-from ..config import (
-    TEST_SETS_NAMES,
-    REF_METRIC_SIGN,
-    REFERENCE_METRIC,
-    DATA_TYPES_TEST_SETS,
-    POSSIBLE_METRICS,
-)
-from .logger import Logger, LocalLogger
 
 
 class ModelCheckpoint(pl.Callback):
