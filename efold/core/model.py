@@ -67,7 +67,15 @@ class Model(pl.LightningModule):
             return optimizer
 
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=self.gamma)
-        return [optimizer], [scheduler]
+        warmup_scheduler = torch.optim.lr_scheduler.LinearLR(
+            optimizer, start_factor=0.1, total_iters=self.warmup_epochs
+        )
+        combined_scheduler = torch.optim.lr_scheduler.SequentialLR(
+            optimizer,
+            schedulers=[warmup_scheduler, scheduler],
+            milestones=[self.warmup_epochs],
+        )
+        return [optimizer], [combined_scheduler]
 
     def _loss_signal(self, batch: Batch, data_type: str):
         assert data_type in [

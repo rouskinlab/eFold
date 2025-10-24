@@ -65,6 +65,7 @@ if __name__ == "__main__":
         weight_decay=0,
         gamma=0.995,
         wandb=USE_WANDB,
+        warmup_epochs=3,
     )
 
     if USE_WANDB:
@@ -73,8 +74,10 @@ if __name__ == "__main__":
     trainer = Trainer(
         accelerator=device,
         devices=n_gpu if STRATEGY == "ddp" else 1,
-        strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else 'auto',
-        max_epochs=21,
+        strategy=DDPStrategy(find_unused_parameters=False)
+        if STRATEGY == "ddp"
+        else "auto",
+        max_epochs=24,  # 21 + 3 warmup
         log_every_n_steps=1,
         accumulate_grad_batches=32,
         use_distributed_sampler=STRATEGY != "ddp",
