@@ -1,0 +1,97 @@
+import os
+import sys
+sys.path.append(os.path.abspath("."))
+
+from lightning.pytorch.strategies import DDPStrategy
+import wandb
+from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch import Trainer
+from lightning.pytorch.callbacks import LearningRateMonitor
+from efold.core.callbacks import ModelCheckpoint
+from efold.config import device
+from efold import DataModule, create_model
+
+import os, random, numpy as np, torch
+from lightning.pytorch import seed_everything
+
+SEED = 1337
+
+# Seed everything
+os.environ["PYTHONHASHSEED"] = str(SEED)
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+torch.cuda.manual_seed_all(SEED)
+seed_everything(SEED, workers=True)
+
+
+# Train loop
+if __name__ == "__main__":
+    USE_WANDB = True
+    STRATEGY = "ddp"
+    n_gpu = 8
+
+    print("Running on device: {}".format(device))
+    if USE_WANDB:
+        wandb_logger = WandbLogger(
+    project="efold-final-tests", entity="rouskin-lab", name="efoldV2_FT_repro_seed1337")
+
+    # fit loop
+    batch_size = 1
+    dm = DataModule(
+        name=["efold_train"], 
+        strategy=STRATEGY,
+        shuffle_train=False if STRATEGY == "ddp" else True,
+        data_type=["structure"],  #
+        force_download=False,
+        batch_size=batch_size,
+        max_len=1024,
+        min_len=1,
+        structure_padding_value=0,
+        train_split=None,
+        external_valid=["yack_valid", "PDB", "archiveII", "lncRNA", "viral_fragments"],
+    )
+
+    model = create_model(
+        model="efold",
+        ntoken=5,
+        d_model=64,
+        c_z=32,
+        d_cnn=64,
+        num_blocks=4,
+        no_recycles=0,
+        dropout=0,
+        lr=1e-3,
+        weight_decay=0,
+        gamma=0.995,
+        wandb=USE_WANDB,
+    )
+
+    model.load_state_dict(torch.load('models/efoldV2_PT_repro_seed1337_epoch10-15_avg.pt', map_location=torch.device(device)))
+
+    if USE_WANDB:
+        wandb_logger.watch(model, log="all")
+
+    trainer = Trainer(
+        accelerator=device,
+        devices=n_gpu if STRATEGY == "ddp" else 1,
+        strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else 'auto',
+        max_epochs=15,
+        log_every_n_steps=1,
+        accumulate_grad_batches=32,
+        use_distributed_sampler=STRATEGY != "ddp",
+        logger=wandb_logger if USE_WANDB else None,
+        callbacks=[
+            LearningRateMonitor(logging_interval="epoch"),
+            ModelCheckpoint(every_n_epoch=1),
+        ]
+        if USE_WANDB
+        else [],
+        enable_checkpointing=False,
+    )
+
+    trainer.fit(model, datamodule=dm)
+    # trainer.test(model, datamodule=dm)
+
+    if USE_WANDB:
+        wandb.finish()
