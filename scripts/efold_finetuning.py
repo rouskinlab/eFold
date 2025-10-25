@@ -14,7 +14,7 @@ from efold import DataModule, create_model
 import os, random, numpy as np, torch
 from lightning.pytorch import seed_everything
 
-SEED = 1337
+SEED = 1338
 
 # Seed everything
 os.environ["PYTHONHASHSEED"] = str(SEED)
@@ -34,18 +34,18 @@ if __name__ == "__main__":
     print("Running on device: {}".format(device))
     if USE_WANDB:
         wandb_logger = WandbLogger(
-    project="efold-final-tests", entity="rouskin-lab", name="efoldV2_FT_repro_seed1337")
+    project="efold-final-tests", entity="rouskin-lab", name="efoldV2_FT_ablation1_less_seed1338")
 
     # fit loop
     batch_size = 1
     dm = DataModule(
-        name=["efold_train"], 
+        name=["pri_miRNA", "human_mRNA"], 
         strategy=STRATEGY,
         shuffle_train=False if STRATEGY == "ddp" else True,
-        data_type=["structure"],  #
+        data_type=["structure"],
         force_download=False,
         batch_size=batch_size,
-        max_len=1024,
+        max_len=2000,
         min_len=1,
         structure_padding_value=0,
         train_split=None,
@@ -61,13 +61,13 @@ if __name__ == "__main__":
         num_blocks=4,
         no_recycles=0,
         dropout=0,
-        lr=1e-3,
+        lr=0.0003,
         weight_decay=0,
         gamma=0.995,
         wandb=USE_WANDB,
     )
 
-    model.load_state_dict(torch.load('models/efoldV2_PT_repro_seed1337_epoch10-15_avg.pt', map_location=torch.device(device)))
+    model.load_state_dict(torch.load('models/efoldV2_PT_ablation1_less_seed1338_epoch10-15_avg.pt', map_location=torch.device(device)))
 
     if USE_WANDB:
         wandb_logger.watch(model, log="all")

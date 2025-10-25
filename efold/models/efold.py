@@ -87,12 +87,12 @@ class eFold(Model):
             ResLayer(
                 dim_in=d_cnn,
                 dim_out=d_cnn // 2,
-                n_blocks=12,
+                n_blocks=4,
                 kernel_size=3,
                 dropout=dropout,
             ),
             ResLayer(
-                dim_in=d_cnn // 2, dim_out=1, n_blocks=12, kernel_size=3, dropout=dropout
+                dim_in=d_cnn // 2, dim_out=1, n_blocks=4, kernel_size=3, dropout=dropout
             ),
         )
 
