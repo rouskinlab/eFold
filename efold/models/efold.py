@@ -62,12 +62,7 @@ class eFold(Model):
             dropout=dropout,
             no_recycles=no_recycles,
         )
-        # Freeze unused trunk and encoder parameters to avoid DDP unused-params error
-        for p in self.encoder.parameters():
-            p.requires_grad_(False)
-        for p in self.eFold.parameters():
-            p.requires_grad_(False)
-
+        self.sequence_to_pair = SequenceToPair(d_model, c_z // 2, c_z)
         # self.output_net_DMS = nn.Sequential(
         #     nn.LayerNorm(d_model),
         #     nn.Linear(d_model, d_model),
@@ -96,6 +91,10 @@ class eFold(Model):
             ),
         )
 
+    def _initZeros(self):
+        torch.nn.init.zeros_(self.sequence_to_pair.o_proj.weight)
+        torch.nn.init.zeros_(self.sequence_to_pair.o_proj.bias)
+
     def forward(self, batch: Batch) -> Tensor:
         # Encoding of RNA sequence
         src = batch.get("sequence")
@@ -108,7 +107,8 @@ class eFold(Model):
         # z = z.unsqueeze(1).repeat(1, z.shape[1], 1, 1)  # (N, L, L, c_z / 2)
         # z = torch.cat((z, z.permute(0, 2, 1, 3)), dim=-1)  # (N, L, L, c_z)
 
-        # s, z = self.eFold(s, z)
+        s, _ = self.eFold(s, z)
+        z = self.sequence_to_pair(s)
 
         structure = self.structure_adapter(z)  # (N, L, L, d_cnn)
         structure = self.output_structure(structure.permute(0, 3, 1, 2)).squeeze(
@@ -201,10 +201,10 @@ class EvoBlock(nn.Module):
         self.layernorm = nn.LayerNorm(c_s)
 
         # Adapter to add sequence rep to pair rep
-        self.sequence_to_pair = SequenceToPair(c_s, c_z // 2, c_z)
+        #self.sequence_to_pair = SequenceToPair(c_s, c_z // 2, c_z)
 
         # bias attention heads
-        self.pair_to_sequence = PairToSequence(c_z, no_heads_s)
+        #self.pair_to_sequence = PairToSequence(c_z, no_heads_s)
 
         # self.seq_attention = Attention(c_s, no_heads_s, c_s / no_heads_s, gated=True)
 
@@ -218,9 +218,9 @@ class EvoBlock(nn.Module):
         self.pos = PositionalEncoding(self.c_s, dropout)
         self.ln = nn.LayerNorm(self.c_s, eps=1e-12, elementwise_affine=True)
 
-        self.resNet = ResLayer(
-            dim_in=c_z, dim_out=c_z, n_blocks=2, kernel_size=3, dropout=dropout
-        )
+        # self.resNet = ResLayer(
+        #     dim_in=c_z, dim_out=c_z, n_blocks=2, kernel_size=3, dropout=dropout
+        # )
 
         # self.tri_mul_out = TriangleMultiplicationOutgoing(
         #     c_z,
@@ -246,7 +246,7 @@ class EvoBlock(nn.Module):
 
         # Transition
         self.mlp_seq = ResidueMLP(c_s, 2 * c_s, dropout=dropout)
-        self.mlp_pair = ResidueMLP(c_z, 2 * c_z, dropout=dropout)
+        # self.mlp_pair = ResidueMLP(c_z, 2 * c_z, dropout=dropout)
 
         assert dropout < 0.4
         self.drop = nn.Dropout(dropout)
@@ -274,15 +274,15 @@ class EvoBlock(nn.Module):
         # torch.nn.init.zeros_(self.tri_att_end.mha.linear_o.weight)
         # torch.nn.init.zeros_(self.tri_att_end.mha.linear_o.bias)
 
-        torch.nn.init.zeros_(self.sequence_to_pair.o_proj.weight)
-        torch.nn.init.zeros_(self.sequence_to_pair.o_proj.bias)
-        torch.nn.init.zeros_(self.pair_to_sequence.linear.weight)
+        #torch.nn.init.zeros_(self.sequence_to_pair.o_proj.weight)
+        #torch.nn.init.zeros_(self.sequence_to_pair.o_proj.bias)
+       #torch.nn.init.zeros_(self.pair_to_sequence.linear.weight)
         # torch.nn.init.zeros_(self.seq_attention.o_proj.weight)
         # torch.nn.init.zeros_(self.seq_attention.o_proj.bias)
         torch.nn.init.zeros_(self.mlp_seq.mlp[-2].weight)
         torch.nn.init.zeros_(self.mlp_seq.mlp[-2].bias)
-        torch.nn.init.zeros_(self.mlp_pair.mlp[-2].weight)
-        torch.nn.init.zeros_(self.mlp_pair.mlp[-2].bias)
+        # torch.nn.init.zeros_(self.mlp_pair.mlp[-2].weight)
+        # torch.nn.init.zeros_(self.mlp_pair.mlp[-2].bias)
 
     def forward(self, sequence_state, pairwise_state):
         """
@@ -306,14 +306,14 @@ class EvoBlock(nn.Module):
         assert seq_dim == pairwise_state.shape[2]
 
         # Update sequence state
-        bias = self.pair_to_sequence(pairwise_state)
+        #bias = self.pair_to_sequence(pairwise_state)
 
         # Self attention with bias + mlp.
         y = self.layernorm(sequence_state)
         pe = self.pos(y)
         y = self.ln(y)
         # y, _ = self.seq_attention(y,bias=bias)
-        y, _ = self.seq_attention([y, y, y, pe], bias=bias)
+        y, _ = self.seq_attention([y, y, y, pe])
         sequence_state = sequence_state + self.drop(y)
         # FF + Local conv + FF
 
@@ -331,13 +331,14 @@ class EvoBlock(nn.Module):
         sequence_state = self.ln_4(sequence_state)
 
         sequence_state = self.mlp_seq(sequence_state)
+        
+        # pairwise_state = self.sequence_to_pair(sequence_state)
+        # # Update pairwise state
+        # pairwise_state = pairwise_state + self.sequence_to_pair(sequence_state)
 
-        # Update pairwise state
-        pairwise_state = pairwise_state + self.sequence_to_pair(sequence_state)
-
-        pairwise_state = self.resNet(pairwise_state.permute(0, 3, 1, 2)).permute(
-            0, 2, 3, 1
-        )
+        # pairwise_state = self.resNet(pairwise_state.permute(0, 3, 1, 2)).permute(
+        #     0, 2, 3, 1
+        # )
 
         # # Axial attention
         # pairwise_state = pairwise_state + self.row_drop(
@@ -354,7 +355,8 @@ class EvoBlock(nn.Module):
         # )
 
         # MLP over pairs.
-        pairwise_state = self.mlp_pair(pairwise_state)
+        # pairwise_state = self.mlp_pair(pairwise_state)
+        
 
         return sequence_state, pairwise_state
 

@@ -34,7 +34,7 @@ if __name__ == "__main__":
     print("Running on device: {}".format(device))
     if USE_WANDB:
         wandb_logger = WandbLogger(
-    project="efold-final-tests", entity="rouskin-lab", name="efoldV2_PT_ablation1_less_seed1338")
+    project="efold-final-tests", entity="rouskin-lab", name="test_ablation2_w_albe")
 
     # fit loop
     batch_size = 1
