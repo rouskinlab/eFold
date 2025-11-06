@@ -14,3 +14,4 @@ bppm/test_results_PT+FT.feather
 .DS_Store
 build/
 efold.egg-info
+tests/data/16S/data.json

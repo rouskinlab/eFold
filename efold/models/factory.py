@@ -3,6 +3,7 @@ from .efold import eFold
 from .cnn import CNN
 from .ribonanza import Ribonanza
 from .unet import U_Net
+from .trm import TRM
 
 
 def create_model(model: str, *args, **kwargs):
@@ -16,4 +17,6 @@ def create_model(model: str, *args, **kwargs):
         return U_Net(*args, **kwargs)
     if model == "ribonanza":
         return Ribonanza(*args, **kwargs)
+    if model == "trm":
+        return TRM(*args, **kwargs)
     raise ValueError(f"Unknown model: {model}")

@@ -29,22 +29,24 @@ def compute_f1(pred_matrix, target_matrix, threshold=0.5):
     :return: precision, recall F1 score for this RNA structure
     """
 
-    pred_matrix = (pred_matrix > threshold).float()
+    # Binarize predictions
+    pred_binary = (pred_matrix > threshold).float()
 
-
-    TP = torch.sum(pred_matrix*target_matrix)
-    PP = torch.sum(pred_matrix)
+    TP = torch.sum(pred_binary * target_matrix)
+    PP = torch.sum(pred_binary)
     P = torch.sum(target_matrix)
     sum_pair = PP + P
 
+    # Perfect empty case: no true pairs and no predicted pairs
     if sum_pair == 0:
         return [1.0, 1.0, 1.0]
-    else:
-        return [
-                (TP / PP).item(),
-                (TP / P).item(),
-                (2 * TP / sum_pair).item()
-                ]
+
+    # Avoid NaNs when there are zero predicted or zero true pairs
+    precision = (TP / PP).item() if PP.item() > 0 else 0.0
+    recall = (TP / P).item() if P.item() > 0 else 0.0
+    f1 = (2 * TP / sum_pair).item() if sum_pair.item() > 0 else 1.0
+
+    return [precision, recall, f1]
 
 
 data_path = "/n/data1/hms/microbiology/rouskin/lab/projects/deep_learning/eFold/tests/data"
