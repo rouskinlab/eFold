@@ -11,16 +11,30 @@ from efold.core.callbacks import ModelCheckpoint
 from efold.config import device
 from efold import DataModule, create_model
 
+import os, random, numpy as np, torch
+from lightning.pytorch import seed_everything
+
+SEED = 1338
+
+# Seed everything
+os.environ["PYTHONHASHSEED"] = str(SEED)
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+torch.cuda.manual_seed_all(SEED)
+seed_everything(SEED, workers=True)
+
 
 # Train loop
 if __name__ == "__main__":
-    USE_WANDB = False
-    STRATEGY = "random"
-    n_gpu = 1
+    USE_WANDB = True
+    STRATEGY = "ddp"
+    n_gpu = 8
 
     print("Running on device: {}".format(device))
     if USE_WANDB:
-        wandb_logger = WandbLogger(project='test')
+        wandb_logger = WandbLogger(
+    project="efold-final-tests", entity="rouskin-lab", name="efoldV2_PT_ablation1_less_seed1338")
 
     # fit loop
     batch_size = 1
@@ -31,11 +45,11 @@ if __name__ == "__main__":
         data_type=["structure"],  #
         force_download=False,
         batch_size=batch_size,
-        max_len=1000,
+        max_len=1024,
         min_len=1,
         structure_padding_value=0,
         train_split=None,
-        external_valid=["yack_valid"],
+        external_valid=["yack_valid", "PDB", "archiveII", "lncRNA", "viral_fragments"],
     )
 
     model = create_model(
@@ -47,7 +61,7 @@ if __name__ == "__main__":
         num_blocks=4,
         no_recycles=0,
         dropout=0,
-        lr=1e-3,
+        lr=3e-4,
         weight_decay=0,
         gamma=0.995,
         wandb=USE_WANDB,
@@ -60,7 +74,7 @@ if __name__ == "__main__":
         accelerator=device,
         devices=n_gpu if STRATEGY == "ddp" else 1,
         strategy=DDPStrategy(find_unused_parameters=False) if STRATEGY == "ddp" else 'auto',
-        max_epochs=15,
+        max_epochs=21,
         log_every_n_steps=1,
         accumulate_grad_batches=32,
         use_distributed_sampler=STRATEGY != "ddp",
@@ -75,7 +89,7 @@ if __name__ == "__main__":
     )
 
     trainer.fit(model, datamodule=dm)
-    trainer.test(model, datamodule=dm)
+    # trainer.test(model, datamodule=dm)
 
     if USE_WANDB:
         wandb.finish()

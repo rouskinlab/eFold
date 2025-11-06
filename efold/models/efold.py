@@ -181,7 +181,7 @@ class EvoBlock(nn.Module):
         c_z,
         no_heads_s,
         no_heads_z,
-        dropout=0,
+        dropout: float = 0.0,
     ):
         super(EvoBlock, self).__init__()
         assert c_s % no_heads_s == 0
